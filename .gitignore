@@ -1,0 +1,14 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log
+.idea/
+.vscode/
+coverage/
+node_modules/
+dist/
+out/
+release/
+*.db
+*.sqlite
