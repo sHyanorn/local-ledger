@@ -1,20 +1,20 @@
-# 技术决策记录
+# Technical Decisions
 
 ## D001 Electron + React + TypeScript + Zustand
-- 日期：2026-11-04
-- 理由：与已掌握的技术栈一致，且能完整展示桌面端安全实践
-- 备选：Tauri（体积更小，但需要 Rust）
+- Date: 2026-11-04
+- Rationale: matches an already familiar stack and fully showcases desktop security practices
+- Alternatives: Tauri (smaller bundle, but requires Rust)
 
-## D002 整库加密
-- 日期：2026-11-04
-- 决定：使用 SQLCipher 兼容的加密 SQLite
-- 理由：比逐字段加密更简单可靠，索引和查询照常使用
-- 备选：逐字段加密（灵活但容易遗漏）
+## D002 Whole-database encryption
+- Date: 2026-11-04
+- Decision: use SQLCipher-compatible encrypted SQLite
+- Rationale: simpler and more reliable than per-field encryption; indexes and queries work as usual
+- Alternatives: per-field encryption (flexible, but easy to miss a field)
 
-## D003 金额用整数分
-- 日期：2026-11-04
-- 理由：避免浮点误差
+## D003 Store amounts as integer cents
+- Date: 2026-11-04
+- Rationale: avoids floating-point errors
 
-## D004 不做云同步
-- 日期：2026-11-04
-- 理由：本地优先是产品卖点，也减少攻击面
+## D004 No cloud sync
+- Date: 2026-11-04
+- Rationale: local-first is the product's selling point and reduces the attack surface
