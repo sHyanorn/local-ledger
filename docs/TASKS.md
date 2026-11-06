@@ -2,7 +2,7 @@
 
 ## M0 Setup
 - [ ] Scaffold a React + TypeScript project with electron-vite and add Zustand
-- [ ] Configure ESLint, Prettier, Vitest and Playwright
+- [ ] Configure oxlint, Prettier, Vitest and Playwright
 - [ ] Apply the Electron security configuration from CLAUDE.md and write tests for it
 - [ ] CI: lint, type check, unit tests
 
