@@ -18,3 +18,7 @@
 ## D004 No cloud sync
 - Date: 2026-11-04
 - Rationale: local-first is the product's defining property and reduces the attack surface
+
+## D005 oxlint instead of ESLint
+- Date: 2026-11-06
+- Rationale: the same linter as vault-share (its D006), so the frontends of these projects share one lint setup; oxlint is the default of the current `create-vite` template
