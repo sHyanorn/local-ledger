@@ -15,6 +15,7 @@ import {
   type TransferSide,
 } from '../../shared/transfers'
 import type { Db } from '../vault/database'
+import { found } from './errors'
 
 interface Candidate {
   outId: number
@@ -205,7 +206,7 @@ export function unlinkTransfer(db: Db, id: number): Outcome<'not-found'> {
        WHERE status = 'confirmed' AND (out_id = ? OR in_id = ?)`,
     )
     .run(id, id)
-  return changes > 0 ? { ok: true } : { ok: false, reason: 'not-found' }
+  return found(changes)
 }
 
 /** Records that two transactions are not a transfer, so they are not offered again. */

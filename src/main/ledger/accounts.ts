@@ -1,7 +1,7 @@
 import type { Created, Outcome } from '../../shared/ipc'
 import type { Account, AccountFields } from '../../shared/ledger'
 import type { Db } from '../vault/database'
-import { isDuplicate } from './errors'
+import { found, orDuplicate } from './errors'
 
 export function listAccounts(db: Db): Account[] {
   return db
@@ -21,7 +21,7 @@ export function createAccount(
   db: Db,
   fields: AccountFields,
 ): Created<'duplicate'> {
-  try {
+  return orDuplicate(() => {
     const { lastInsertRowid } = db
       .prepare(
         `INSERT INTO accounts (name, type, currency, opening_balance_cents)
@@ -29,10 +29,7 @@ export function createAccount(
       )
       .run(fields)
     return { ok: true, id: Number(lastInsertRowid) }
-  } catch (error) {
-    if (isDuplicate(error)) return { ok: false, reason: 'duplicate' }
-    throw error
-  }
+  })
 }
 
 /**
@@ -55,17 +52,14 @@ export function updateAccount(
     if (current.currency !== fields.currency && current.used > 0) {
       return { ok: false, reason: 'currency-in-use' }
     }
-    try {
+    return orDuplicate(() => {
       db.prepare(
         `UPDATE accounts SET name = @name, type = @type, currency = @currency,
            opening_balance_cents = @openingBalanceCents
          WHERE id = @id`,
       ).run({ id, ...fields })
       return { ok: true }
-    } catch (error) {
-      if (isDuplicate(error)) return { ok: false, reason: 'duplicate' }
-      throw error
-    }
+    })
   })()
 }
 
@@ -81,6 +75,6 @@ export function deleteAccount(
       .get(id) as number
     if (used > 0) return { ok: false, reason: 'in-use' }
     const { changes } = db.prepare('DELETE FROM accounts WHERE id = ?').run(id)
-    return changes > 0 ? { ok: true } : { ok: false, reason: 'not-found' }
+    return found(changes)
   })()
 }

@@ -12,7 +12,7 @@ import type {
   RuleSuggestion,
 } from '../../shared/rules'
 import type { Db } from '../vault/database'
-import { isMissingReference } from './errors'
+import { found, orNotFound } from './errors'
 import { matchKey } from './match-key'
 
 const RANK: Record<RuleMatch, number> = { is: 0, 'starts-with': 1, contains: 2 }
@@ -92,8 +92,8 @@ export function createRule(
 ):
   | { ok: true; id: number; applied: number }
   | { ok: false; reason: 'not-found' } {
-  try {
-    return db.transaction(() => {
+  return orNotFound(() =>
+    db.transaction(() => {
       const rules = listRules(db)
       const { lastInsertRowid } = db
         .prepare(
@@ -111,34 +111,28 @@ export function createRule(
         id,
         applied: fields.apply ? applyRule(db, id) : 0,
       }
-    })()
-  } catch (error) {
-    if (isMissingReference(error)) return { ok: false, reason: 'not-found' }
-    throw error
-  }
+    })(),
+  )
 }
 
 export function updateRule(
   db: Db,
   { id, ...fields }: RuleFields & { id: number },
 ): Outcome<'not-found'> {
-  try {
+  return orNotFound(() => {
     const { changes } = db
       .prepare(
         `UPDATE rules SET pattern = ?, match_type = ?, category_id = ?
          WHERE id = ?`,
       )
       .run(fields.pattern, fields.match, fields.categoryId, id)
-    return changes > 0 ? { ok: true } : { ok: false, reason: 'not-found' }
-  } catch (error) {
-    if (isMissingReference(error)) return { ok: false, reason: 'not-found' }
-    throw error
-  }
+    return found(changes)
+  })
 }
 
 export function deleteRule(db: Db, id: number): Outcome<'not-found'> {
   const { changes } = db.prepare('DELETE FROM rules WHERE id = ?').run(id)
-  return changes > 0 ? { ok: true } : { ok: false, reason: 'not-found' }
+  return found(changes)
 }
 
 /** Moves a rule one place earlier (-1) or later (1) in the list. */

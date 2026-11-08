@@ -3,7 +3,7 @@
 import type { Created, Outcome } from '../../shared/ipc'
 import type { Category, CategoryFields } from '../../shared/ledger'
 import type { Db } from '../vault/database'
-import { isDuplicate } from './errors'
+import { found, orDuplicate } from './errors'
 
 export function listCategories(db: Db): Category[] {
   return db
@@ -45,17 +45,14 @@ export function createCategory(
   return db.transaction((): ReturnType<typeof createCategory> => {
     const problem = parentProblem(db, fields.parentId)
     if (problem) return { ok: false, reason: problem }
-    try {
+    return orDuplicate(() => {
       const { lastInsertRowid } = db
         .prepare(
           'INSERT INTO categories (name, parent_id) VALUES (@name, @parentId)',
         )
         .run(fields)
       return { ok: true, id: Number(lastInsertRowid) }
-    } catch (error) {
-      if (isDuplicate(error)) return { ok: false, reason: 'duplicate' }
-      throw error
-    }
+    })
   })()
 }
 
@@ -68,15 +65,12 @@ export function updateCategory(
     if (!exists) return { ok: false, reason: 'not-found' }
     const problem = parentProblem(db, fields.parentId, id)
     if (problem) return { ok: false, reason: problem }
-    try {
+    return orDuplicate(() => {
       db.prepare(
         'UPDATE categories SET name = @name, parent_id = @parentId WHERE id = @id',
       ).run({ id, ...fields })
       return { ok: true }
-    } catch (error) {
-      if (isDuplicate(error)) return { ok: false, reason: 'duplicate' }
-      throw error
-    }
+    })
   })()
 }
 
@@ -90,6 +84,6 @@ export function deleteCategory(db: Db, id: number): Outcome<'not-found'> {
     const { changes } = db
       .prepare('DELETE FROM categories WHERE id = ?')
       .run(id)
-    return changes > 0 ? { ok: true } : { ok: false, reason: 'not-found' }
+    return found(changes)
   })()
 }

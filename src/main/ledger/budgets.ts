@@ -7,7 +7,7 @@ import type { Outcome } from '../../shared/ipc'
 import type { Currency } from '../../shared/money'
 import { shiftMonth } from '../../shared/months'
 import type { Db } from '../vault/database'
-import { isMissingReference } from './errors'
+import { orNotFound } from './errors'
 import { monthSpending } from './reports'
 import { getSettings } from './settings'
 
@@ -96,14 +96,11 @@ export function setBudget(
     amountCents,
   }: { categoryId: number; month: string; amountCents: number | null },
 ): Outcome<'not-found'> {
-  try {
+  return orNotFound(() => {
     db.prepare(
       `INSERT INTO budgets (category_id, month, amount_cents) VALUES (?, ?, ?)
        ON CONFLICT (category_id, month) DO UPDATE SET amount_cents = excluded.amount_cents`,
     ).run(categoryId, month, amountCents)
     return { ok: true }
-  } catch (error) {
-    if (isMissingReference(error)) return { ok: false, reason: 'not-found' }
-    throw error
-  }
+  })
 }

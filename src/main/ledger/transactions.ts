@@ -9,7 +9,7 @@ import type {
   TransactionPage,
 } from '../../shared/ledger'
 import type { Db } from '../vault/database'
-import { isMissingReference } from './errors'
+import { found, orNotFound } from './errors'
 
 const COLUMNS = `t.id, t.account_id AS accountId, t.date,
   t.amount_cents AS amountCents, t.description,
@@ -128,7 +128,7 @@ export function createTransaction(
   db: Db,
   fields: TransactionFields,
 ): Created<'not-found'> {
-  try {
+  return orNotFound(() => {
     const { lastInsertRowid } = db
       .prepare(
         `INSERT INTO transactions
@@ -137,17 +137,14 @@ export function createTransaction(
       )
       .run(row(fields))
     return { ok: true, id: Number(lastInsertRowid) }
-  } catch (error) {
-    if (isMissingReference(error)) return { ok: false, reason: 'not-found' }
-    throw error
-  }
+  })
 }
 
 export function updateTransaction(
   db: Db,
   { id, ...fields }: TransactionFields & { id: number },
 ): Outcome<'not-found'> {
-  try {
+  return orNotFound(() => {
     const values = { id, ...row(fields) }
     // A new amount or account means it is no longer that transfer.
     const unpair = db.prepare(
@@ -174,11 +171,8 @@ export function updateTransaction(
       unpair.run(values)
       return update.run(values)
     })()
-    return changes > 0 ? { ok: true } : { ok: false, reason: 'not-found' }
-  } catch (error) {
-    if (isMissingReference(error)) return { ok: false, reason: 'not-found' }
-    throw error
-  }
+    return found(changes)
+  })
 }
 
 export function setTransactionCategory(
@@ -186,7 +180,7 @@ export function setTransactionCategory(
   id: number,
   categoryId: number | null,
 ): Outcome<'not-found'> {
-  try {
+  return orNotFound(() => {
     const { changes } = db
       .prepare(
         `UPDATE transactions SET category_id = @categoryId,
@@ -194,16 +188,13 @@ export function setTransactionCategory(
          WHERE id = @id`,
       )
       .run({ id, categoryId })
-    return changes > 0 ? { ok: true } : { ok: false, reason: 'not-found' }
-  } catch (error) {
-    if (isMissingReference(error)) return { ok: false, reason: 'not-found' }
-    throw error
-  }
+    return found(changes)
+  })
 }
 
 export function deleteTransaction(db: Db, id: number): Outcome<'not-found'> {
   const { changes } = db
     .prepare('DELETE FROM transactions WHERE id = ?')
     .run(id)
-  return changes > 0 ? { ok: true } : { ok: false, reason: 'not-found' }
+  return found(changes)
 }
