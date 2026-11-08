@@ -89,6 +89,39 @@ test('an account with transactions is not deleted, and keeps its currency', asyn
   await expect(accountButton(home, 'Everyday')).toBeVisible()
 })
 
+test('an account that gained transactions since the page loaded is not deleted', async ({
+  home,
+}) => {
+  await sidebar(home).getByRole('button', { name: 'Add Account' }).click()
+  const dialog = home.getByRole('dialog', { name: 'New Account' })
+  await dialog.getByLabel('Name').fill('Fake Wallet')
+  await dialog.getByRole('button', { name: 'Add Account' }).click()
+  await expect(home.getByRole('heading', { name: 'Fake Wallet' })).toBeVisible()
+  await home.getByRole('button', { name: 'Edit Account…' }).click()
+  // A transaction the page has not heard of yet.
+  await home.evaluate(async () => {
+    const accounts = await window.ledger.accounts.list()
+    const wallet = accounts.find((account) => account.name === 'Fake Wallet')!
+    await window.ledger.transactions.create({
+      accountId: wallet.id,
+      date: '2026-05-01',
+      amountCents: -500,
+      description: 'Fake Kiosk',
+      categoryId: null,
+      notes: '',
+    })
+  })
+  await home.getByRole('button', { name: 'Delete Account…' }).click()
+  const confirm = home.getByRole('alertdialog', { name: 'Delete account?' })
+  await confirm.getByRole('button', { name: 'Delete' }).click()
+  const edit = home.getByRole('dialog', { name: 'Edit Account' })
+  await expect(edit.getByRole('alert')).toHaveText(
+    'This account has transactions. Delete or move them before deleting the account.',
+  )
+  await edit.getByRole('button', { name: 'Cancel' }).click()
+  await expect(accountButton(home, 'Fake Wallet')).toBeVisible()
+})
+
 test('categories nest two levels, and a deleted one takes its subcategories', async ({
   home,
   ledger,

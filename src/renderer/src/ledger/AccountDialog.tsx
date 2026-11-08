@@ -20,6 +20,8 @@ const PROBLEMS: Record<string, string> = {
   duplicate: 'An account with this name already exists.',
   'currency-in-use': 'An account with transactions keeps its currency.',
   'not-found': 'This account no longer exists.',
+  'in-use':
+    'This account has transactions. Delete or move them before deleting the account.',
   failed: 'The account could not be saved.',
 }
 
