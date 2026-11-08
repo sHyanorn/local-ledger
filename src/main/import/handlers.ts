@@ -1,13 +1,12 @@
 // IPC handlers for importing CSV files. The page never names a path: the
 // file comes from the system's open dialog, shown here.
-import { open, type FileHandle } from 'node:fs/promises'
 import { basename } from 'node:path'
 import { dialog, type BaseWindow } from 'electron'
 import { handle } from '../ipc'
 import type { Vault } from '../vault/vault'
 import { undoBatch, listBatches } from './batches'
-import { MAX_FILE_BYTES } from './csv'
 import { cleanText } from './mapping'
+import { readChosen } from './read-file'
 import { ImportSession } from './session'
 
 export function handleImport(
@@ -67,39 +66,4 @@ export function handleImport(
   )
   handle('import:batches', () => listBatches(db()), devOrigin)
   handle('import:undo', ({ id }) => undoBatch(db(), id), devOrigin)
-}
-
-/**
- * The file's bytes, read through one handle: only a regular file, and only
- * up to the limit, whatever size the file system reports.
- */
-async function readChosen(
-  path: string,
-): Promise<Uint8Array | 'too-large' | 'unreadable'> {
-  let handle: FileHandle | undefined
-  try {
-    handle = await open(path, 'r')
-    if (!(await handle.stat()).isFile()) return 'unreadable'
-    const buffer = Buffer.alloc(MAX_FILE_BYTES + 1)
-    let total = 0
-    while (total < buffer.length) {
-      const { bytesRead } = await handle.read(
-        buffer,
-        total,
-        buffer.length - total,
-        null,
-      )
-      if (bytesRead === 0) break
-      total += bytesRead
-    }
-    if (total > MAX_FILE_BYTES) {
-      buffer.fill(0)
-      return 'too-large'
-    }
-    return buffer.subarray(0, total)
-  } catch {
-    return 'unreadable'
-  } finally {
-    await handle?.close().catch(() => undefined)
-  }
 }
