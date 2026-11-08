@@ -62,6 +62,35 @@
 
 ## D012 Self-test switch
 - Date: 2026-11-08
-- Decision: `--self-test` waits for the window to render from `app://`, opens a throwaway encrypted database with a random key through the bundled SQLCipher module, prints each step without key material, and exits 0 or 1
+- Decision: `--self-test` moves the user data directory to a new temporary directory before the app is ready, waits for the window to render from `app://`, then creates, locks and unlocks a vault there with a throwaway password, which runs the key derivation worker and the bundled SQLCipher module. It prints each step without key material and exits 0 or 1. The package check fails if the default user data directory changes during a self-test
 - Rationale: the packaged app refuses the debugging entry points every test driver uses, so a check inside the app is the only way to show that it starts with its fuses, ASAR integrity and signature, and loads its native module from `app.asar.unpacked`. The same path runs unpackaged in CI on all three platforms
 - Trade-off: a switch in the shipped app that anyone can pass; it only opens a window and a temporary database, and exits
+
+## D013 Sealed data key and database generations
+- Date: 2026-11-08
+- Decision: the database is encrypted with a random 32-byte data key. Argon2id derives a key from the master password that seals the data key with AES-256-GCM; the authenticated header binds the generation and KDF settings. `vault/vault.json` holds the header and the sealed key and names the current database, `vault/ledger-<generation>.db`. The data key reaches SQLite as a raw SQLCipher v4 key through a wiped buffer, so no second KDF runs and no string holds it
+- Create: the vault is built in a staging directory and renamed into place, so a crash leaves no vault or a whole one
+- Password change: a new data key under the new password; the database is copied, the copy re-encrypted (`rekey`), checked, flushed and renamed to the next generation; replacing `vault.json` atomically is the single commit point. The original file is never rekeyed in place, because SQLite3 Multiple Ciphers does not document what a crash mid-rekey leaves
+- Recovery: files of other generations and temporary files are removed only after the current generation opens and passes `quick_check`. A missing or invalid `vault.json`, or a missing current database, makes the vault "damaged": nothing is deleted and the user is asked to restore from a backup
+- Database settings: rollback journal (`journal_mode=DELETE`), so a copy of one file is the whole database; `synchronous=FULL`; foreign keys on; `temp_store=MEMORY`, so no temporary file holds plaintext; STRICT tables
+- Rationale: a wrong password fails the GCM check before the database is touched, which tells it apart from a damaged database, and the structure leaves room for a recovery key
+- Trade-off: a password change rewrites the whole database; at personal-finance sizes this takes milliseconds (20,000 rows in 7 ms)
+
+## D014 Master password rules
+- Date: 2026-11-08
+- Decision: at least 15 and at most 1,024 code points after NFKC normalization; no composition rules and no strength meter. The password is NFKC-normalized before it is encoded, so the same text typed on any keyboard gives the same key. Unlocking checks only the upper bound, so raising the minimum never locks anyone out. Unlocking has no attempt limit
+- Rationale: offline guessing against a copied vault is the main threat, and NIST SP 800-63B-4 asks for 15 characters for a password used as a single factor. An attempt limit cannot stop an attacker who copies the files; the Argon2id cost does the work
+- Setup says once, next to the button, that a forgotten password cannot be recovered; the placeholder suggests a sentence
+
+## D015 Key derivation
+- Date: 2026-11-08
+- Decision: Argon2id from `hash-wasm` 4.13.0 (MIT, no dependencies, WebAssembly) with m=64 MiB, t=3, p=4 (RFC 9106, second recommended option), a 16-byte salt and a 32-byte key. It runs in a worker thread, which ends after each derivation. `vault.json` may ask for 19 MiB to 1 GiB, 1 to 10 passes and 1 to 16 lanes, nothing outside
+- Measured (Electron 45, 2.1 GHz Xeon, 4 cores): 321 ms to derive, 329 ms to unlock. On the main thread the derivation blocked the event loop for 281 ms; in the worker, 7 ms
+- Alternatives: the native `argon2` package is four times faster but has no darwin-x64 or win32-arm64 prebuild and runs an install script; Node's `crypto.argon2` exists in Electron 45 but fails, since BoringSSL lacks Argon2
+- Check: unit tests pin vectors computed with hash-wasm and the reference C implementation (node-argon2 0.45.2); 4.12.0 and 4.13.0 give identical output
+
+## D016 Locking replaces the page process
+- Date: 2026-11-08
+- Decision: the window hosts its page in a `WebContentsView`. On every unlock, lock and password change the main process loads the page in a new view and closes the old one, whose renderer process then exits, so a typed password or decrypted data never outlives the change in a renderer. Locking closes the database. The vault locks after 5 minutes of system idle time, when the operating system locks the screen or suspends, on Cmd/Ctrl+L, and when the window closes
+- Rationale: clearing a store cannot wipe what JavaScript strings and the DOM held; ending the process can. Two views of the same origin get separate processes; the e2e suite asserts that the old process has exited
+- Later: the idle limit becomes a setting in M5

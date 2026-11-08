@@ -55,7 +55,7 @@ A personal finance desktop app whose data stays on the local machine in a fully 
                     │ IPC (zod-validated)
 ┌───────────────────▼──────────────────────────┐
 │ Main process                                 │
-│  vault: master password → Argon2id → DB key  │
+│  vault: password → Argon2id → sealed DB key  │
 │  db: SQLCipher-compatible encrypted SQLite   │
 │  import / export / rules / backup            │
 └──────────────────────────────────────────────┘
@@ -63,10 +63,11 @@ A personal finance desktop app whose data stays on the local machine in a fully 
 
 Encryption scheme:
 
-- The whole database is encrypted with `better-sqlite3-multiple-ciphers` (SQLCipher-compatible)
-- The database key is derived from the master password and a random salt with Argon2id; the salt and parameters are stored in a separate plaintext config file
-- Changing the master password re-encrypts the database
+- The whole database is encrypted with `better-sqlite3-multiple-ciphers` (SQLCipher v4 scheme) under a random 32-byte data key
+- A key derived from the master password with Argon2id seals the data key (AES-256-GCM); `vault.json` holds the salt, the Argon2id parameters and the sealed key, in plaintext
+- Changing the master password draws a new data key and re-encrypts the database into a new file; replacing `vault.json` commits the change (D013)
 - A backup file is the encrypted database itself plus version information
+- Details and limits: `docs/SECURITY_DESIGN.md`
 
 ## 5. Data model
 

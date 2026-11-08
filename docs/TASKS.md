@@ -8,18 +8,18 @@
 - [x] CI: lint, type check, unit tests, e2e tests and the native checks
 
 ## M1 Encrypted storage
-- [ ] Argon2id key derivation and parameter configuration
-- [ ] Open the encrypted database, create tables, run migrations
-- [ ] First-run password setup and unlock screen
-- [ ] Idle auto-lock
-- [ ] Change the master password
-- [ ] Encryption tests
-- [ ] Keep keys in Buffers and zero them after use; state in the plan and in `docs/SECURITY_DESIGN.md` what cannot be wiped (the master password arrives over IPC as a string, and the key reaches SQLite as a hex string)
+- [x] Argon2id key derivation and parameter configuration
+- [x] Open the encrypted database, create tables, run migrations
+- [x] First-run password setup and unlock screen
+- [x] Idle auto-lock
+- [x] Change the master password
+- [x] Encryption tests
+- [x] Keep keys in Buffers and zero them after use; state in `docs/SECURITY_DESIGN.md` what cannot be wiped (the master password arrives over IPC as a string)
 
 ## M2 Data core
 - [ ] Typed IPC API with zod validation
 - [ ] CRUD for accounts and categories
-- [ ] Transaction list, search, filtering and editing
+- [ ] Transaction list, search, filtering and editing; extend the lock test to check that no fake transaction text survives a lock
 - [ ] `npm run seed` fake data generator
 
 ## M3 Import and categorization
@@ -34,9 +34,12 @@
 - [ ] Excel and PDF export, preferring options with few dependencies
 
 ## M5 Polish and release
-- [ ] Apple-style UI polish, dark mode, keyboard shortcuts
+- [ ] Apple-style UI polish, dark mode, keyboard shortcuts; a setting for the auto-lock time
 - [ ] Encrypted backup and restore
 - [ ] Release workflow: macOS and Windows installers, checksums and provenance attestation (D006)
 - [ ] Playwright end-to-end tests
-- [ ] Write `docs/SECURITY_DESIGN.md`
+- [ ] Complete `docs/SECURITY_DESIGN.md`
 - [ ] English README, screenshots and GIFs; publish the first release
+
+## Nice to have
+- [ ] Recovery key: a random key, shown once at setup, that also seals the data key (D013 leaves room for it)
