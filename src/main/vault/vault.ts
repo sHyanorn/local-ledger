@@ -19,7 +19,12 @@ import { join } from 'node:path'
 import type { BackupSummary } from '../../shared/backup'
 import type { Outcome, VaultState } from '../../shared/ipc'
 import { errorCode } from '../error-code'
-import { changeKey, DamagedError, openDatabase } from './database'
+import {
+  changeKey,
+  DamagedError,
+  openDatabase,
+  passesIntegrityCheck,
+} from './database'
 import type { Db } from './database'
 import {
   flushDirectory,
@@ -356,10 +361,10 @@ export class Vault {
         try {
           const db = openDatabase(path, dataKey)
           try {
-            if (db.pragma('integrity_check', { simple: true }) !== 'ok')
+            if (!passesIntegrityCheck(db))
               return { ok: false, reason: 'damaged' }
             changeKey(db, fresh)
-            if (db.pragma('integrity_check', { simple: true }) !== 'ok')
+            if (!passesIntegrityCheck(db))
               return { ok: false, reason: 'damaged' }
             summary = db
               .prepare(
@@ -373,10 +378,8 @@ export class Vault {
           }
         } catch (error) {
           fresh.fill(0)
-          if (error instanceof NewerSchemaError)
-            return { ok: false, reason: 'newer' }
-          if (error instanceof DamagedError)
-            return { ok: false, reason: 'damaged' }
+          const reason = openFailure(error)
+          if (reason) return { ok: false, reason }
           throw error
         }
         dataKey.fill(0)
@@ -546,7 +549,7 @@ export class Vault {
       const copy = openDatabase(temporary, oldKey)
       try {
         changeKey(copy, created.dataKey)
-        if (copy.pragma('integrity_check', { simple: true }) !== 'ok') {
+        if (!passesIntegrityCheck(copy)) {
           throw new Error('the re-encrypted copy failed integrity_check')
         }
       } finally {
@@ -619,9 +622,8 @@ export class Vault {
     try {
       db = openDatabase(join(this.dir, databaseName(file.generation)), dataKey)
     } catch (error) {
-      if (error instanceof NewerSchemaError)
-        return { ok: false, reason: 'newer' }
-      if (error instanceof DamagedError) return { ok: false, reason: 'damaged' }
+      const reason = openFailure(error)
+      if (reason) return { ok: false, reason }
       throw error
     }
     this.#db = db
@@ -724,11 +726,7 @@ export class Vault {
    */
   #removeStaging(): void {
     mkdirSync(this.root, { recursive: true })
-    for (const name of readdirSync(this.root)) {
-      if (name.startsWith(STAGING_PREFIX)) {
-        rmSync(join(this.root, name), { recursive: true, force: true })
-      }
-    }
+    removeDirs(this.root, STAGING_PREFIX)
   }
 
   /**
@@ -737,11 +735,7 @@ export class Vault {
    */
   #removeRestoring(): void {
     try {
-      for (const name of readdirSync(this.root)) {
-        if (name.startsWith(RESTORING_PREFIX)) {
-          rmSync(join(this.root, name), { recursive: true, force: true })
-        }
-      }
+      removeDirs(this.root, RESTORING_PREFIX)
     } catch {
       // No user data directory yet.
     }
@@ -756,6 +750,22 @@ export class Vault {
       } catch (error) {
         console.error(`vault listener failed: ${errorCode(error)}`)
       }
+    }
+  }
+}
+
+/** Why a database did not open, when it is damaged or newer than this app. */
+function openFailure(error: unknown): 'newer' | 'damaged' | null {
+  if (error instanceof NewerSchemaError) return 'newer'
+  if (error instanceof DamagedError) return 'damaged'
+  return null
+}
+
+/** Removes the directories under root whose names start with the prefix. */
+function removeDirs(root: string, prefix: string): void {
+  for (const name of readdirSync(root)) {
+    if (name.startsWith(prefix)) {
+      rmSync(join(root, name), { recursive: true, force: true })
     }
   }
 }

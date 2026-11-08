@@ -54,6 +54,10 @@ export function changeKey(db: Db, key: Uint8Array): void {
   }
 }
 
+/** Whether every page and index of the database reads back whole. */
+export const passesIntegrityCheck = (db: Db): boolean =>
+  db.pragma('integrity_check', { simple: true }) === 'ok'
+
 /**
  * An existing ledger: the first read decrypts page 1 and so checks the key,
  * migrations have run at least once, and every page reads back. An empty
