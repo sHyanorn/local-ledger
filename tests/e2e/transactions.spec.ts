@@ -107,7 +107,7 @@ test('a transaction is added, edited, recategorized in place and deleted', async
   await dialog.getByLabel('Description').fill('Fake Market Stall')
   await dialog.getByLabel('Amount').fill('-3')
   await dialog.getByRole('button', { name: 'Add Transaction' }).click()
-  await expect(dialog.getByRole('alert')).toContainText('positive number')
+  await expect(dialog.getByRole('alert')).toContainText('without a sign')
   await dialog.getByLabel('Amount').fill('12.50')
   await dialog
     .getByLabel('Category')
@@ -147,11 +147,67 @@ test('a transaction is added, edited, recategorized in place and deleted', async
     .getByRole('button', { name: 'Fake Market Stall', exact: true })
     .click()
   await home.getByRole('button', { name: 'Delete…' }).click()
-  const confirm = home.getByRole('dialog', { name: 'Delete transaction?' })
+  const confirm = home.getByRole('alertdialog', { name: 'Delete transaction?' })
   await expect(confirm).toContainText('“Fake Market Stall” on')
   await confirm.getByRole('button', { name: 'Delete' }).click()
   await expect(added).toHaveCount(0)
   await expect(balance).toHaveText(before ?? '')
+})
+
+test('a change keeps the reader’s place, and focus goes back where it was', async ({
+  home,
+}) => {
+  const list = table(home).locator('.rows')
+  await list.evaluate((element) => {
+    element.scrollTop = element.scrollHeight
+  })
+  await expect(rows(home)).toHaveCount(400)
+  const row = rows(home).nth(250)
+  await row.scrollIntoViewIfNeeded()
+  const before = await list.evaluate((element) => element.scrollTop)
+  const description = row.locator('.description button')
+  await description.click()
+  const dialog = home.getByRole('dialog', { name: 'Edit Transaction' })
+  await dialog.getByLabel('Notes').fill('fake note')
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(dialog).toBeHidden()
+  await expect(description).toBeFocused()
+  await expect(rows(home)).toHaveCount(400)
+  // Within a row: off-screen rows have estimated heights.
+  const after = await list.evaluate((element) => element.scrollTop)
+  expect(Math.abs(after - before)).toBeLessThan(36)
+
+  // Escape closes a dialog, and focus goes back to what opened it.
+  await description.click()
+  await home.keyboard.press('Escape')
+  await expect(description).toBeFocused()
+
+  // A category picked in place keeps the focus on its cell.
+  const cell = row.getByRole('button', { name: /^Category of / })
+  await cell.click()
+  await row.getByRole('combobox').selectOption('')
+  await expect(row.getByRole('button', { name: /^Category of / })).toBeFocused()
+})
+
+test('a row recategorized out of the category shown leaves the list, and the totals follow', async ({
+  home,
+  ledger,
+}) => {
+  await home.getByLabel('Category', { exact: true }).selectOption('none')
+  const uncategorized = ledger.transactions.filter(
+    (row) => row.category === null,
+  )
+  await expect(totals(home)).toContainText(
+    `${n(uncategorized.length)} transactions`,
+  )
+  const first = rows(home).first()
+  const description = await first.locator('.description button').textContent()
+  await first.getByRole('button', { name: /^Category of / }).click()
+  await first.getByRole('combobox').selectOption({ label: 'Travel' })
+  await expect(totals(home)).toContainText(
+    `${n(uncategorized.length - 1)} transactions`,
+  )
+  await expect(rows(home).first()).not.toContainText(description ?? '')
 })
 
 test('after a lock, no transaction text stays in a page or reachable in the main process', async ({

@@ -63,7 +63,7 @@ test('an account is added, renamed and deleted', async ({ home }) => {
 
   await home.getByRole('button', { name: 'Edit Account…' }).click()
   await home.getByRole('button', { name: 'Delete Account…' }).click()
-  const confirm = home.getByRole('dialog', { name: 'Delete account?' })
+  const confirm = home.getByRole('alertdialog', { name: 'Delete account?' })
   await expect(confirm).toContainText('“Fake Purse” will be deleted.')
   await confirm.getByRole('button', { name: 'Delete' }).click()
   await expect(accountButton(home, 'Fake Purse')).toHaveCount(0)
@@ -81,7 +81,7 @@ test('an account with transactions is not deleted, and keeps its currency', asyn
   await home.getByRole('button', { name: 'Edit Account…' }).click()
   await expect(home.getByLabel('Currency')).toBeDisabled()
   await home.getByRole('button', { name: 'Delete Account…' }).click()
-  const notice = home.getByRole('dialog', { name: 'Account in use' })
+  const notice = home.getByRole('alertdialog', { name: 'Account in use' })
   await expect(notice).toContainText(
     `“Everyday” has ${used.length.toLocaleString('en-AU')} transactions.`,
   )
@@ -122,7 +122,7 @@ test('categories nest two levels, and a deleted one takes its subcategories', as
     row.category?.startsWith('Food'),
   ).length
   await expect(
-    home.getByRole('dialog', { name: 'Delete category?' }),
+    home.getByRole('alertdialog', { name: 'Delete category?' }),
   ).toHaveText(
     new RegExp(
       `“Food” and its 3 subcategories will be deleted\\. ${affected.toLocaleString('en-AU')} transactions will become uncategorized\\.`,

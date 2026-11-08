@@ -51,9 +51,12 @@ export function TransactionDialog({
     event.preventDefault()
     const cents = parseAmount(amount)
     if (!description.trim()) return setProblem('Enter a description.')
-    if (!isIsoDate(date)) return setProblem('Enter a date.')
-    if (cents === null || cents <= 0) {
-      return setProblem('Enter the amount as a positive number, such as 12.50.')
+    if (!isIsoDate(date)) {
+      return setProblem('Enter a date from 1900 to 2999.')
+    }
+    // The direction carries the sign.
+    if (cents === null || cents < 0) {
+      return setProblem('Enter the amount without a sign, such as 12.50.')
     }
     setBusy(true)
     try {
@@ -127,6 +130,8 @@ export function TransactionDialog({
             Date
             <input
               type="date"
+              min="1900-01-01"
+              max="2999-12-31"
               value={date}
               onChange={(event) => setDate(event.target.value)}
             />

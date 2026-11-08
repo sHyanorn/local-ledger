@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { PAGE_MAX } from '../../../shared/ledger'
 import type {
   CurrencyTotal,
   Transaction,
@@ -20,32 +21,42 @@ interface Loaded {
 /**
  * The transactions matching a filter, newest first, a page at a time, and
  * their totals per currency. Until a new filter's rows arrive the old ones
- * stay; a response for an older request is dropped.
+ * stay. Each load starts a generation; a page from an older one is dropped.
  */
 export function useTransactions(filter: TransactionFilter) {
   const key = JSON.stringify(filter)
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [paging, setPaging] = useState(false)
-  const request = useRef(0)
-
-  const reload = useCallback(async () => {
-    const id = ++request.current
-    const result = await firstPage(key)
-    if (id === request.current) setLoaded(result)
-  }, [key])
+  const [pageFailed, setPageFailed] = useState(false)
+  const generation = useRef(0)
 
   useEffect(() => {
-    const id = ++request.current
-    void firstPage(key).then((result) => {
-      if (id === request.current) setLoaded(result)
+    const id = ++generation.current
+    void fetchRows(key, PAGE).then((result) => {
+      if (id !== generation.current) return
+      setLoaded(result)
+      setPageFailed(false)
     })
   }, [key])
 
   const current = loaded?.key === key ? loaded : null
+  const shown = current?.rows.length ?? 0
+
+  /**
+   * Loads again every row shown so far, with the totals, so a change shows
+   * where it belongs and the reader keeps their place.
+   */
+  const refresh = useCallback(async () => {
+    const id = ++generation.current
+    const result = await fetchRows(key, Math.max(shown, PAGE))
+    if (id !== generation.current) return
+    setLoaded(result)
+    setPageFailed(false)
+  }, [key, shown])
 
   const loadMore = useCallback(async () => {
-    if (!current?.next || paging) return
-    const id = ++request.current
+    if (!current?.next || paging || pageFailed) return
+    const id = generation.current
     setPaging(true)
     try {
       const page = await window.ledger.transactions.page(
@@ -53,26 +64,27 @@ export function useTransactions(filter: TransactionFilter) {
         PAGE,
         current.next,
       )
-      if (id !== request.current) return
-      setLoaded({
-        ...current,
-        rows: [...current.rows, ...page.rows],
-        next: page.next,
-      })
+      if (id !== generation.current) return
+      setLoaded((before) =>
+        before?.key === key
+          ? { ...before, rows: [...before.rows, ...page.rows], next: page.next }
+          : before,
+      )
     } catch {
-      if (id === request.current) setLoaded({ ...current, failed: true })
+      // Shown with a way to try again; never retried on its own.
+      if (id === generation.current) setPageFailed(true)
     } finally {
       setPaging(false)
     }
-  }, [current, key, paging])
+  }, [current, key, paging, pageFailed])
 
-  /** Shows a saved change in place, without reloading the list. */
+  /** Shows a saved change in place, without loading anything. */
   const replace = useCallback((row: Transaction) => {
     setLoaded(
-      (shown) =>
-        shown && {
-          ...shown,
-          rows: shown.rows.map((candidate) =>
+      (before) =>
+        before && {
+          ...before,
+          rows: before.rows.map((candidate) =>
             candidate.id === row.id ? row : candidate,
           ),
         },
@@ -85,20 +97,31 @@ export function useTransactions(filter: TransactionFilter) {
     more: Boolean(current?.next),
     loading: !current || paging,
     failed: current?.failed ?? false,
-    reload,
+    pageFailed,
+    refresh,
     loadMore,
+    retry: () => setPageFailed(false),
     replace,
   }
 }
 
-async function firstPage(key: string): Promise<Loaded> {
+/** The first `count` matching rows, a page at a time, and the totals. */
+async function fetchRows(key: string, count: number): Promise<Loaded> {
   const filter = JSON.parse(key) as TransactionFilter
   try {
-    const [page, totals] = await Promise.all([
-      window.ledger.transactions.page(filter, PAGE),
-      window.ledger.transactions.totals(filter),
-    ])
-    return { key, rows: page.rows, totals, next: page.next, failed: false }
+    const rows: Transaction[] = []
+    let next: TransactionCursor | null = null
+    do {
+      const page = await window.ledger.transactions.page(
+        filter,
+        Math.min(PAGE_MAX, count - rows.length),
+        next ?? undefined,
+      )
+      rows.push(...page.rows)
+      next = page.next
+    } while (next && rows.length < count)
+    const totals = await window.ledger.transactions.totals(filter)
+    return { key, rows, totals, next, failed: false }
   } catch {
     return { key, rows: [], totals: [], next: null, failed: true }
   }

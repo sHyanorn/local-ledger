@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { isIsoDate } from '../../../shared/dates'
 import { SEARCH_MAX } from '../../../shared/ledger'
 import type { Transaction, TransactionFilter } from '../../../shared/ledger'
 import { formatAmount } from '../../../shared/money'
@@ -12,9 +13,12 @@ import { useTransactions } from './useTransactions'
 
 type Editing = { transaction?: Transaction } | null
 
+const DATE_MIN = '1900-01-01'
+const DATE_MAX = '2999-12-31'
+
 export function Transactions({ accountId }: { accountId: number | null }) {
   const accounts = useLedger((store) => store.accounts)
-  const refresh = useLedger((store) => store.refresh)
+  const refreshLedger = useLedger((store) => store.refresh)
   const account = accounts.find((candidate) => candidate.id === accountId)
   const [search, setSearch] = useState('')
   const [text, setText] = useState('')
@@ -31,11 +35,12 @@ export function Transactions({ accountId }: { accountId: number | null }) {
   }, [search])
 
   const filter = useMemo((): TransactionFilter => {
+    // A custom bound counts once it is a whole date in range.
     const range =
       period === 'custom'
         ? {
-            ...(custom.from ? { from: custom.from } : {}),
-            ...(custom.to ? { to: custom.to } : {}),
+            ...(isIsoDate(custom.from) ? { from: custom.from } : {}),
+            ...(isIsoDate(custom.to) ? { to: custom.to } : {}),
           }
         : periodRange(period)
     return {
@@ -49,31 +54,34 @@ export function Transactions({ accountId }: { accountId: number | null }) {
   }, [accountId, category, period, custom, text])
 
   const list = useTransactions(filter)
-  const { reload } = list
   const narrowed = Object.keys(filter).some((key) => key !== 'accountId')
   const names = useMemo(
     () => new Map(accounts.map((option) => [option.id, option.name])),
     [accounts],
   )
 
+  // After a change the list and the sidebar load again, keeping the place.
   const saved = () => {
-    void reload()
-    void refresh()
+    void list.refresh()
+    void refreshLedger()
   }
 
   const recategorize = async (row: Transaction, value: string) => {
     const categoryId = value === '' ? null : Number(value)
-    const { id, currency: _currency, ...fields } = row
     try {
-      const result = await window.ledger.transactions.update({
-        id,
-        ...fields,
+      const result = await window.ledger.transactions.setCategory(
+        row.id,
         categoryId,
-      })
-      if (result.ok) list.replace({ ...row, categoryId })
-      void refresh()
+      )
+      // Under a category filter the row may no longer belong in the list.
+      if (result.ok && filter.category === undefined) {
+        list.replace({ ...row, categoryId })
+      } else {
+        void list.refresh()
+      }
+      void refreshLedger()
     } catch {
-      void reload()
+      void list.refresh()
     }
   }
 
@@ -135,6 +143,8 @@ export function Transactions({ accountId }: { accountId: number | null }) {
             <input
               type="date"
               aria-label="From"
+              min={DATE_MIN}
+              max={DATE_MAX}
               value={custom.from}
               onChange={(event) =>
                 setCustom({ ...custom, from: event.target.value })
@@ -143,6 +153,8 @@ export function Transactions({ accountId }: { accountId: number | null }) {
             <input
               type="date"
               aria-label="To"
+              min={DATE_MIN}
+              max={DATE_MAX}
               value={custom.to}
               onChange={(event) =>
                 setCustom({ ...custom, to: event.target.value })
@@ -160,7 +172,9 @@ export function Transactions({ accountId }: { accountId: number | null }) {
         showAccount={accountId === null}
         names={names}
         more={list.more}
+        failed={list.pageFailed}
         onMore={() => void list.loadMore()}
+        onRetry={list.retry}
         onEdit={(transaction) => setEditing({ transaction })}
         onCategory={(row, value) => void recategorize(row, value)}
       />
@@ -214,7 +228,9 @@ function TransactionTable({
   showAccount,
   names,
   more,
+  failed,
   onMore,
+  onRetry,
   onEdit,
   onCategory,
 }: {
@@ -222,27 +238,35 @@ function TransactionTable({
   showAccount: boolean
   names: Map<number, string>
   more: boolean
+  /** Loading the next page failed. */
+  failed: boolean
   onMore: () => void
+  onRetry: () => void
   onEdit: (row: Transaction) => void
   onCategory: (row: Transaction, value: string) => void
 }) {
   const list = useRef<HTMLDivElement>(null)
   const end = useRef<HTMLDivElement>(null)
+  const more$ = useRef(onMore)
+  useEffect(() => {
+    more$.current = onMore
+  })
 
   // The next page loads as the end of the list comes within 400 pixels of
-  // view. The list scrolls, so it is the root that margin applies to.
+  // view. The list scrolls, so it is the root that margin applies to. The
+  // observer is set up again after each page, and after a retry.
   useEffect(() => {
     const sentinel = end.current
-    if (!sentinel || !more) return
+    if (!sentinel || !more || failed) return
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry?.isIntersecting) onMore()
+        if (entry?.isIntersecting) more$.current()
       },
       { root: list.current, rootMargin: '400px' },
     )
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [more, onMore, rows.length])
+  }, [more, failed, rows.length])
 
   return (
     <div className="table" role="table" aria-label="Transactions">
@@ -295,6 +319,14 @@ function TransactionTable({
             </span>
           </div>
         ))}
+        {failed && rows.length > 0 && (
+          <p className="load-failed" role="alert">
+            More transactions could not be loaded.{' '}
+            <button type="button" className="secondary" onClick={onRetry}>
+              Try Again
+            </button>
+          </p>
+        )}
         <div ref={end} aria-hidden="true" />
       </div>
     </div>
@@ -315,9 +347,17 @@ function CategoryCell({
   const categories = useLedger((store) => store.categories)
   const [picking, setPicking] = useState(false)
   const select = useRef<HTMLSelectElement>(null)
+  const button = useRef<HTMLButtonElement>(null)
+  // After a choice or Escape, focus returns to the cell, so a keyboard user
+  // can go on down the list.
+  const refocus = useRef(false)
 
   useEffect(() => {
-    if (!picking) return
+    if (!picking) {
+      if (refocus.current) button.current?.focus()
+      refocus.current = false
+      return
+    }
     select.current?.focus()
     // Opens straight away; the click that asked for it allows that.
     try {
@@ -326,6 +366,11 @@ function CategoryCell({
       // Without the click's activation the select stays focused, closed.
     }
   }, [picking])
+
+  const close = () => {
+    refocus.current = true
+    setPicking(false)
+  }
 
   if (!picking) {
     const category = categories.find((option) => option.id === row.categoryId)
@@ -337,6 +382,7 @@ function CategoryCell({
       : 'Uncategorized'
     return (
       <button
+        ref={button}
         type="button"
         className={`inline${category ? '' : ' muted'}`}
         aria-label={`Category of ${row.description}: ${name}`}
@@ -354,8 +400,13 @@ function CategoryCell({
       className="inline"
       value={row.categoryId ?? ''}
       onChange={(event) => {
-        setPicking(false)
+        close()
         onChange(row, event.target.value)
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return
+        event.preventDefault()
+        close()
       }}
       onBlur={() => setPicking(false)}
     >
