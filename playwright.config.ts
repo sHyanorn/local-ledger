@@ -5,6 +5,7 @@ import { defineConfig } from '@playwright/test'
 // debugging port, both of which Playwright needs. Its self-test covers it.
 export default defineConfig({
   testDir: 'tests/e2e',
+  tsconfig: 'tests/e2e/tsconfig.json',
   timeout: 30_000,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),

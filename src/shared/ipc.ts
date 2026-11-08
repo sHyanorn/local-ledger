@@ -7,7 +7,7 @@ import {
   schemas,
   transactionFields,
   transactionFilter,
-} from './ledger'
+} from './schemas'
 import type {
   Account,
   Category,

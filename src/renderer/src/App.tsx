@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Damaged } from './screens/Damaged'
-import { Home } from './screens/Home'
+import { Ledger } from './ledger/Ledger'
 import { Setup } from './screens/Setup'
 import { Unlock } from './screens/Unlock'
 import { useVault } from './store'
@@ -21,7 +21,7 @@ export function App() {
     case 'locked':
       return <Unlock />
     case 'unlocked':
-      return <Home />
+      return <Ledger />
     case 'damaged':
       return <Damaged />
   }

@@ -1,0 +1,6 @@
+{
+  // Read by Playwright only, which loads modules through tsconfig paths. The
+  // type check (tsconfig.test.json) maps the SQLite package to its types,
+  // which Playwright would then load as code.
+  "compilerOptions": {}
+}

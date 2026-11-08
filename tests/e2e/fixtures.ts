@@ -1,5 +1,11 @@
 import { _electron as electron, expect, test as base } from '@playwright/test'
 import type { ElectronApplication, Page } from '@playwright/test'
+import { DEMO_PASSWORD } from '../../scripts/seed/demo'
+import { generateLedger } from '../../scripts/seed/generate'
+import type { SeedLedger, SeedOptions } from '../../scripts/seed/generate'
+import { insertLedger } from '../../scripts/seed/insert'
+import { deriveHere } from '../../src/main/vault/kdf'
+import { Vault } from '../../src/main/vault/vault'
 
 export { expect } from '@playwright/test'
 
@@ -85,5 +91,47 @@ export const test = base.extend<{
   },
   page: async ({ app }, provide) => {
     await provide(await app.firstWindow())
+  },
+})
+
+/** Fast key derivation for test vaults; vault.json records it. */
+const TEST_KDF = { memoryKiB: 19_456, iterations: 2, parallelism: 1 }
+
+/** Writes a locked vault of seeded fake data, as the app would find it. */
+export async function seedVault(
+  userData: string,
+  options: SeedOptions = {},
+): Promise<SeedLedger> {
+  const vault = new Vault(userData, { derive: deriveHere, kdf: TEST_KDF })
+  const created = await vault.create(DEMO_PASSWORD)
+  if (!created.ok) throw new Error(`seed vault: ${created.reason}`)
+  const ledger = generateLedger(options)
+  insertLedger(vault.database(), ledger)
+  vault.lock()
+  return ledger
+}
+
+/**
+ * The app on a seeded vault: `ledger` is the fake data written, `home` the
+ * page after unlocking it.
+ */
+export const ledgerTest = test.extend<{ ledger: SeedLedger; home: Page }>({
+  ledger: async ({ userData }, provide) => {
+    await provide(await seedVault(userData))
+  },
+  app: async ({ userData, ledger }, provide) => {
+    if (!ledger) throw new Error('seed first')
+    const app = await launch(userData)
+    await (await app.firstWindow()).waitForLoadState('load')
+    await provide(app)
+    await app.close()
+  },
+  home: async ({ app, page }, provide) => {
+    await page.getByLabel('Master password').fill(DEMO_PASSWORD)
+    const home = await replacedBy(app, () =>
+      page.getByRole('button', { name: 'Unlock' }).click(),
+    )
+    await expect(home.getByRole('navigation', { name: 'Ledger' })).toBeVisible()
+    await provide(home)
   },
 })

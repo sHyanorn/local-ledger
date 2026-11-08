@@ -277,7 +277,8 @@ test('a password change that fails says so, and the old password still works', a
   test.skip(process.platform === 'win32')
   const NEW = 'a new fake passphrase for tests'
   const home = await createVault(app, page)
-  await home.getByRole('button', { name: 'Change Password…' }).click()
+  await home.getByRole('button', { name: 'Settings' }).click()
+  await home.getByRole('button', { name: 'Change Master Password…' }).click()
   await home.getByLabel('Current password').fill(PASSWORD)
   await home.getByLabel('New password', { exact: true }).fill(NEW)
   await home.getByLabel('Confirm new password').fill(NEW)
@@ -318,7 +319,8 @@ test('changing the password re-keys the vault in a new page process', async ({
 }) => {
   const NEW = 'a new fake passphrase for tests'
   const home = await createVault(app, page)
-  await home.getByRole('button', { name: 'Change Password…' }).click()
+  await home.getByRole('button', { name: 'Settings' }).click()
+  await home.getByRole('button', { name: 'Change Master Password…' }).click()
   await home.getByLabel('Current password').fill('not the fake passphrase')
   await home.getByLabel('New password', { exact: true }).fill(NEW)
   await home.getByLabel('Confirm new password').fill(NEW)
