@@ -29,8 +29,6 @@ import type {
 } from './ledger'
 import { PASSWORD_MAX, PASSWORD_MIN, passwordLength } from './password'
 
-export { PASSWORD_MAX, PASSWORD_MIN, passwordLength } from './password'
-
 // Bounds the work done before normalization; NFKC can lengthen a string.
 const passwordText = z.string().max(PASSWORD_MAX * 4)
 

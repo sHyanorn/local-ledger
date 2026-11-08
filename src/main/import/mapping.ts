@@ -22,9 +22,9 @@ const INVISIBLE =
   /[\u061c\u200b\u200e\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/g
 
 /**
- * Text as stored: bidirectional controls and zero-width spaces are dropped, control characters become spaces, runs of
- * space become one, and the result is in composed form like every name in
- * the ledger.
+ * Text as stored: bidirectional controls and zero-width spaces are dropped,
+ * control characters become spaces, runs of space become one, and the
+ * result is in composed form like every name in the ledger.
  */
 export function cleanText(text: string): string {
   return text

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { guard } from '../../src/main/ipc'
 import { LockedError } from '../../src/main/vault/vault'
-import { PASSWORD_MIN, passwordLength } from '../../src/shared/ipc'
+import { PASSWORD_MIN, passwordLength } from '../../src/shared/password'
 
 vi.mock('electron', () => ({ ipcMain: {} }))
 
