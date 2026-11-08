@@ -45,7 +45,7 @@
 - [x] Release workflow: macOS and Windows installers, checksums and provenance attestation (D006)
 - [x] Playwright end-to-end tests, including the whole flow from setting a password to exporting
 - [x] Complete `docs/SECURITY_DESIGN.md`
-- [ ] English README, screenshots and GIFs; publish the first release
+- [x] English README, screenshots and GIFs; publish the first release
 
 ## Nice to have
 - [ ] Open an exported workbook in Excel and Numbers, which have not been tried (D030); and see the sidebar vibrancy on a real Mac (D037)
