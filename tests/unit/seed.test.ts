@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { generateLedger } from '../../scripts/seed/generate'
 import { insertLedger } from '../../scripts/seed/insert'
+import { appUserDataDirs, isAppUserData } from '../../scripts/seed/user-data'
 import { listAccounts } from '../../src/main/ledger/accounts'
 import { listCategories } from '../../src/main/ledger/categories'
 import { totalTransactions } from '../../src/main/ledger/transactions'
@@ -124,5 +125,51 @@ describe('insertLedger', () => {
     } finally {
       db.close()
     }
+  })
+})
+
+describe('the seed', () => {
+  it('knows where the app keeps its data on each platform', () => {
+    const home = '/home/fake'
+    expect(appUserDataDirs('linux', {}, home)).toEqual([
+      '/home/fake/.config/Local Ledger',
+      '/home/fake/.config/local-ledger',
+    ])
+    expect(
+      appUserDataDirs('linux', { XDG_CONFIG_HOME: '/fake/config' }, home)[0],
+    ).toBe('/fake/config/Local Ledger')
+    expect(appUserDataDirs('darwin', {}, home)[0]).toBe(
+      '/home/fake/Library/Application Support/Local Ledger',
+    )
+  })
+
+  it('refuses the app’s own data directories and anything inside them', () => {
+    const dirs = [
+      '/home/fake/.config/Local Ledger',
+      '/home/fake/.config/local-ledger',
+    ]
+    expect(
+      isAppUserData('/home/fake/.config/local-ledger', dirs, 'linux'),
+    ).toBe(true)
+    expect(
+      isAppUserData('/home/fake/.config/Local Ledger/vault', dirs, 'linux'),
+    ).toBe(true)
+    expect(
+      isAppUserData('/home/fake/.config/LOCAL LEDGER', dirs, 'darwin'),
+    ).toBe(true)
+    expect(
+      isAppUserData('/home/fake/.config/LOCAL LEDGER', dirs, 'linux'),
+    ).toBe(false)
+    expect(isAppUserData('/home/fake/.config', dirs, 'linux')).toBe(false)
+    expect(
+      isAppUserData('/home/fake/.config/local-ledger-demo', dirs, 'linux'),
+    ).toBe(false)
+    expect(
+      isAppUserData(
+        '/home/fake/projects/local-ledger/.demo/user-data',
+        dirs,
+        'linux',
+      ),
+    ).toBe(false)
   })
 })
