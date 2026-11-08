@@ -226,6 +226,9 @@ test('a vault whose database is missing is reported, and nothing is deleted', as
     await expect(
       shown.getByRole('heading', { name: 'This vault cannot be opened' }),
     ).toBeVisible()
+    await expect(
+      shown.getByRole('button', { name: 'Restore from Backup…' }),
+    ).toBeVisible()
     expect(
       await shown.evaluate(() =>
         window.ledger.vault.unlock('fake ledger passphrase for tests'),

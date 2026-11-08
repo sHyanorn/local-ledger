@@ -1,4 +1,5 @@
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -11,7 +12,8 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createAccount } from '../../src/main/ledger/accounts'
 import { openDatabase } from '../../src/main/vault/database'
-import { deriveHere } from '../../src/main/vault/kdf'
+import { openBackupKey, readBackup } from '../../src/main/vault/backup'
+import { deriveHere, encodePassword } from '../../src/main/vault/kdf'
 import type { KdfParams } from '../../src/main/vault/kdf'
 import { openKey } from '../../src/main/vault/keys'
 import { parseVaultFile } from '../../src/main/vault/vault-file'
@@ -180,31 +182,104 @@ describe('a crash during a restore', () => {
   ] as const)(
     'after "%s" leaves one whole vault that opens with the current password',
     async (step, expected, aside) => {
+      // The disk as a crash at that step would leave it.
+      const disk = newRoot()
       const crashing = open(root, (at) => {
-        if (at === step) throw new Error('crash')
+        if (at === step) cpSync(root, disk, { recursive: true })
       })
       vault.lock()
       expect(await crashing.unlock(NOW)).toEqual({ ok: true })
-      const staged = await check(crashing)
-      await expect(crashing.restore(staged, NOW)).rejects.toThrow('crash')
+      expect(await crashing.restore(await check(crashing), NOW)).toEqual({
+        ok: true,
+      })
       crashing.lock()
 
-      const restarted = open(root)
+      const restarted = open(disk)
       expect(restarted.state).toBe('locked')
       expect(await restarted.unlock(NOW)).toEqual({ ok: true })
       expect(names(restarted)).toEqual(expected)
-      expect(replaced(root)).toHaveLength(aside)
+      expect(replaced(disk)).toHaveLength(aside)
       restarted.lock()
     },
   )
 
   it('leaves no staged backup behind at the next start', async () => {
+    mkdirSync(join(root, 'unrelated'))
     const staged = await check(vault)
     expect(existsSync(staged.dir)).toBe(true)
     vault.lock()
     open(root)
     expect(existsSync(staged.dir)).toBe(false)
-    mkdirSync(join(root, 'unrelated'))
     expect(existsSync(join(root, 'unrelated'))).toBe(true)
+  })
+})
+
+describe('a restore that fails part way', () => {
+  it('puts the vault back and keeps it open', async () => {
+    const failing = open(root, (at) => {
+      if (at === 'vault moved aside') throw new Error('rename refused')
+    })
+    vault.lock()
+    expect(await failing.unlock(NOW)).toEqual({ ok: true })
+    const states: string[] = []
+    failing.onChange((state) => states.push(state))
+    await expect(failing.restore(await check(failing), NOW)).rejects.toThrow(
+      'rename refused',
+    )
+    expect(failing.unlocked).toBe(true)
+    expect(states).toEqual(['unlocked'])
+    expect(names(failing)).toEqual(['Fake Added Later', 'Fake Backed Up'])
+    expect(replaced(root)).toEqual([])
+    failing.lock()
+  })
+
+  it('cannot be spoiled by wiping the staged key while it runs', async () => {
+    const staged = await check(vault)
+    const restoring = vault.restore(staged, NOW)
+    // As a discard from the page would, between the two key derivations.
+    staged.dataKey.fill(0)
+    expect(await restoring).toEqual({ ok: true })
+    expect(names(vault)).toEqual(['Fake Backed Up'])
+  })
+})
+
+describe('the restored vault', () => {
+  it('has a data key of its own, which neither the backup nor an old vault.json opens', async () => {
+    const before = readFileSync(join(root, 'vault', 'vault.json'), 'utf8')
+    expect(await vault.restore(await check(vault), NOW)).toEqual({ ok: true })
+    account(vault, 'Fake Added After Restore')
+    vault.lock()
+    const file = parseVaultFile(
+      readFileSync(join(root, 'vault', 'vault.json'), 'utf8'),
+    )!
+    const live = join(root, 'vault', `ledger-${file.generation}.db`)
+    const backupKey = await openKey(
+      { ...parseVaultFile(before)!, generation: 2 },
+      NOW,
+      deriveHere,
+    )
+    // Old keys: the backup's (under OLD) and the vault's before the restore.
+    const read = readBackup(backup)!
+    const sealing = await deriveHere(
+      encodePassword(OLD),
+      read.header.kdf.salt,
+      read.header.kdf,
+    )
+    for (const key of [openBackupKey(read.header, sealing), backupKey]) {
+      expect(key).not.toBeNull()
+      expect(() => openDatabase(live, key!)).toThrow()
+    }
+  })
+
+  it('can replace a vault that does not open, without its password', async () => {
+    vault.lock()
+    const staged = await check(open(newRoot()))
+    rmSync(join(root, 'vault', 'vault.json'))
+    const damaged = open(root)
+    expect(damaged.state).toBe('damaged')
+    expect(await damaged.restore(staged, null)).toEqual({ ok: true })
+    expect(names(damaged)).toEqual(['Fake Backed Up'])
+    expect(replaced(root)).toHaveLength(1)
+    damaged.lock()
   })
 })

@@ -50,17 +50,21 @@ export function startApp(): void {
       // Closing the window locks the vault; on macOS the app stays running.
       window.window.on('closed', () => {
         window = null
+        backups.forget()
         vault.lock()
       })
     }
     open()
     handleImport(vault, () => window?.window ?? null, devOrigin)
     handleExport(vault, () => window?.window ?? null, devOrigin)
-    handleBackup(vault, () => window?.window ?? null, devOrigin)
+    const backups = handleBackup(vault, () => window?.window ?? null, devOrigin)
     vault.onChange(() => window?.replaceView())
     // Also replaces a page that was already locked, so a password typed
     // but not submitted does not survive a lock.
     const lock = () => {
+      // A backup chosen for a restore goes too, also at setup, where there
+      // is no vault to lock and so no change for it to hear of.
+      backups.forget()
       if (!vault.lock()) window?.replaceView()
     }
     handle('vault:lock', lock, devOrigin)

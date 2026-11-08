@@ -2,6 +2,7 @@
 // directory under the user data directory. Holds the open database while
 // unlocked. Operations run one at a time; a lock takes effect at once and
 // cancels the operations already called.
+import { randomFillSync } from 'node:crypto'
 import {
   copyFileSync,
   existsSync,
@@ -30,7 +31,7 @@ import {
 import type { Checkpoint } from './files'
 import { openBackupKey, readBackup, writeBackup } from './backup'
 import { open, seal } from './envelope'
-import { DEFAULT_KDF, encodePassword } from './kdf'
+import { DEFAULT_KDF, encodePassword, KEY_BYTES } from './kdf'
 import type { Derive, KdfParams } from './kdf'
 import { createKey, openKey, sealDataKey } from './keys'
 import type { NewKey } from './keys'
@@ -348,9 +349,16 @@ export class Vault {
         const path = join(dir, databaseName(1))
         writeFileSync(path, backup.database, { mode: 0o600 })
         let summary: BackupSummary
+        // A fresh data key, as a password change draws: the backup's key,
+        // which old copies of vault.json or the backup itself still unseal,
+        // must not open the vault this becomes.
+        const fresh = randomFillSync(Buffer.alloc(KEY_BYTES))
         try {
           const db = openDatabase(path, dataKey)
           try {
+            if (db.pragma('integrity_check', { simple: true }) !== 'ok')
+              return { ok: false, reason: 'damaged' }
+            changeKey(db, fresh)
             if (db.pragma('integrity_check', { simple: true }) !== 'ok')
               return { ok: false, reason: 'damaged' }
             summary = db
@@ -364,12 +372,15 @@ export class Vault {
             db.close()
           }
         } catch (error) {
+          fresh.fill(0)
           if (error instanceof NewerSchemaError)
             return { ok: false, reason: 'newer' }
           if (error instanceof DamagedError)
             return { ok: false, reason: 'damaged' }
           throw error
         }
+        dataKey.fill(0)
+        dataKey = fresh
         syncFile(path)
         // Sealed now, so a restore with the backup's password needs nothing
         // more from the user; the password is not kept.
@@ -412,56 +423,88 @@ export class Vault {
     staged: StagedBackup,
     currentPassword: string | null,
   ): Promise<Outcome<'wrong-password' | 'exists' | 'locked' | 'damaged'>> {
+    // A copy, taken now, so nothing else can wipe the key before this runs.
+    const dataKey = Buffer.from(staged.dataKey)
     return this.#run(async (cancelled) => {
-      if (cancelled()) return { ok: false, reason: 'locked' }
-      let file = staged.file
-      if (currentPassword === null) {
-        if (existsSync(this.dir)) return { ok: false, reason: 'exists' }
-      } else {
-        if (!this.#db) return { ok: false, reason: 'locked' }
-        const current = this.#readFile()
-        if (!current) return { ok: false, reason: 'damaged' }
-        const key = await openKey(current, currentPassword, this.derive)
-        if (!key) return { ok: false, reason: 'wrong-password' }
-        key.fill(0)
-        file = await sealDataKey(
-          currentPassword,
-          staged.dataKey,
-          1,
-          this.derive,
-          this.kdf,
-        )
-        if (cancelled() || !this.#db) return { ok: false, reason: 'locked' }
+      if (cancelled() || !existsSync(staged.dir)) {
+        dataKey.fill(0)
+        return { ok: false, reason: cancelled() ? 'locked' : 'damaged' }
       }
-      if (
-        !writeFileAtomic(join(staged.dir, VAULT_FILE), serializeVaultFile(file))
-      )
-        throw new Error('the restored vault could not be flushed')
-      this.#removeStaging()
-      const whole = mkdtempSync(join(this.root, STAGING_PREFIX))
-      rmSync(whole, { recursive: true })
-      renameSync(staged.dir, whole)
-      flushDirectory(this.root)
-      this.checkpoint('restore staged')
-      if (this.#db) this.#close(this.#db)
-      this.#db = null
-      if (existsSync(this.dir)) {
-        renameSync(this.dir, join(this.root, replacedName(new Date())))
-        flushDirectory(this.root)
-        this.checkpoint('vault moved aside')
-      }
-      renameSync(whole, this.dir)
-      // The restored vault is in place: the page shows it either way.
+      let current: VaultFile | null = null
+      let currentKey: Buffer | null = null
       try {
+        let file = staged.file
+        if (currentPassword === null) {
+          // Only with no vault, or one that does not open, as at setup.
+          if (existsSync(this.dir) && this.state !== 'damaged')
+            return { ok: false, reason: 'exists' }
+        } else {
+          if (!this.#db) return { ok: false, reason: 'locked' }
+          current = this.#readFile()
+          if (!current) return { ok: false, reason: 'damaged' }
+          currentKey = await openKey(current, currentPassword, this.derive)
+          if (!currentKey) return { ok: false, reason: 'wrong-password' }
+          file = await sealDataKey(
+            currentPassword,
+            dataKey,
+            1,
+            this.derive,
+            this.kdf,
+          )
+          if (cancelled() || !this.#db) return { ok: false, reason: 'locked' }
+        }
+        if (
+          !writeFileAtomic(
+            join(staged.dir, VAULT_FILE),
+            serializeVaultFile(file),
+          )
+        )
+          throw new Error('the restored vault could not be flushed')
+        this.#removeStaging()
+        const whole = mkdtempSync(join(this.root, STAGING_PREFIX))
+        rmSync(whole, { recursive: true })
+        renameSync(staged.dir, whole)
         flushDirectory(this.root)
-        const opened = this.#openWithKey(file, staged.dataKey)
-        if (!opened.ok)
-          throw new Error(`the restored vault did not open: ${opened.reason}`)
+        this.checkpoint('restore staged')
+        if (this.#db) this.#close(this.#db)
+        this.#db = null
+        let aside: string | null = null
+        try {
+          if (existsSync(this.dir)) {
+            aside = join(this.root, replacedName(new Date()))
+            renameSync(this.dir, aside)
+            flushDirectory(this.root)
+            this.checkpoint('vault moved aside')
+          }
+          renameSync(whole, this.dir)
+        } catch (error) {
+          // Nothing was replaced after all: put back and reopen the vault
+          // that was there, so the page is not left on a closed one.
+          try {
+            if (aside && !existsSync(this.dir)) renameSync(aside, this.dir)
+            flushDirectory(this.root)
+            if (current && currentKey) this.#openWithKey(current, currentKey)
+          } catch {
+            // Left as it is; startup finds whichever vault is whole.
+          }
+          if (!this.#db) this.#emit()
+          throw error
+        }
+        // The restored vault is in place: the page shows it either way.
+        try {
+          flushDirectory(this.root)
+          const opened = this.#openWithKey(file, dataKey)
+          if (!opened.ok)
+            throw new Error(`the restored vault did not open: ${opened.reason}`)
+        } finally {
+          staged.dataKey.fill(0)
+          if (!this.#db) this.#emit()
+        }
+        return { ok: true }
       } finally {
-        staged.dataKey.fill(0)
-        if (!this.#db) this.#emit()
+        dataKey.fill(0)
+        currentKey?.fill(0)
       }
-      return { ok: true }
     })
   }
 

@@ -139,7 +139,7 @@ ledgerTest(
 
 ledgerTest(
   'a lock forgets a backup that was opened for restoring',
-  async ({ app, home }, testInfo) => {
+  async ({ app, home, userData }, testInfo) => {
     const path = testInfo.outputPath('forgotten.llbackup')
     await makeBackup(app, home, path)
     await chooseBackup(app, path)
@@ -153,11 +153,18 @@ ledgerTest(
         DEMO_PASSWORD,
       ),
     ).toMatchObject({ ok: true })
+    const staged = () =>
+      readdirSync(userData).filter((name) =>
+        name.startsWith('vault.restoring-'),
+      )
+    expect(staged()).toHaveLength(1)
     const locked = await replacedBy(app, () =>
       app.evaluate(({ powerMonitor }) => {
         powerMonitor.emit('lock-screen')
       }),
     )
+    // Gone at the lock itself, before any unlock.
+    expect(staged()).toEqual([])
     await locked.getByLabel('Master password').fill(DEMO_PASSWORD)
     const again = await replacedBy(app, () =>
       locked.getByRole('button', { name: 'Unlock' }).click(),
@@ -183,8 +190,35 @@ ledgerTest(
         setup.getByRole('heading', { name: 'Create a master password' }),
       ).toBeVisible()
       await chooseBackup(fresh, path)
-      await setup.getByRole('button', { name: 'Restore from Backup…' }).click()
-      const dialog = setup.getByRole('dialog', { name: 'Restore from Backup' })
+      // A lock at setup, with no vault to lock, still drops a checked backup.
+      expect(
+        await setup.evaluate(() => window.ledger.restore.open()),
+      ).toMatchObject({ ok: true })
+      expect(
+        await setup.evaluate(
+          (password) => window.ledger.restore.check(password),
+          DEMO_PASSWORD,
+        ),
+      ).toMatchObject({ ok: true })
+      const afterLock = await replacedBy(fresh, () =>
+        fresh.evaluate(({ powerMonitor }) => {
+          powerMonitor.emit('lock-screen')
+        }),
+      )
+      expect(
+        await afterLock.evaluate(() => window.ledger.restore.commit(null)),
+      ).toEqual({ ok: false, reason: 'not-checked' })
+      expect(
+        readdirSync(testInfo.outputPath('fresh-user-data')).filter((name) =>
+          name.startsWith('vault.restoring-'),
+        ),
+      ).toEqual([])
+      await afterLock
+        .getByRole('button', { name: 'Restore from Backup…' })
+        .click()
+      const dialog = afterLock.getByRole('dialog', {
+        name: 'Restore from Backup',
+      })
       await dialog.getByRole('button', { name: 'Choose Backup…' }).click()
       await dialog.getByLabel('Backup password').fill(DEMO_PASSWORD)
       await dialog.getByRole('button', { name: 'Open Backup' }).click()

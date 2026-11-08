@@ -20,7 +20,7 @@ export function handleBackup(
   vault: Vault,
   window: () => BaseWindow | null,
   devOrigin?: string,
-): void {
+): { forget: () => void } {
   // Replaced at every lock and unlock, so work begun before one stops.
   let state = new AbortController()
   /** The backup file chosen for a restore, and once checked, its staged copy. */
@@ -34,11 +34,16 @@ export function handleBackup(
     state = new AbortController()
     forget()
   })
-  /** A restore starts from setup, with no vault, or from an open one. */
+  /** A restore runs from setup, from a vault that does not open, or from an open one. */
   const restoring = () => {
     const now = vault.state
-    if (now !== 'new' && now !== 'unlocked') throw new LockedError()
+    if (now === 'locked') throw new LockedError()
     return now
+  }
+  /** While a restore runs, the backup it uses stays where it is. */
+  let committing = false
+  const idle = () => {
+    if (committing) throw new Error('busy')
   }
 
   handle(
@@ -78,6 +83,7 @@ export function handleBackup(
     'restore:open',
     async () => {
       restoring()
+      idle()
       const signal = state.signal
       const options = {
         properties: ['openFile' as const],
@@ -111,6 +117,7 @@ export function handleBackup(
     'restore:check',
     async ({ password }) => {
       restoring()
+      idle()
       const signal = state.signal
       const pending = chosen
       if (!pending) return { ok: false, reason: 'no-file' } as const
@@ -131,12 +138,19 @@ export function handleBackup(
     'restore:commit',
     async ({ currentPassword }) => {
       const now = restoring()
+      idle()
       const staged = chosen?.staged
       if (!staged) return { ok: false, reason: 'not-checked' } as const
-      // From setup there is no current password; from an open vault there is.
-      if ((now === 'new') !== (currentPassword === null))
+      // From an open vault the current password is needed; otherwise none.
+      if ((now === 'unlocked') !== (currentPassword !== null))
         return { ok: false, reason: 'exists' } as const
-      const result = await vault.restore(staged, currentPassword)
+      committing = true
+      let result: Awaited<ReturnType<Vault['restore']>>
+      try {
+        result = await vault.restore(staged, currentPassword)
+      } finally {
+        committing = false
+      }
       if (result.ok || result.reason !== 'wrong-password') forget()
       if (result.ok) return result
       if (result.reason === 'locked') throw new LockedError()
@@ -148,8 +162,9 @@ export function handleBackup(
     'restore:discard',
     () => {
       restoring()
-      forget()
+      if (!committing) forget()
     },
     devOrigin,
   )
+  return { forget }
 }
