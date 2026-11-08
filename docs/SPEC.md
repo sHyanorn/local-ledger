@@ -24,7 +24,7 @@ A personal finance desktop app whose data stays on the local machine in a fully 
   - Date and amount format detection, with a preview before import
   - Duplicate transaction detection (fuzzy matching on date, amount and description)
 - Automatic categorization
-  - User rules: if the description contains a keyword, assign it to a category
+  - User rules: if the description contains, starts with or is some text, assign it to a category
   - When the user changes a category manually, offer to create a new rule
 - Budgets: monthly budgets per category, with overspending alerts
 - Charts: monthly income and expenses, category breakdown, trends
@@ -74,14 +74,18 @@ Encryption scheme:
 ```
 accounts(id, name, type, currency, opening_balance_cents, created_at)
 transactions(id, account_id, date, amount_cents, description, category_id,
-             import_batch_id, hash, notes, created_at)
+             import_batch_id, hash, notes, edited, created_at)
 categories(id, name, parent_id, color, icon)
 rules(id, pattern, match_type, category_id, priority)
+rule_dismissals(key)
 budgets(id, category_id, month, amount_cents)
 import_batches(id, file_name, row_count, imported_at)
+import_mappings(signature, mapping)
+transfer_links(out_id, in_id, status)
+report_transactions: transactions minus both sides of confirmed transfers
 ```
 
-All amounts are stored as integers (cents).
+All amounts are stored as integers (cents). An imported transaction's `hash` is its fingerprint (D025); `edited` marks a change by the user. Rules match by "contains", "starts with" or "is" (D026). Transfers are pairs of transactions (D027).
 
 ## 6. Interface
 

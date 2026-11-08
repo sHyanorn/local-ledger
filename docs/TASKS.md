@@ -23,20 +23,21 @@
 - [x] `npm run seed` fake data generator
 
 ## M3 Import and categorization
-- [ ] CSV parsing and generic column-mapping wizard
-- [ ] Templates for the four Australian banks (tested with hand-made sample files)
-- [ ] Import preview and duplicate detection
-- [ ] Rule engine and "create a rule after a manual change" prompt
-- [ ] Deleting a category that rules point to: say how many, and what happens to them
-- [ ] Transfers: when both accounts' CSVs are imported, one transfer appears twice (out of one, into the other); detect the pair and keep it out of M4's income and spending
+- [x] CSV parsing and generic column-mapping wizard
+- [x] Templates for the four Australian banks (tested with hand-made sample files)
+- [ ] Check the bank templates against `npm run csv:shape` output from real exports
+- [x] Import preview and duplicate detection
+- [x] Rule engine and "create a rule after a manual change" prompt
+- [x] Deleting a category that rules point to: say how many, and what happens to them
+- [x] Transfers: when both accounts' CSVs are imported, one transfer appears twice (out of one, into the other); detect the pair and keep it out of M4's income and spending
 
 ## M4 Budgets and reports
 - [ ] Budget setup and overspending alerts
-- [ ] Overview and report charts
-- [ ] Excel and PDF export, preferring options with few dependencies
+- [ ] Overview and report charts, reading income and spending from `report_transactions` so paired transfers stay out (D027)
+- [ ] Excel and PDF export, preferring options with few dependencies; text cells written as text, and any CSV export escaping cells that start with `=`, `+`, `-`, `@`, a tab or a line break, full-width forms included (SECURITY_DESIGN)
 
 ## M5 Polish and release
-- [ ] Apple-style UI polish, dark mode, keyboard shortcuts; a setting for the auto-lock time
+- [ ] Apple-style UI polish, dark mode, keyboard shortcuts; a setting for the auto-lock time; dropping a CSV file on the window to import it
 - [ ] Encrypted backup and restore
 - [ ] Release workflow: macOS and Windows installers, checksums and provenance attestation (D006)
 - [ ] Playwright end-to-end tests
