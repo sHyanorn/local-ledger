@@ -12,6 +12,8 @@ out/
 .demo/
 release/
 *.db
+# The known-answer vault in the test fixtures is made up and must be committed.
+!tests/fixtures/**/*.db
 *.sqlite
 test-results/
 playwright-report/
