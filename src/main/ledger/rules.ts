@@ -3,6 +3,7 @@
 // first less specific one: "is" before "starts with" before "contains", a
 // longer pattern before a shorter one. The user can move rules after that.
 import type { Outcome } from '../../shared/ipc'
+import { PATTERN_MAX } from '../../shared/rules'
 import type {
   Rule,
   RuleFields,
@@ -69,7 +70,9 @@ export function applyRule(db: Db, id: number): number {
   if (!rule) return 0
   const rows = db
     .prepare(
-      'SELECT id, description FROM transactions WHERE category_id IS NULL',
+      `SELECT id, description FROM transactions
+       WHERE category_id IS NULL
+         AND id NOT IN (SELECT id FROM transfer_members)`,
     )
     .all() as { id: number; description: string }[]
   const set = db.prepare(
@@ -174,15 +177,24 @@ export function ruleReach(
     (other) => other.id !== rule.id,
   )
   const rows = db
-    .prepare('SELECT description, category_id AS categoryId FROM transactions')
-    .all() as { description: string; categoryId: number | null }[]
+    .prepare(
+      `SELECT description, category_id AS categoryId,
+         id IN (SELECT id FROM transfer_members) AS transfer
+       FROM transactions`,
+    )
+    .all() as {
+    description: string
+    categoryId: number | null
+    transfer: number
+  }[]
   const reach: RuleReach = { matches: 0, taken: 0, uncategorized: 0 }
   for (const row of rows) {
     const key = matchKey(row.description)
     if (!matches(rule, key)) continue
     reach.matches++
     if (earlier.some((other) => matches(other, key))) reach.taken++
-    else if (row.categoryId === null) reach.uncategorized++
+    // A transfer needs no category, so applying a rule leaves it alone.
+    else if (row.categoryId === null && !row.transfer) reach.uncategorized++
   }
   return reach
 }
@@ -199,7 +211,12 @@ export function payeeOf(description: string): string {
     .replace(/\S*\d{3,}\S*/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-  return payee.length >= 3 ? payee : description.trim()
+  const chosen = payee.length >= 3 ? payee : description.trim()
+  if (chosen.length <= PATTERN_MAX) return chosen
+  // A rule's text has a limit; the start of a payee names it.
+  const cut = chosen.slice(0, PATTERN_MAX + 1)
+  const space = cut.lastIndexOf(' ')
+  return (space > 0 ? cut.slice(0, space) : cut.slice(0, PATTERN_MAX)).trim()
 }
 
 /**

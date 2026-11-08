@@ -24,6 +24,7 @@ import {
   updateRule,
 } from '../../src/main/ledger/rules'
 import { createTransaction } from '../../src/main/ledger/transactions'
+import { pairTransfers } from '../../src/main/ledger/transfers'
 import { openDatabase, type Db } from '../../src/main/vault/database'
 import type { RuleMatch } from '../../src/shared/rules'
 
@@ -201,6 +202,33 @@ describe('applying', () => {
     expect(applyRule(db, id)).toBe(0)
   })
 
+  it('leaves paired transfers alone', () => {
+    const coffee = category('Fake Coffee')
+    const savings = createAccount(db, {
+      name: 'Fake Savings',
+      type: 'savings',
+      currency: 'AUD',
+      openingBalanceCents: 0,
+    })
+    if (!savings.ok) throw new Error('no account')
+    transaction('Fake Transfer')
+    createTransaction(db, {
+      accountId: savings.id,
+      date: '2026-05-03',
+      amountCents: 450,
+      description: 'Fake Transfer',
+      categoryId: null,
+      notes: '',
+    })
+    pairTransfers(db)
+    expect(ruleReach(db, { pattern: 'fake transfer', match: 'is' })).toEqual({
+      matches: 2,
+      taken: 0,
+      uncategorized: 0,
+    })
+    expect(rule('fake transfer', 'is', coffee, true).applied).toBe(0)
+  })
+
   it('measures what a rule would reach at its place', () => {
     const coffee = category('Fake Coffee')
     transaction('Fake Cafe Newtown', coffee)
@@ -269,6 +297,13 @@ describe('suggestions', () => {
     ['123456', '123456'],
   ])('takes the payee of %j', (description, payee) => {
     expect(payeeOf(description)).toBe(payee)
+  })
+
+  it('keeps a long payee within a rule text, cut at a word', () => {
+    const payee = payeeOf(`${'Fake Words '.repeat(20)}End`)
+    expect(payee.length).toBeLessThanOrEqual(100)
+    expect(payee.endsWith('Words')).toBe(true)
+    expect(payeeOf('x'.repeat(150))).toHaveLength(100)
   })
 
   it('offers a rule when another transaction has the same payee', () => {
