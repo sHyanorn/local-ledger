@@ -13,6 +13,7 @@ import {
   rendererPid,
   replacedBy,
   test,
+  ledgerTest,
 } from './fixtures'
 
 const APP_URL = 'app://local-ledger/index.html'
@@ -357,3 +358,38 @@ for (const name of switches.sandboxOff) {
     expect(`${result.stdout}${result.stderr}`).toMatch(refusal)
   })
 }
+
+ledgerTest(
+  'every data channel refuses while the vault is locked',
+  async ({ page }) => {
+    const results = await page.evaluate(async () => {
+      const { accounts, categories, transactions } = window.ledger
+      const calls = [
+        () => accounts.list(),
+        () =>
+          accounts.create({
+            name: 'Fake',
+            type: 'cash',
+            currency: 'AUD',
+            openingBalanceCents: 0,
+          }),
+        () => categories.list(),
+        () => categories.delete(1),
+        () => transactions.page({}, 10),
+        () => transactions.totals({}),
+        () => transactions.setCategory(1, null),
+        () => transactions.delete(1),
+      ]
+      return Promise.all(
+        calls.map((call) =>
+          call().then(
+            () => 'answered',
+            (error: Error) => error.message,
+          ),
+        ),
+      )
+    })
+    expect(results).toHaveLength(8)
+    for (const result of results) expect(result).toMatch(/Error: locked$/)
+  },
+)

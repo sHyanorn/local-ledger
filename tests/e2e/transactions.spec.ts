@@ -214,6 +214,14 @@ test('after a lock, no transaction text stays in a page or reachable in the main
   app,
   home,
 }, testInfo) => {
+  // Planted before, and long: found past where snapshots used to cut strings.
+  const control = `Control ${randomUUID()}`
+  await app.evaluate(
+    (_electron, value) => {
+      Object.assign(globalThis, { residueControl: value })
+    },
+    `${'-'.repeat(4096)}${control}`,
+  )
   const marker = `Residue ${randomUUID()}`
   await home.getByRole('button', { name: 'Add Transaction' }).click()
   const dialog = home.getByRole('dialog', { name: 'New Transaction' })
@@ -231,16 +239,12 @@ test('after a lock, no transaction text stays in a page or reachable in the main
   expect(await locked.content()).not.toContain(marker)
 
   // A heap snapshot collects garbage first, so it holds only what is still
-  // reachable. A string planted in the main process proves the search works.
+  // reachable. It does not hold the contents of Buffers and other binary
+  // arrays; SECURITY_DESIGN says so.
   const file = testInfo.outputPath('main.heapsnapshot')
-  const control = `Control ${randomUUID()}`
-  await app.evaluate(
-    (_electron, [path, value]) => {
-      Object.assign(globalThis, { residueControl: value })
-      process.getBuiltinModule('v8').writeHeapSnapshot(path)
-    },
-    [file, control] as const,
-  )
+  await app.evaluate((_electron, path) => {
+    process.getBuiltinModule('v8').writeHeapSnapshot(path)
+  }, file)
   // Booleans, so a failure does not print a snapshot of many megabytes.
   const snapshot = readFileSync(file, 'utf8')
   expect(snapshot.includes(control), 'the control is found').toBe(true)

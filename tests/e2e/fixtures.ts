@@ -121,7 +121,10 @@ export const ledgerTest = test.extend<{ ledger: SeedLedger; home: Page }>({
   },
   app: async ({ userData, ledger }, provide) => {
     if (!ledger) throw new Error('seed first')
-    const app = await launch(userData)
+    // Heap snapshots keep strings whole, so a residue search sees all of them.
+    const app = await launch(userData, [
+      '--js-flags=--heap-snapshot-string-limit=1000000000',
+    ])
     await (await app.firstWindow()).waitForLoadState('load')
     await provide(app)
     await app.close()
@@ -132,6 +135,14 @@ export const ledgerTest = test.extend<{ ledger: SeedLedger; home: Page }>({
       page.getByRole('button', { name: 'Unlock' }).click(),
     )
     await expect(home.getByRole('navigation', { name: 'Ledger' })).toBeVisible()
+    // A CSP violation is logged as a console error, so this also fails a
+    // test whose page tried eval or a remote load.
+    const problems: string[] = []
+    home.on('console', (message) => {
+      if (message.type() === 'error') problems.push(message.text())
+    })
+    home.on('pageerror', (error) => problems.push(error.message))
     await provide(home)
+    expect(problems).toEqual([])
   },
 })
