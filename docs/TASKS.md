@@ -41,14 +41,14 @@
 - [x] Import preview at the 50,000-row limit: it took about 4 s to show and up to 1 s per checkbox; now about 0.2 s and 15 ms (D035)
 - [x] Delimiter detection: a two-line tab-separated file with comma thousands separators was read as comma-separated, and a semicolon file with unquoted semicolons in descriptions split wrongly
 - [x] A home-currency setting for budgets (D028, D032)
-- [ ] Open an exported workbook in Excel and Numbers, which have not been tried (D030)
 - [x] Encrypted backup and restore (D033, D034)
 - [ ] Release workflow: macOS and Windows installers, checksums and provenance attestation (D006)
 - [x] Playwright end-to-end tests, including the whole flow from setting a password to exporting
-- [ ] Complete `docs/SECURITY_DESIGN.md`
+- [x] Complete `docs/SECURITY_DESIGN.md`
 - [ ] English README, screenshots and GIFs; publish the first release
 
 ## Nice to have
+- [ ] Open an exported workbook in Excel and Numbers, which have not been tried (D030); and see the sidebar vibrancy on a real Mac (D037)
 - [ ] Check the bank layouts against real exports, should any become available (D024): every check so far used public, made-up samples
 - [ ] Archive an account: hide it from lists while keeping its transactions
 - [ ] Recovery key: a random key, shown once at setup, that also seals the data key (D013 leaves room for it)

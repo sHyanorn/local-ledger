@@ -1,6 +1,6 @@
 # Security Design
 
-Local Ledger keeps personal finance data on one computer, encrypted at rest. This document describes the encryption, what each part protects against, and what it does not. Electron hardening is summarized here and recorded in DECISIONS (D009, D010, D012); M5 completes this document.
+Local Ledger keeps personal finance data on one computer, encrypted at rest. This document describes the encryption, what each part protects against, and what it does not. Electron hardening is summarized here and recorded in DECISIONS (D009, D010, D012).
 
 ## Threat model
 
@@ -96,4 +96,19 @@ What it cannot do, and does not claim:
 - IPC: one handler per channel; each checks that the sender is the app's own page and validates its payload with zod (D017). The data channels need the vault unlocked. A failure reaches the page as a code only; the main process logs the channel and an error code, never a message or the payload.
 - The app refuses to start with any switch that weakens the Chromium sandbox and, when packaged, with a remote debugging port.
 - Fuses: no `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` or `--inspect`; the app loads only from an integrity-checked `app.asar`; `file://` gets no extra privileges. The native SQLite binary sits in `app.asar.unpacked`, outside the integrity check.
-- Releases are unsigned (D006); the release workflow (M5) publishes checksums and build provenance attestations to verify downloads with.
+
+## Releases and supply chain
+
+- Releases are not code signed (D006): macOS builds carry an ad-hoc signature and Windows installers none, so neither system can name a publisher, and both warn at first launch (README). In their place, each release lists the SHA-256 of every file in `SHA256SUMS` and carries a GitHub build provenance attestation that ties each file to the commit and workflow run that built it (D038); `gh attestation verify` checks one.
+- Each installer is built on a runner of its own platform and architecture, which first runs the self-test of the unpackaged app and then checks the packaged one: fuses, ASAR integrity, the files in `app.asar`, and that the app starts its self-test (D012).
+- There is no auto-update; the app never connects to a release feed. Check for Updates opens the releases page in the browser.
+- npm dependencies are pinned to exact versions with a lockfile, and their install scripts do not run (`.npmrc`); the Electron binary is fetched by a separate step that checks it against Electron's published checksums. GitHub Actions are pinned to commit SHAs. Dependabot proposes updates weekly; CI runs `npm audit --audit-level=high` (D011). Runtime dependencies: SQLite3 Multiple Ciphers, hash-wasm (Argon2id), zod, csv-parse and fflate.
+- The SQLite native module sits in `app.asar.unpacked`, outside the ASAR integrity check, as native modules must; replacing it needs write access to the installed app, which this design does not protect against (Threat model).
+
+## Known limits
+
+- Malware running as the user, a weak or forgotten master password: see the threat model.
+- Decrypted data lives in memory while the vault is open, as JavaScript strings until garbage collection and in SQLite's page cache, and may reach swap or a hibernation file (Memory).
+- Files outside the vault are plaintext: exports, the CSV files imported, and nothing else the app writes. Backups are encrypted, but an old backup, and a vault set aside by a restore, open with the password they had.
+- SQLCipher authenticates pages, not the database as a whole, so a vault folder replaced by an older copy of itself still opens. A backup's sealed header binds its own pages together.
+- Releases are unsigned; a download is only as trustworthy as the checksum and attestation check the user makes.
