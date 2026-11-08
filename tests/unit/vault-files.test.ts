@@ -10,9 +10,9 @@ import { readBackup } from '../../src/main/vault/backup'
 import { deriveHere } from '../../src/main/vault/kdf'
 import { Vault } from '../../src/main/vault/vault'
 import { parseVaultFile } from '../../src/main/vault/vault-file'
+import { PASSWORD } from '../support/vault'
 
 const FIXTURES = join(__dirname, '../fixtures/vault-v1')
-const PASSWORD = 'fake ledger passphrase for tests'
 const base64 = (text: string) => Buffer.from(text, 'base64')
 
 const KDF = {

@@ -1,6 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { ImportSession } from '../../src/main/import/session'
 import { createAccount } from '../../src/main/ledger/accounts'
@@ -25,17 +22,16 @@ import {
 } from '../../src/main/ledger/rules'
 import { createTransaction } from '../../src/main/ledger/transactions'
 import { pairTransfers } from '../../src/main/ledger/transfers'
-import { openDatabase, type Db } from '../../src/main/vault/database'
+import type { Db } from '../../src/main/vault/database'
 import type { RuleMatch } from '../../src/shared/rules'
+import { tempDatabase, type TempDatabase } from '../support/temp-database'
 
-let dir: string
+let temp: TempDatabase
 let db: Db
 let accountId: number
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'ledger-rules-'))
-  db = openDatabase(join(dir, 'ledger.db'), Buffer.alloc(32, 7), {
-    create: true,
-  })
+  temp = tempDatabase('ledger-rules-')
+  db = temp.db
   const account = createAccount(db, {
     name: 'Fake Everyday',
     type: 'bank',
@@ -45,10 +41,7 @@ beforeEach(() => {
   if (!account.ok) throw new Error('no account')
   accountId = account.id
 })
-afterEach(() => {
-  db.close()
-  rmSync(dir, { recursive: true, force: true })
-})
+afterEach(() => temp.dispose())
 
 const category = (name: string, parentId: number | null = null) => {
   const result = createCategory(db, { name, parentId })

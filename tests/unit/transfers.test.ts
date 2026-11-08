@@ -1,6 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { listBatches, undoBatch } from '../../src/main/import/batches'
 import { ImportSession } from '../../src/main/import/session'
@@ -21,20 +18,19 @@ import {
   transferChoices,
   unlinkTransfer,
 } from '../../src/main/ledger/transfers'
-import { openDatabase, type Db } from '../../src/main/vault/database'
+import type { Db } from '../../src/main/vault/database'
 import { generateLedger } from '../../scripts/seed/generate'
 import { insertLedger } from '../../scripts/seed/insert'
+import { tempDatabase, type TempDatabase } from '../support/temp-database'
 
-let dir: string
+let temp: TempDatabase
 let db: Db
 let everyday: number
 let savings: number
 let travel: number
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'ledger-transfers-'))
-  db = openDatabase(join(dir, 'ledger.db'), Buffer.alloc(32, 7), {
-    create: true,
-  })
+  temp = tempDatabase('ledger-transfers-')
+  db = temp.db
   const account = (name: string, currency: 'AUD' | 'CNY' = 'AUD') => {
     const result = createAccount(db, {
       name,
@@ -49,10 +45,7 @@ beforeEach(() => {
   savings = account('Fake Savings')
   travel = account('Fake Travel', 'CNY')
 })
-afterEach(() => {
-  db.close()
-  rmSync(dir, { recursive: true, force: true })
-})
+afterEach(() => temp.dispose())
 
 const add = (
   accountId: number,

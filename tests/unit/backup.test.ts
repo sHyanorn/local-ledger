@@ -10,11 +10,8 @@ import {
 } from '../../src/main/vault/backup'
 import { openDatabase } from '../../src/main/vault/database'
 import { deriveHere, encodePassword } from '../../src/main/vault/kdf'
-import type { KdfParams } from '../../src/main/vault/kdf'
 import { Vault } from '../../src/main/vault/vault'
-
-const FAST: KdfParams = { memoryKiB: 19_456, iterations: 2, parallelism: 1 }
-const PASSWORD = 'fake ledger passphrase for tests'
+import { FAST, PASSWORD } from '../support/vault'
 
 let root: string
 let vault: Vault

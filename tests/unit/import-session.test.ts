@@ -1,5 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { listBatches, undoBatch } from '../../src/main/import/batches'
@@ -12,21 +11,17 @@ import {
   updateTransaction,
 } from '../../src/main/ledger/transactions'
 import { createCategory } from '../../src/main/ledger/categories'
-import { openDatabase, type Db } from '../../src/main/vault/database'
+import type { Db } from '../../src/main/vault/database'
 import type { ImportFile, Mapping } from '../../src/shared/imports'
+import { tempDatabase, type TempDatabase } from '../support/temp-database'
 
-let dir: string
+let temp: TempDatabase
 let db: Db
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'ledger-import-'))
-  db = openDatabase(join(dir, 'ledger.db'), Buffer.alloc(32, 7), {
-    create: true,
-  })
+  temp = tempDatabase('ledger-import-')
+  db = temp.db
 })
-afterEach(() => {
-  db.close()
-  rmSync(dir, { recursive: true, force: true })
-})
+afterEach(() => temp.dispose())
 
 const account = (name = 'Fake Everyday') => {
   const result = createAccount(db, {

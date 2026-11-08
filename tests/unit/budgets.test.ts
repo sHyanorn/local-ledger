@@ -1,6 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createAccount } from '../../src/main/ledger/accounts'
 import { monthBudgets, setBudget } from '../../src/main/ledger/budgets'
@@ -10,11 +7,12 @@ import {
 } from '../../src/main/ledger/categories'
 import { createTransaction } from '../../src/main/ledger/transactions'
 import { pairTransfers } from '../../src/main/ledger/transfers'
-import { openDatabase, type Db } from '../../src/main/vault/database'
+import type { Db } from '../../src/main/vault/database'
 import { budgetState, type MonthBudgets } from '../../src/shared/budgets'
 import { schemas } from '../../src/shared/schemas'
+import { tempDatabase, type TempDatabase } from '../support/temp-database'
 
-let dir: string
+let temp: TempDatabase
 let db: Db
 let everyday: number
 let savings: number
@@ -22,10 +20,8 @@ let travel: number
 let food: number
 let coffee: number
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'ledger-budgets-'))
-  db = openDatabase(join(dir, 'ledger.db'), Buffer.alloc(32, 7), {
-    create: true,
-  })
+  temp = tempDatabase('ledger-budgets-')
+  db = temp.db
   const account = (name: string, currency: 'AUD' | 'CNY' = 'AUD') => {
     const result = createAccount(db, {
       name,
@@ -47,10 +43,7 @@ beforeEach(() => {
   food = category('Fake Food')
   coffee = category('Fake Coffee', food)
 })
-afterEach(() => {
-  db.close()
-  rmSync(dir, { recursive: true, force: true })
-})
+afterEach(() => temp.dispose())
 
 const add = (
   accountId: number,

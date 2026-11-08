@@ -10,11 +10,9 @@ import { join } from 'node:path'
 import Database from 'better-sqlite3-multiple-ciphers'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { deriveHere } from '../../src/main/vault/kdf'
-import type { KdfParams } from '../../src/main/vault/kdf'
 import { Vault } from '../../src/main/vault/vault'
+import { FAST, PASSWORD } from '../support/vault'
 
-const FAST: KdfParams = { memoryKiB: 19_456, iterations: 2, parallelism: 1 }
-const PASSWORD = 'fake ledger passphrase for tests'
 // Fake data that must never appear in clear on disk.
 const MARKERS = ['FAKE-PAYEE-7c1e9a', 'FAKE-NOTE-52bd04', 'FAKE-ACCOUNT-e83f11']
 

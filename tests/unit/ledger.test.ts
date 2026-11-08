@@ -1,6 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   createAccount,
@@ -22,26 +19,21 @@ import {
   totalTransactions,
   updateTransaction,
 } from '../../src/main/ledger/transactions'
-import { openDatabase } from '../../src/main/vault/database'
 import type { Db } from '../../src/main/vault/database'
 import type {
   AccountFields,
   TransactionFields,
   TransactionFilter,
 } from '../../src/shared/ledger'
+import { tempDatabase, type TempDatabase } from '../support/temp-database'
 
-let dir: string
+let temp: TempDatabase
 let db: Db
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'ledger-data-'))
-  db = openDatabase(join(dir, 'ledger.db'), Buffer.alloc(32, 7), {
-    create: true,
-  })
+  temp = tempDatabase('ledger-data-')
+  db = temp.db
 })
-afterEach(() => {
-  db.close()
-  rmSync(dir, { recursive: true, force: true })
-})
+afterEach(() => temp.dispose())
 
 const created = (result: { ok: boolean; id?: number }) => {
   if (!result.ok || result.id === undefined) throw new Error('not created')

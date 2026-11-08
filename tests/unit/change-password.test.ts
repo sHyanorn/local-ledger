@@ -16,15 +16,11 @@ import {
   openDatabase,
 } from '../../src/main/vault/database'
 import { deriveHere } from '../../src/main/vault/kdf'
-import type { KdfParams } from '../../src/main/vault/kdf'
 import { openKey } from '../../src/main/vault/keys'
 import { parseVaultFile } from '../../src/main/vault/vault-file'
 import { Vault } from '../../src/main/vault/vault'
 import type { VaultState } from '../../src/shared/ipc'
-
-const FAST: KdfParams = { memoryKiB: 19_456, iterations: 2, parallelism: 1 }
-const OLD = 'old fake ledger passphrase'
-const NEW = 'new fake ledger passphrase'
+import { FAST, OLD, NEW } from '../support/vault'
 
 // Each step of a change, and which password a crash right after it leaves
 // working. Replacing vault.json is the commit point.

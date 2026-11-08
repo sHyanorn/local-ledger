@@ -1,6 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { strFromU8, unzipSync } from 'fflate'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { csvField, startsLikeFormula } from '../../src/main/export/formula'
@@ -18,8 +15,9 @@ import { setBudget } from '../../src/main/ledger/budgets'
 import { createCategory } from '../../src/main/ledger/categories'
 import { createTransaction } from '../../src/main/ledger/transactions'
 import { pairTransfers } from '../../src/main/ledger/transfers'
-import { openDatabase, type Db } from '../../src/main/vault/database'
+import type { Db } from '../../src/main/vault/database'
 import { schemas } from '../../src/shared/schemas'
+import { tempDatabase, type TempDatabase } from '../support/temp-database'
 
 // OWASP's formula starts, and the full-width forms Excel also reads.
 const DANGEROUS = [
@@ -200,14 +198,12 @@ describe('workbook', () => {
 })
 
 describe('statement', () => {
-  let dir: string
+  let temp: TempDatabase
   let db: Db
   const ids: Record<string, number> = {}
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'ledger-export-'))
-    db = openDatabase(join(dir, 'ledger.db'), Buffer.alloc(32, 7), {
-      create: true,
-    })
+    temp = tempDatabase('ledger-export-')
+    db = temp.db
     for (const [name, currency] of [
       ['Fake Everyday', 'AUD'],
       ['=Fake Savings', 'AUD'],
@@ -234,10 +230,7 @@ describe('statement', () => {
       ids[name] = result.id
     }
   })
-  afterEach(() => {
-    db.close()
-    rmSync(dir, { recursive: true, force: true })
-  })
+  afterEach(() => temp.dispose())
   const add = (
     account: string,
     date: string,

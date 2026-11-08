@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import Database from 'better-sqlite3-multiple-ciphers'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { Derive } from '../../src/main/vault/kdf'
+import { FAST, OLD, NEW } from '../support/vault'
 
 const seen = vi.hoisted(() => ({ keys: [] as Uint8Array[], sealFails: false }))
 
@@ -43,9 +44,6 @@ vi.mock('../../src/main/vault/keys', async (importOriginal) => {
 const { deriveHere } = await import('../../src/main/vault/kdf')
 const { Vault } = await import('../../src/main/vault/vault')
 
-const FAST = { memoryKiB: 19_456, iterations: 2, parallelism: 1 }
-const OLD = 'old fake ledger passphrase'
-const NEW = 'new fake ledger passphrase'
 let root: string
 let failDerivation = 0
 let duringDerivation: (() => void) | null = null

@@ -14,7 +14,6 @@ import { createAccount } from '../../src/main/ledger/accounts'
 import { openDatabase } from '../../src/main/vault/database'
 import { openBackupKey, readBackup } from '../../src/main/vault/backup'
 import { deriveHere, encodePassword } from '../../src/main/vault/kdf'
-import type { KdfParams } from '../../src/main/vault/kdf'
 import { openKey } from '../../src/main/vault/keys'
 import { parseVaultFile } from '../../src/main/vault/vault-file'
 import {
@@ -22,8 +21,8 @@ import {
   Vault,
   type StagedBackup,
 } from '../../src/main/vault/vault'
+import { FAST } from '../support/vault'
 
-const FAST: KdfParams = { memoryKiB: 19_456, iterations: 2, parallelism: 1 }
 const OLD = 'fake passphrase when backed up'
 const NOW = 'fake passphrase in use today'
 

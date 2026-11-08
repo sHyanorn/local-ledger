@@ -1,6 +1,7 @@
 // The page's vault store, with the preload API stubbed.
 import { beforeEach, expect, it, vi } from 'vitest'
 import { PASSWORD_MAX } from '../../src/shared/password'
+import { PASSWORD } from '../support/vault'
 
 const vault = {
   status: vi.fn(),
@@ -11,8 +12,6 @@ const vault = {
 }
 vi.stubGlobal('window', { ledger: { version: 'test', vault } })
 const { useVault } = await import('../../src/renderer/src/store')
-
-const PASSWORD = 'fake ledger passphrase for tests'
 
 beforeEach(() => {
   vi.clearAllMocks()

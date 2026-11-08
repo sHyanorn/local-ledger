@@ -4,6 +4,7 @@ import { mkdtempSync, readdirSync, readlinkSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { FAST, OLD, NEW } from '../support/vault'
 
 const failing = vi.hoisted(() => ({ flushes: 0, listing: false }))
 
@@ -33,9 +34,6 @@ vi.mock('node:fs', async (importOriginal) => {
 const { deriveHere } = await import('../../src/main/vault/kdf')
 const { Vault } = await import('../../src/main/vault/vault')
 
-const FAST = { memoryKiB: 19_456, iterations: 2, parallelism: 1 }
-const OLD = 'old fake ledger passphrase'
-const NEW = 'new fake ledger passphrase'
 let root: string
 
 beforeEach(() => {
