@@ -145,17 +145,24 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
     } catch {
       // Writes to a frozen object throw in strict mode code.
     }
+    const methods = (name: string) => Object.keys(ledger[name] as object).sort()
     return {
       keys: Object.keys(ledger),
       version: ledger.version,
-      vault: Object.keys(vault).sort(),
+      vault: methods('vault'),
+      accounts: methods('accounts'),
+      categories: methods('categories'),
+      transactions: methods('transactions'),
       unlockReplaced: String(vault.unlock).includes('replaced'),
     }
   })
   expect(api).toEqual({
-    keys: ['version', 'vault'],
+    keys: ['version', 'vault', 'accounts', 'categories', 'transactions'],
     version: pkg.version,
     vault: ['changePassword', 'create', 'lock', 'status', 'unlock'],
+    accounts: ['create', 'delete', 'list', 'update'],
+    categories: ['create', 'delete', 'list', 'update'],
+    transactions: ['create', 'delete', 'page', 'totals', 'update'],
     unlockReplaced: false,
   })
 })

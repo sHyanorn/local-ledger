@@ -4,6 +4,7 @@ import { channels } from '../shared/ipc'
 import { errorCode } from './error-code'
 import type { Channel, Payload, Results } from '../shared/ipc'
 import { isTrustedSender } from './security'
+import { LockedError } from './vault/vault'
 
 type Handler<C extends Channel> = (
   payload: Payload<C>,
@@ -32,6 +33,8 @@ export function guard<C extends Channel>(
     try {
       return await handler(parsed.data as Payload<C>)
     } catch (error) {
+      // A page that outlived its vault state; it is about to be replaced.
+      if (error instanceof LockedError) throw new Error('locked')
       console.error(`${channel} failed: ${errorCode(error)}`)
       throw new Error('failed')
     }

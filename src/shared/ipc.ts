@@ -1,6 +1,19 @@
 // IPC channels between preload and the main process, with the schema the
 // main process validates each payload against.
 import { z } from 'zod'
+import {
+  accountFields,
+  categoryFields,
+  schemas,
+  transactionFields,
+  transactionFilter,
+} from './ledger'
+import type {
+  Account,
+  Category,
+  CurrencyTotal,
+  TransactionPage,
+} from './ledger'
 import { PASSWORD_MAX, PASSWORD_MIN, passwordLength } from './password'
 
 export { PASSWORD_MAX, PASSWORD_MIN, passwordLength } from './password'
@@ -29,6 +42,19 @@ export const channels = {
     current: givenPassword,
     next: newPassword,
   }),
+  'accounts:list': z.undefined(),
+  'accounts:create': accountFields,
+  'accounts:update': schemas.accountUpdate,
+  'accounts:delete': schemas.id,
+  'categories:list': z.undefined(),
+  'categories:create': categoryFields,
+  'categories:update': schemas.categoryUpdate,
+  'categories:delete': schemas.id,
+  'transactions:page': schemas.transactionPage,
+  'transactions:totals': transactionFilter,
+  'transactions:create': transactionFields,
+  'transactions:update': schemas.transactionUpdate,
+  'transactions:delete': schemas.id,
 } as const
 
 export type Channel = keyof typeof channels
@@ -39,6 +65,10 @@ export type VaultState = 'new' | 'locked' | 'unlocked' | 'damaged'
 export type Outcome<Reason extends string> =
   { ok: true } | { ok: false; reason: Reason }
 
+/** An outcome that names the new record. */
+export type Created<Reason extends string> =
+  { ok: true; id: number } | { ok: false; reason: Reason }
+
 export interface Results {
   'vault:status': VaultState
   'vault:create': Outcome<'exists' | 'locked'>
@@ -47,4 +77,17 @@ export interface Results {
   >
   'vault:lock': void
   'vault:change-password': Outcome<'wrong-password' | 'locked' | 'damaged'>
+  'accounts:list': Account[]
+  'accounts:create': Created<'duplicate'>
+  'accounts:update': Outcome<'duplicate' | 'not-found' | 'currency-in-use'>
+  'accounts:delete': Outcome<'in-use' | 'not-found'>
+  'categories:list': Category[]
+  'categories:create': Created<'duplicate' | 'not-found' | 'too-deep'>
+  'categories:update': Outcome<'duplicate' | 'not-found' | 'too-deep'>
+  'categories:delete': Outcome<'not-found'>
+  'transactions:page': TransactionPage
+  'transactions:totals': CurrencyTotal[]
+  'transactions:create': Created<'not-found'>
+  'transactions:update': Outcome<'not-found'>
+  'transactions:delete': Outcome<'not-found'>
 }

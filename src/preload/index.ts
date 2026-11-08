@@ -20,6 +20,30 @@ const api: LedgerApi = {
     changePassword: (current, next) =>
       invoke('vault:change-password', { current, next }),
   },
+  accounts: {
+    list: () => invoke('accounts:list', undefined),
+    create: (fields) => invoke('accounts:create', fields),
+    update: (fields) => invoke('accounts:update', fields),
+    delete: (id) => invoke('accounts:delete', { id }),
+  },
+  categories: {
+    list: () => invoke('categories:list', undefined),
+    create: (fields) => invoke('categories:create', fields),
+    update: (fields) => invoke('categories:update', fields),
+    delete: (id) => invoke('categories:delete', { id }),
+  },
+  transactions: {
+    page: (filter, limit, after) =>
+      invoke('transactions:page', {
+        filter,
+        limit,
+        ...(after ? { after } : {}),
+      }),
+    totals: (filter) => invoke('transactions:totals', filter),
+    create: (fields) => invoke('transactions:create', fields),
+    update: (fields) => invoke('transactions:update', fields),
+    delete: (id) => invoke('transactions:delete', { id }),
+  },
 }
 
 contextBridge.exposeInMainWorld('ledger', api)

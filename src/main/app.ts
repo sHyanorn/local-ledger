@@ -3,6 +3,7 @@ import { app, powerMonitor } from 'electron'
 import { watchForLock } from './auto-lock'
 import { hardenApp } from './hardening'
 import { handle } from './ipc'
+import { handleLedger } from './ledger/handlers'
 import { setMenu } from './menu'
 import { registerAppScheme, serveAppScheme } from './protocol'
 import { APP_ORIGIN, windowWebPreferences } from './security'
@@ -33,6 +34,7 @@ export function startApp(): void {
       ({ current, next }) => vault.changePassword(current, next),
       devOrigin,
     )
+    handleLedger(vault, devOrigin)
 
     const webPreferences = windowWebPreferences(
       join(__dirname, '../preload/index.js'),

@@ -68,6 +68,16 @@ export const migrations: readonly Migration[] = [
         UNIQUE (category_id, month)
       ) STRICT;
     `),
+
+  // 2: opening balances, and names unique where the page shows them side by side.
+  (db) =>
+    db.exec(`
+      ALTER TABLE accounts
+        ADD COLUMN opening_balance_cents INTEGER NOT NULL DEFAULT 0;
+      CREATE UNIQUE INDEX accounts_name ON accounts (name COLLATE NOCASE);
+      CREATE UNIQUE INDEX categories_name
+        ON categories (ifnull(parent_id, 0), name COLLATE NOCASE);
+    `),
 ]
 
 export class NewerSchemaError extends Error {
