@@ -76,10 +76,14 @@ export function Transactions({ accountId }: { accountId: number | null }) {
   }
 
   /** After the user sets a category, a rule may be worth offering. */
+  const suggestion$ = useRef(0)
   const suggestFor = (id: number) => {
-    window.ledger.rules
-      .suggest(id)
-      .then(setSuggestion, () => setSuggestion(null))
+    // Only the answer for the latest change counts.
+    const asked = ++suggestion$.current
+    const answer = (value: RuleSuggestion | null) => {
+      if (asked === suggestion$.current) setSuggestion(value)
+    }
+    window.ledger.rules.suggest(id).then(answer, () => answer(null))
   }
 
   const startImport = async () => {

@@ -77,6 +77,7 @@ export function TransfersView() {
                   <button
                     type="button"
                     className="secondary"
+                    aria-label={`Not a transfer: ${pair.out.description} and ${pair.in.description}`}
                     onClick={() =>
                       void decide(() =>
                         window.ledger.transfers.reject(pair.out.id, pair.in.id),
@@ -87,6 +88,7 @@ export function TransfersView() {
                   </button>
                   <button
                     type="button"
+                    aria-label={`Pair ${pair.out.description} with ${pair.in.description}`}
                     onClick={() =>
                       void decide(() =>
                         window.ledger.transfers.link(pair.out.id, pair.in.id),

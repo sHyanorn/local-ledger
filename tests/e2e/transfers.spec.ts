@@ -79,11 +79,11 @@ ledgerTest(
     await expect(pairs).toHaveCount(2)
     await pairs
       .filter({ hasText: 'Fake Card Credit' })
-      .getByRole('button', { name: 'Not a Transfer' })
+      .getByRole('button', { name: /^Not a transfer:/ })
       .click()
     await expect(pairs).toHaveCount(1)
     await expect(transfers.getByLabel('1 to review')).toBeVisible()
-    await pairs.getByRole('button', { name: 'Pair' }).click()
+    await pairs.getByRole('button', { name: /^Pair Fake Move Out/ }).click()
     await expect(home.getByText('No transfers to review')).toBeVisible()
     await expect(transfers.getByLabel(/to review/)).toHaveCount(0)
   },

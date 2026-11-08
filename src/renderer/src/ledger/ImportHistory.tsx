@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { isoDate } from '../../../shared/dates'
 import type { ImportBatch } from '../../../shared/imports'
 import { Confirm } from '../components/Dialog'
 import { formatDate } from './format'
@@ -41,7 +42,7 @@ export function ImportHistory() {
           <li key={batch.id} className="list-row">
             <span className="name">{batch.fileName}</span>
             <span className="muted">
-              {formatDate(batch.importedAt.slice(0, 10))} ·{' '}
+              {formatDate(isoDate(new Date(batch.importedAt)))} ·{' '}
               {count(batch.count, 'transaction')}
             </span>
             <button
@@ -71,11 +72,13 @@ export function ImportHistory() {
 function undoMessage(batch: ImportBatch): string {
   const changed =
     batch.edited > 0
-      ? `, including ${count(batch.edited, 'one', 'ones')} you have changed`
+      ? `, including ${batch.edited.toLocaleString('en-AU')} you have changed`
       : ''
   const paired =
-    batch.paired > 0
-      ? ` ${count(batch.paired, 'transfer')} they are part of will be unpaired.`
-      : ''
+    batch.paired === 1
+      ? ' 1 of them is paired as a transfer, which will be unpaired.'
+      : batch.paired > 1
+        ? ` ${batch.paired.toLocaleString('en-AU')} of them are paired as transfers, which will be unpaired.`
+        : ''
   return `${count(batch.count, 'transaction')} from “${batch.fileName}” will be deleted${changed}.${paired}`
 }
