@@ -67,29 +67,42 @@ const width = (cells: readonly string[]) => {
   return end
 }
 
+/**
+ * The layout, with the date order that reads the most of the file's dates.
+ * When several read them all, as when no day is past the 12th, they are all
+ * listed for the user to choose from.
+ */
 function layout(
   template: TemplateId | null,
   mapping: Omit<Mapping, 'dateOrder'>,
-  dates: readonly string[],
+  rows: readonly Row[],
   accountColumn: number | null = null,
 ): Layout {
-  const filled = dates.filter((date) => date.trim() !== '')
-  const orders = DATE_ORDERS.filter((order) =>
-    mostly(filled, (date) => parseDate(date, order) !== null),
+  const dates = (mapping.header ? rows.slice(1) : rows)
+    .map((row) => row.cells[mapping.date] ?? '')
+    .filter((date) => date.trim() !== '')
+  const read = DATE_ORDERS.map(
+    (order) =>
+      [
+        order,
+        dates.filter((date) => parseDate(date, order) !== null).length,
+      ] as const,
   )
+  const most = Math.max(...read.map(([, count]) => count))
+  const best = read
+    .filter(([, count]) => count === most)
+    .map(([order]) => order)
   return {
     template,
-    mapping: { ...mapping, dateOrder: orders[0] ?? 'dmy' },
+    mapping: { ...mapping, dateOrder: best[0] ?? 'dmy' },
     accountColumn,
-    dateOrders: orders,
+    dateOrders: most > 0 ? best : [],
   }
 }
 
 function bankLayout(rows: readonly Row[]): Layout | null {
   const first = rows[0]?.cells ?? []
   const data = (header: boolean) => rows.slice(header ? 1 : 0, SAMPLE + 1)
-  const column = (sample: readonly Row[], index: number) =>
-    sample.map((row) => row.cells[index] ?? '')
 
   if (startsWith(first, NAB_HEADER)) {
     // Transaction Details, else Merchant Name, else Transaction Type.
@@ -101,7 +114,7 @@ function bankLayout(rows: readonly Row[]): Layout | null {
         description: [5, 8, 4],
         amount: { kind: 'signed', column: 1, negate: false },
       },
-      column(data(true), 0),
+      rows,
     )
   }
   if (startsWith(first, WESTPAC_HEADER)) {
@@ -113,7 +126,7 @@ function bankLayout(rows: readonly Row[]): Layout | null {
         description: [2],
         amount: { kind: 'split', debit: 3, credit: 4 },
       },
-      column(data(true), 1),
+      rows,
       0,
     )
   }
@@ -140,7 +153,7 @@ function bankLayout(rows: readonly Row[]): Layout | null {
   if (
     mostly(sample, (row) => width(row.cells) === 4 && isAmount(row.cells[3]))
   ) {
-    return layout('commbank', mapping, column(sample, 0))
+    return layout('commbank', mapping, rows)
   }
   if (
     mostly(
@@ -150,7 +163,7 @@ function bankLayout(rows: readonly Row[]): Layout | null {
         !isAmount(row.cells[3]),
     )
   ) {
-    return layout('anz', mapping, column(sample, 0))
+    return layout('anz', mapping, rows)
   }
   return null
 }
@@ -211,7 +224,7 @@ function guessLayout(rows: readonly Row[]): Layout | null {
   return layout(
     null,
     { header, date, description: [description], amount },
-    sample.map((row) => row.cells[date] ?? ''),
+    rows,
   )
 }
 

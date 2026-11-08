@@ -48,7 +48,10 @@ export function ImportView({
   const [mapping, setMapping] = useState<Mapping>(
     file.mapping ?? fallbackMapping(file.columns),
   )
-  const [editingColumns, setEditingColumns] = useState(file.mapping === null)
+  // Opens when the columns are unknown, or the dates fit more than one order.
+  const [editingColumns, setEditingColumns] = useState(
+    file.mapping === null || file.dateOrders.length > 1,
+  )
   const [targets, setTargets] = useState<ImportTarget[]>(() =>
     file.groups
       ? file.groups.map((group) => ({ key: group.key, accountId: null }))

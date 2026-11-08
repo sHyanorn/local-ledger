@@ -226,6 +226,28 @@ describe('guessed layouts', () => {
   })
 })
 
+describe('date order', () => {
+  const file = (dates: string[]) =>
+    rows(...dates.map((date, index) => [date, '-1.00', `Fake ${index}`]))
+  const early = Array.from(
+    { length: 60 },
+    (_, index) => `0${(index % 9) + 1}/0${(index % 3) + 1}/2026`,
+  )
+
+  it('takes the order that reads the most dates, past the first rows', () => {
+    // Sixty dates fit either order; the two after them only month first.
+    const layout = detectLayout(file([...early, '05/13/2026', '05/14/2026']))
+    expect(layout?.mapping.dateOrder).toBe('mdy')
+    expect(layout?.dateOrders).toEqual(['mdy'])
+  })
+
+  it('lists every order that reads them all, day first first', () => {
+    const layout = detectLayout(file(early))
+    expect(layout?.mapping.dateOrder).toBe('dmy')
+    expect(layout?.dateOrders).toEqual(['dmy', 'mdy'])
+  })
+})
+
 describe('layouts as public sample files write them', () => {
   it('takes a header added to a CommBank or ANZ file as a header', () => {
     const commbank = detectLayout(
