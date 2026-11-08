@@ -17,6 +17,8 @@ import type { Db } from '../vault/database'
 
 /** Days apart that a reworded or hand-entered transaction may be. */
 export const MATCH_DAYS = 4
+/** Existing transactions considered for each incoming row, nearest first. */
+const NEAREST = 10
 
 export interface IncomingRow {
   index: number
@@ -57,17 +59,19 @@ const dayNumber = (date: string) => Date.parse(`${date}T00:00:00Z`) / DAY
 const shiftDate = (date: string, days: number) =>
   new Date((dayNumber(date) + days) * DAY).toISOString().slice(0, 10)
 
+const words = (text: string) =>
+  new Set(
+    text
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((word) => word.length > 1),
+  )
+
 /** Words two descriptions share, of all their words: 0 to 1. */
-export function similarity(a: string, b: string): number {
-  const words = (text: string) =>
-    new Set(
-      text
-        .toLowerCase()
-        .split(/[^\p{L}\p{N}]+/u)
-        .filter((word) => word.length > 1),
-    )
-  const left = words(a)
-  const right = words(b)
+export function similarity(
+  left: ReadonlySet<string>,
+  right: ReadonlySet<string>,
+): number {
   if (left.size === 0 && right.size === 0) return 0
   let shared = 0
   for (const word of left) if (right.has(word)) shared++
@@ -76,6 +80,12 @@ export function similarity(a: string, b: string): number {
 
 export function classify(db: Db, rows: readonly IncomingRow[]): Classified[] {
   const prints = fingerprints(rows)
+  const wordSets = new Map<string, Set<string>>()
+  const wordsOf = (text: string) => {
+    let set = wordSets.get(text)
+    if (!set) wordSets.set(text, (set = words(text)))
+    return set
+  }
   const exact = db.prepare<[number, string], { id: number }>(
     'SELECT id FROM transactions WHERE account_id = ? AND hash = ?',
   )
@@ -89,13 +99,17 @@ export function classify(db: Db, rows: readonly IncomingRow[]): Classified[] {
   })
 
   const near = db.prepare<
-    [number, number, string, string],
+    [number, number, string, string, string],
     { id: number; date: string; amountCents: number; description: string }
   >(
     `SELECT id, date, amount_cents AS amountCents, description
      FROM transactions
-     WHERE account_id = ? AND amount_cents = ? AND date BETWEEN ? AND ?`,
+     WHERE account_id = ? AND amount_cents = ? AND date BETWEEN ? AND ?
+     ORDER BY abs(julianday(date) - julianday(?)), id
+     LIMIT ${NEAREST}`,
   )
+  // Many alike rows on alike days would otherwise compare every one with
+  // every other; a few nearest candidates each are enough to choose from.
   const pairs: {
     position: number
     match: ExistingMatch
@@ -109,13 +123,14 @@ export function classify(db: Db, rows: readonly IncomingRow[]): Classified[] {
       row.cents,
       shiftDate(row.date, -MATCH_DAYS),
       shiftDate(row.date, MATCH_DAYS),
+      row.date,
     )) {
       if (taken.has(match.id)) continue
       pairs.push({
         position,
         match,
         days: Math.abs(dayNumber(match.date) - dayNumber(row.date)),
-        alike: similarity(match.description, row.description),
+        alike: similarity(wordsOf(match.description), wordsOf(row.description)),
       })
     }
   })

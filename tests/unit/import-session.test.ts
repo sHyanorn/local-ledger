@@ -134,9 +134,13 @@ describe('fingerprints', () => {
 
 describe('similarity', () => {
   it('is the share of words in common', () => {
-    expect(similarity('Fake Cafe Newtown', 'FAKE CAFE')).toBeCloseTo(2 / 3)
-    expect(similarity('Fake Cafe', 'Other Shop')).toBe(0)
-    expect(similarity('', '')).toBe(0)
+    const words = (text: string) =>
+      new Set(text.toLowerCase().split(' ').filter(Boolean))
+    expect(
+      similarity(words('Fake Cafe Newtown'), words('fake cafe')),
+    ).toBeCloseTo(2 / 3)
+    expect(similarity(words('Fake Cafe'), words('Other Shop'))).toBe(0)
+    expect(similarity(new Set(), new Set())).toBe(0)
   })
 })
 
@@ -177,6 +181,54 @@ describe('classify', () => {
     ])
     expect(result[0]?.match?.id).toBe(alike)
     expect(near).toBeGreaterThan(0)
+  })
+
+  it('ranks by date, then wording, whatever order the ledger holds them in', () => {
+    const everyday = account()
+    // Inserted farthest first, so the table's own order is the wrong one.
+    manual(everyday, '2026-05-06', -450, 'Fake Cafe')
+    const reworded = manual(everyday, '2026-05-03', -450, 'Other Words')
+    const alike = manual(everyday, '2026-05-03', -450, 'Fake Cafe')
+    const result = classify(db, [
+      {
+        index: 0,
+        accountId: everyday,
+        date: '2026-05-03',
+        cents: -450,
+        description: 'Fake Cafe',
+      },
+      {
+        index: 1,
+        accountId: everyday,
+        date: '2026-05-03',
+        cents: -450,
+        description: 'Other Words',
+      },
+    ])
+    expect(result.map((entry) => entry.match?.id)).toEqual([alike, reworded])
+  })
+
+  it('looks at the nearest few candidates only, so many alike rows stay fast', () => {
+    const everyday = account()
+    const insert = db.prepare(
+      "INSERT INTO transactions (account_id, date, amount_cents, description) VALUES (?, '2026-05-03', -100, 'Fake Same')",
+    )
+    db.transaction(() => {
+      for (let i = 0; i < 3000; i++) insert.run(everyday)
+    })()
+    const incoming = Array.from({ length: 3000 }, (_, index) => ({
+      index,
+      accountId: everyday,
+      date: '2026-05-03',
+      cents: -100,
+      description: `Fake Same ${index}`,
+    }))
+    const started = performance.now()
+    const result = classify(db, incoming)
+    expect(performance.now() - started).toBeLessThan(3000)
+    expect(
+      result.filter((entry) => entry.status === 'possible').length,
+    ).toBeGreaterThan(0)
   })
 
   it('ignores other amounts, other accounts, and dates more than four days apart', () => {
