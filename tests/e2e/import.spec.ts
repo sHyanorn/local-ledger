@@ -299,3 +299,44 @@ ledgerTest(
     ).toBeVisible()
   },
 )
+
+ledgerTest(
+  'a long file previews only the rows in view, and every row stays reachable',
+  async ({ app, home }, testInfo) => {
+    const path = testInfo.outputPath('long.csv')
+    const lines = Array.from(
+      { length: 3000 },
+      (_, index) =>
+        `${String((index % 28) + 1).padStart(2, '0')}/03/2025,-1.${String(index % 100).padStart(2, '0')},Fake Long ${index},100.00`,
+    )
+    writeFileSync(path, `${lines.join('\n')}\n`)
+    await chooseFile(app, path)
+    await home.getByRole('button', { name: 'Import CSV…' }).click()
+    await home
+      .locator('label.inline-field select')
+      .selectOption({ label: 'Everyday' })
+    const table = home.getByRole('table', { name: 'Rows to import' })
+    await expect(table).toHaveAttribute('aria-rowcount', '3001')
+    await expect(
+      home.getByRole('button', { name: 'Import 3,000 Transactions' }),
+    ).toBeVisible()
+    // Far fewer rows are drawn than the file holds.
+    const drawn = await table.locator('.rows [role=row]').count()
+    expect(drawn).toBeGreaterThan(10)
+    expect(drawn).toBeLessThan(200)
+
+    // The last row is reached by scrolling, and its box works.
+    await table.locator('.rows').evaluate((list) => {
+      list.scrollTop = list.scrollHeight
+    })
+    const last = table.getByRole('checkbox', { name: 'Import Fake Long 2999' })
+    await expect(last).toBeChecked()
+    await expect(
+      last.locator('xpath=ancestor::*[@role="row"]'),
+    ).toHaveAttribute('aria-rowindex', '3001')
+    await last.uncheck()
+    await expect(
+      home.getByRole('button', { name: 'Import 2,999 Transactions' }),
+    ).toBeVisible()
+  },
+)

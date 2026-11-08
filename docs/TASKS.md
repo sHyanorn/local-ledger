@@ -38,7 +38,7 @@
 
 ## M5 Polish and release
 - [ ] Apple-style UI polish, dark mode, keyboard shortcuts; a setting for the auto-lock time; dropping a CSV file on the window to import it
-- [ ] Import preview at the 50,000-row limit: it takes about 3 s to show and about 0.5 s per checkbox; consider a virtualized list
+- [x] Import preview at the 50,000-row limit: it took about 4 s to show and up to 1 s per checkbox; now about 0.2 s and 15 ms (D035)
 - [x] Delimiter detection: a two-line tab-separated file with comma thousands separators was read as comma-separated, and a semicolon file with unquoted semicolons in descriptions split wrongly
 - [x] A home-currency setting for budgets (D028, D032)
 - [ ] Open an exported workbook in Excel and Numbers, which have not been tried (D030)

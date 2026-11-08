@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import type { ImportRequest } from '../../../shared/api'
 import {
   DATE_ORDERS,
@@ -10,7 +18,7 @@ import {
   type Mapping,
   type PreviewRow,
 } from '../../../shared/imports'
-import { formatAmount } from '../../../shared/money'
+import { formatAmount, type Currency } from '../../../shared/money'
 import { formatDate } from './format'
 import {
   DATE_ORDER_NAMES,
@@ -41,7 +49,6 @@ export function ImportView({
   accountId: number | null
 }) {
   const accounts = useLedger((store) => store.accounts)
-  const categories = useLedger((store) => store.categories)
   const show = useLedger((store) => store.show)
   const refresh = useLedger((store) => store.refresh)
   const setNotice = useLedger((store) => store.setNotice)
@@ -120,10 +127,14 @@ export function ImportView({
   )
   const duplicates = (preview?.rows.length ?? 0) - shown.length
   const possible = shown.filter((row) => row.status === 'possible').length
-  const currencies = new Map(
-    accounts.map((account) => [account.id, account.currency]),
+  const currencies = useMemo(
+    () => new Map(accounts.map((account) => [account.id, account.currency])),
+    [accounts],
   )
-  const names = new Map(accounts.map((account) => [account.id, account.name]))
+  const names = useMemo(
+    () => new Map(accounts.map((account) => [account.id, account.name])),
+    [accounts],
+  )
 
   const close = () => {
     void window.ledger.imports.discard(file.id)
@@ -167,12 +178,14 @@ export function ImportView({
     }
   }
 
-  const toggle = (row: PreviewRow, on: boolean) => {
-    const next = new Set(selected)
-    if (on) next.add(row.index)
-    else next.delete(row.index)
-    setSelected(next)
-  }
+  const toggle = useCallback((index: number, on: boolean) => {
+    setSelected((before) => {
+      const next = new Set(before)
+      if (on) next.add(index)
+      else next.delete(index)
+      return next
+    })
+  }, [])
   const allSelected =
     shown.length > 0 && shown.every((row) => selected.has(row.index))
 
@@ -283,6 +296,7 @@ export function ImportView({
           role="table"
           aria-label="Rows to import"
           aria-busy={!current}
+          aria-rowcount={shown.length + 1}
         >
           <div
             className={`tr head preview${file.groups ? ' with-account' : ''}`}
@@ -312,59 +326,14 @@ export function ImportView({
             </span>
             <span role="columnheader">Matches</span>
           </div>
-          <div role="rowgroup" className="rows">
-            {shown.map((row) => {
-              const currency = currencies.get(row.accountId) ?? 'AUD'
-              return (
-                <div
-                  key={row.index}
-                  role="row"
-                  className={`tr preview${file.groups ? ' with-account' : ''}`}
-                >
-                  <span role="cell">
-                    <input
-                      type="checkbox"
-                      aria-label={`Import ${row.description}`}
-                      checked={selected.has(row.index)}
-                      onChange={(event) => toggle(row, event.target.checked)}
-                    />
-                  </span>
-                  <span role="cell" className="date">
-                    {formatDate(row.date)}
-                  </span>
-                  <span role="cell" title={row.description}>
-                    {row.description}
-                  </span>
-                  <span
-                    role="cell"
-                    className={row.categoryId === null ? 'muted' : undefined}
-                  >
-                    {categoryName(categories, row.categoryId) ??
-                      'Uncategorized'}
-                  </span>
-                  {file.groups && (
-                    <span role="cell" className="muted">
-                      {names.get(row.accountId)}
-                    </span>
-                  )}
-                  <span
-                    role="cell"
-                    className={`amount${row.amountCents > 0 ? ' positive' : ''}`}
-                  >
-                    {formatAmount(row.amountCents, currency)}
-                  </span>
-                  <span
-                    role="cell"
-                    className="muted"
-                    title={row.match ? row.match.description : undefined}
-                  >
-                    {row.match &&
-                      `${formatDate(row.match.date)} · ${row.match.description}`}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
+          <PreviewRows
+            rows={shown}
+            selected={selected}
+            onToggle={toggle}
+            groups={file.groups !== null}
+            currencies={currencies}
+            names={names}
+          />
         </div>
       )}
 
@@ -582,3 +551,143 @@ function ColumnEditor({
     </section>
   )
 }
+
+/** Rows are this tall (index.css), which lets the list draw only those in view. */
+const ROW_HEIGHT = 35
+/** Rows drawn beyond the visible ones, so scrolling does not show gaps. */
+const OVERSCAN = 20
+
+/**
+ * The preview rows, drawn only around what is in view: a file can hold
+ * 50,000 rows, and drawing them all takes seconds. Each row keeps its
+ * aria-rowindex, so assistive technology knows where it is in the whole.
+ */
+function PreviewRows({
+  rows,
+  selected,
+  onToggle,
+  groups,
+  currencies,
+  names,
+}: {
+  rows: PreviewRow[]
+  selected: Set<number>
+  onToggle: (index: number, on: boolean) => void
+  groups: boolean
+  currencies: Map<number, Currency>
+  names: Map<number, string>
+}) {
+  const list = useRef<HTMLDivElement>(null)
+  const [view, setView] = useState({ top: 0, height: 800 })
+
+  useLayoutEffect(() => {
+    const element = list.current
+    if (!element) return
+    const measure = () =>
+      setView({ top: element.scrollTop, height: element.clientHeight })
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    element.addEventListener('scroll', measure, { passive: true })
+    return () => {
+      observer.disconnect()
+      element.removeEventListener('scroll', measure)
+    }
+  }, [])
+
+  const first = Math.max(0, Math.floor(view.top / ROW_HEIGHT) - OVERSCAN)
+  const last = Math.min(
+    rows.length,
+    Math.ceil((view.top + view.height) / ROW_HEIGHT) + OVERSCAN,
+  )
+
+  return (
+    <div role="rowgroup" className="rows" ref={list}>
+      <div style={{ height: first * ROW_HEIGHT }} aria-hidden="true" />
+      {rows.slice(first, last).map((row, offset) => (
+        <PreviewRowView
+          key={row.index}
+          row={row}
+          position={first + offset + 2}
+          checked={selected.has(row.index)}
+          onToggle={onToggle}
+          groups={groups}
+          currency={currencies.get(row.accountId) ?? 'AUD'}
+          account={names.get(row.accountId)}
+        />
+      ))}
+      <div
+        style={{ height: (rows.length - last) * ROW_HEIGHT }}
+        aria-hidden="true"
+      />
+    </div>
+  )
+}
+
+const PreviewRowView = memo(function PreviewRowView({
+  row,
+  position,
+  checked,
+  onToggle,
+  groups,
+  currency,
+  account,
+}: {
+  row: PreviewRow
+  /** The row's place in the table, the header being 1. */
+  position: number
+  checked: boolean
+  onToggle: (index: number, on: boolean) => void
+  groups: boolean
+  currency: Currency
+  account: string | undefined
+}) {
+  const categories = useLedger((store) => store.categories)
+  return (
+    <div
+      role="row"
+      aria-rowindex={position}
+      className={`tr preview${groups ? ' with-account' : ''}`}
+    >
+      <span role="cell">
+        <input
+          type="checkbox"
+          aria-label={`Import ${row.description}`}
+          checked={checked}
+          onChange={(event) => onToggle(row.index, event.target.checked)}
+        />
+      </span>
+      <span role="cell" className="date">
+        {formatDate(row.date)}
+      </span>
+      <span role="cell" title={row.description}>
+        {row.description}
+      </span>
+      <span
+        role="cell"
+        className={row.categoryId === null ? 'muted' : undefined}
+      >
+        {categoryName(categories, row.categoryId) ?? 'Uncategorized'}
+      </span>
+      {groups && (
+        <span role="cell" className="muted">
+          {account}
+        </span>
+      )}
+      <span
+        role="cell"
+        className={`amount${row.amountCents > 0 ? ' positive' : ''}`}
+      >
+        {formatAmount(row.amountCents, currency)}
+      </span>
+      <span
+        role="cell"
+        className="muted"
+        title={row.match ? row.match.description : undefined}
+      >
+        {row.match &&
+          `${formatDate(row.match.date)} · ${row.match.description}`}
+      </span>
+    </div>
+  )
+})
