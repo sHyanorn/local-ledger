@@ -54,6 +54,7 @@ export const channels = {
   'transactions:totals': transactionFilter,
   'transactions:create': transactionFields,
   'transactions:update': schemas.transactionUpdate,
+  'transactions:set-category': schemas.transactionCategory,
   'transactions:delete': schemas.id,
 } as const
 
@@ -89,5 +90,6 @@ export interface Results {
   'transactions:totals': CurrencyTotal[]
   'transactions:create': Created<'not-found'>
   'transactions:update': Outcome<'not-found'>
+  'transactions:set-category': Outcome<'not-found'>
   'transactions:delete': Outcome<'not-found'>
 }

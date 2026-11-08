@@ -42,6 +42,8 @@ const api: LedgerApi = {
     totals: (filter) => invoke('transactions:totals', filter),
     create: (fields) => invoke('transactions:create', fields),
     update: (fields) => invoke('transactions:update', fields),
+    setCategory: (id, categoryId) =>
+      invoke('transactions:set-category', { id, categoryId }),
     delete: (id) => invoke('transactions:delete', { id }),
   },
 }

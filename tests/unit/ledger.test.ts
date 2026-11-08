@@ -18,6 +18,7 @@ import {
   createTransaction,
   deleteTransaction,
   pageTransactions,
+  setTransactionCategory,
   totalTransactions,
   updateTransaction,
 } from '../../src/main/ledger/transactions'
@@ -342,6 +343,103 @@ describe('transactions', () => {
     expect(page({ text: 'e_S' })).toEqual(['100% Fake_Store'])
     expect(page({ text: '   ' })).toHaveLength(4)
     expect(page({ accountId: everyday, text: 'taxi' })).toEqual([])
+  })
+
+  it('match search text literally: wildcards and the escape character are plain', () => {
+    transaction({ accountId: everyday, description: 'Fake abc' })
+    transaction({ accountId: everyday, description: 'Fake a_c' })
+    transaction({ accountId: everyday, description: 'Fake a\\c' })
+    transaction({
+      accountId: everyday,
+      description: 'Fake plain',
+      notes: '50% off',
+    })
+    expect(page({ text: 'a_c' })).toEqual(['Fake a_c'])
+    expect(page({ text: 'a\\c' })).toEqual(['Fake a\\c'])
+    expect(page({ text: '\\' })).toEqual(['Fake a\\c'])
+    // The notes have their own ESCAPE clause.
+    expect(page({ text: '0%' })).toEqual(['Fake plain'])
+  })
+
+  it('page by date, then by newest entry, whatever order they were entered in', () => {
+    const add = (date: string, description: string) =>
+      transaction({ accountId: everyday, date, description })
+    add('2026-03-01', 'Fake D')
+    add('2026-04-01', 'Fake E')
+    add('2026-01-01', 'Fake A') // entered after later dates
+    add('2026-02-01', 'Fake B')
+    add('2026-02-01', 'Fake C') // same day, entered later
+    const first = pageTransactions(db, { filter: {}, limit: 2 })
+    const second = pageTransactions(db, {
+      filter: {},
+      limit: 2,
+      after: first.next ?? undefined,
+    })
+    const third = pageTransactions(db, {
+      filter: {},
+      limit: 2,
+      after: second.next ?? undefined,
+    })
+    expect(
+      [first, second, third].flatMap((p) => p.rows.map((r) => r.description)),
+    ).toEqual(['Fake E', 'Fake D', 'Fake C', 'Fake B', 'Fake A'])
+    expect(second.next).not.toBeNull()
+    expect(third.next).toBeNull()
+    // A last page that is exactly full has no next page either.
+    expect(pageTransactions(db, { filter: {}, limit: 5 }).next).toBeNull()
+  })
+
+  it('include both ends of a date range', () => {
+    transaction({
+      accountId: everyday,
+      date: '2026-01-31',
+      description: 'Fake before',
+    })
+    transaction({
+      accountId: everyday,
+      date: '2026-02-01',
+      description: 'Fake first',
+    })
+    transaction({
+      accountId: everyday,
+      date: '2026-02-28',
+      description: 'Fake last',
+    })
+    transaction({
+      accountId: everyday,
+      date: '2026-03-01',
+      description: 'Fake after',
+    })
+    expect(page({ from: '2026-02-01', to: '2026-02-28' })).toEqual([
+      'Fake last',
+      'Fake first',
+    ])
+  })
+
+  it('change their category alone', () => {
+    const food = category('Fake Food')
+    const id = transaction({
+      accountId: everyday,
+      description: 'Fake kept',
+      notes: 'fake note',
+    })
+    expect(setTransactionCategory(db, id, food)).toEqual({ ok: true })
+    expect(
+      pageTransactions(db, { filter: {}, limit: 1 }).rows[0],
+    ).toMatchObject({
+      description: 'Fake kept',
+      notes: 'fake note',
+      categoryId: food,
+    })
+    expect(setTransactionCategory(db, id, null)).toEqual({ ok: true })
+    expect(setTransactionCategory(db, id, 99)).toEqual({
+      ok: false,
+      reason: 'not-found',
+    })
+    expect(setTransactionCategory(db, 99, null)).toEqual({
+      ok: false,
+      reason: 'not-found',
+    })
   })
 
   it('total by currency, never across currencies', () => {

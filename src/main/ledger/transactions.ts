@@ -152,6 +152,22 @@ export function updateTransaction(
   }
 }
 
+export function setTransactionCategory(
+  db: Db,
+  id: number,
+  categoryId: number | null,
+): Outcome<'not-found'> {
+  try {
+    const { changes } = db
+      .prepare('UPDATE transactions SET category_id = ? WHERE id = ?')
+      .run(categoryId, id)
+    return changes > 0 ? { ok: true } : { ok: false, reason: 'not-found' }
+  } catch (error) {
+    if (isMissingReference(error)) return { ok: false, reason: 'not-found' }
+    throw error
+  }
+}
+
 export function deleteTransaction(db: Db, id: number): Outcome<'not-found'> {
   const { changes } = db
     .prepare('DELETE FROM transactions WHERE id = ?')

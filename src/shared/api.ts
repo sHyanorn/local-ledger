@@ -47,6 +47,11 @@ export interface LedgerApi {
     update(
       fields: Updated<TransactionFields>,
     ): Promise<Results['transactions:update']>
+    /** Changes only the category, leaving the rest as stored. */
+    setCategory(
+      id: number,
+      categoryId: number | null,
+    ): Promise<Results['transactions:set-category']>
     delete(id: number): Promise<Results['transactions:delete']>
   }
 }

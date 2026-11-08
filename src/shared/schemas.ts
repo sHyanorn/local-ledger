@@ -12,8 +12,20 @@ import {
 import { CURRENCIES, MAX_CENTS } from './money'
 
 const id = z.number().int().positive().max(Number.MAX_SAFE_INTEGER)
-const name = z.string().trim().min(1).max(NAME_MAX)
+/**
+ * Trimmed text in Unicode's composed form (NFC), so text that looks the
+ * same is stored the same, and names and searches compare as written.
+ */
+const text = (max: number, min = 0) =>
+  z
+    .string()
+    .trim()
+    .min(min)
+    .max(max)
+    .transform((value) => value.normalize('NFC'))
+const name = text(NAME_MAX, 1)
 const cents = z.number().int().min(-MAX_CENTS).max(MAX_CENTS)
+/** A calendar date from 1900 to 2999. */
 const date = z.string().refine(isIsoDate)
 
 export const accountFields = z.strictObject({
@@ -32,9 +44,9 @@ export const transactionFields = z.strictObject({
   accountId: id,
   date,
   amountCents: cents,
-  description: z.string().trim().min(1).max(DESCRIPTION_MAX),
+  description: text(DESCRIPTION_MAX, 1),
   categoryId: id.nullable(),
-  notes: z.string().trim().max(NOTES_MAX),
+  notes: text(NOTES_MAX),
 })
 
 export const transactionFilter = z.strictObject({
@@ -44,7 +56,7 @@ export const transactionFilter = z.strictObject({
   from: date.optional(),
   to: date.optional(),
   /** Matched against the description and notes. */
-  text: z.string().max(SEARCH_MAX).optional(),
+  text: text(SEARCH_MAX).optional(),
 })
 
 export const transactionCursor = z.strictObject({ date, id })
@@ -54,6 +66,7 @@ export const schemas = {
   accountUpdate: accountFields.extend({ id }),
   categoryUpdate: categoryFields.extend({ id }),
   transactionUpdate: transactionFields.extend({ id }),
+  transactionCategory: z.strictObject({ id, categoryId: id.nullable() }),
   transactionPage: z.strictObject({
     filter: transactionFilter,
     after: transactionCursor.optional(),

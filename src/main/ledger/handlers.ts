@@ -18,6 +18,7 @@ import {
   createTransaction,
   deleteTransaction,
   pageTransactions,
+  setTransactionCategory,
   totalTransactions,
   updateTransaction,
 } from './transactions'
@@ -54,6 +55,11 @@ export function handleLedger(vault: Vault, devOrigin?: string): void {
   handle(
     'transactions:update',
     (fields) => updateTransaction(db(), fields),
+    devOrigin,
+  )
+  handle(
+    'transactions:set-category',
+    ({ id, categoryId }) => setTransactionCategory(db(), id, categoryId),
     devOrigin,
   )
   handle(

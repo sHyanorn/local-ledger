@@ -162,7 +162,14 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
     vault: ['changePassword', 'create', 'lock', 'status', 'unlock'],
     accounts: ['create', 'delete', 'list', 'update'],
     categories: ['create', 'delete', 'list', 'update'],
-    transactions: ['create', 'delete', 'page', 'totals', 'update'],
+    transactions: [
+      'create',
+      'delete',
+      'page',
+      'setCategory',
+      'totals',
+      'update',
+    ],
     unlockReplaced: false,
   })
 })

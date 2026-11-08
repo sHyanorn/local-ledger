@@ -127,6 +127,15 @@ describe('data channels', () => {
     notes: '',
   }
 
+  it('store text in composed form, so look-alike names collide', async () => {
+    const handler = vi.fn(ok)
+    await guard('accounts:create', handler)(APP, {
+      ...account,
+      name: 'Cafe\u0301',
+    })
+    expect(handler).toHaveBeenCalledWith({ ...account, name: 'Caf\u00e9' })
+  })
+
   it('pass trimmed text to the handler', async () => {
     const handler = vi.fn(ok)
     await guard('accounts:create', handler)(APP, {
