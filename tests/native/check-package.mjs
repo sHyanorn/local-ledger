@@ -31,6 +31,7 @@ function locate() {
     if (!dir) throw new Error('no macOS app in release/')
     const bundle = join(RELEASE, dir, `${productName}.app`)
     return {
+      bundle,
       executable: join(bundle, 'Contents', 'MacOS', productName),
       resources: join(bundle, 'Contents', 'Resources'),
     }
@@ -178,10 +179,27 @@ async function checkLaunch(executable) {
   }
 }
 
-const { executable, resources } = locate()
+/**
+ * The ad-hoc signature must cover the whole bundle, fuses included.
+ * @param {string} bundle
+ */
+function checkSignature(bundle) {
+  let ok = true
+  try {
+    execFileSync('codesign', ['--verify', '--deep', '--strict', bundle], {
+      stdio: 'inherit',
+    })
+  } catch {
+    ok = false
+  }
+  check(ok, 'the ad-hoc signature verifies')
+}
+
+const { bundle, executable, resources } = locate()
 console.log(`checking ${executable}`)
 await checkFuses(executable)
 checkFiles(resources)
+if (bundle) checkSignature(bundle)
 await checkLaunch(executable)
 if (failures > 0) {
   console.error(`${failures} check(s) failed`)
