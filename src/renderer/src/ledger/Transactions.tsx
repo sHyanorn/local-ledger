@@ -241,7 +241,7 @@ export function Transactions({ accountId }: { accountId: number | null }) {
       )}
       <div aria-live="polite">
         {notice && (
-          <div className="suggestion" role="region" aria-label="Import result">
+          <div className="suggestion" role="region" aria-label="Notice">
             <p>{notice}</p>
             <button
               type="button"

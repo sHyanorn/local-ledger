@@ -795,3 +795,85 @@ select.inline:focus {
   flex: 1;
   min-width: 0;
 }
+
+/* Budgets */
+
+.month-switch {
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.month-switch span {
+  min-width: 130px;
+  text-align: center;
+}
+
+.budgets {
+  max-width: 760px;
+  padding: 16px;
+}
+
+.budget {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(80px, 1.2fr) 190px 92px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+}
+
+.budget.child .name {
+  padding-left: 16px;
+}
+
+.budget .bar {
+  display: block;
+}
+
+.budget .track {
+  fill: var(--panel);
+}
+
+.budget .fill {
+  fill: var(--accent);
+}
+
+.budget.close .fill {
+  fill: #c77c02;
+}
+
+.budget.over .fill {
+  fill: var(--danger);
+}
+
+.budget .figure {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.budget.over .figure {
+  color: var(--danger);
+}
+
+.budget > button {
+  justify-self: end;
+}
+
+.budget-form {
+  display: flex;
+  grid-column: 3 / 5;
+  align-items: center;
+  gap: 6px;
+}
+
+.budget-form input {
+  width: 100px;
+}
+
+.budget-extra {
+  margin-top: 12px;
+}
+
+.badge.over {
+  background: var(--danger);
+}

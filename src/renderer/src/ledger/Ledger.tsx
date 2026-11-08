@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { BudgetsView } from './BudgetsView'
 import { ImportView } from './ImportView'
 import { Settings } from './Settings'
 import { Sidebar } from './Sidebar'
@@ -21,6 +22,8 @@ export function Ledger() {
       <main className="main">
         {view.name === 'settings' ? (
           <Settings />
+        ) : view.name === 'budgets' ? (
+          <BudgetsView />
         ) : view.name === 'transfers' ? (
           <TransfersView />
         ) : view.name === 'import' ? (

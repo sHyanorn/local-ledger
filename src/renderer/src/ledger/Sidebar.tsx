@@ -8,6 +8,7 @@ export function Sidebar() {
   const accounts = useLedger((store) => store.accounts)
   const view = useLedger((store) => store.view)
   const transfersToReview = useLedger((store) => store.transfersToReview)
+  const overBudget = useLedger((store) => store.overBudget)
   const show = useLedger((store) => store.show)
   const lock = useVault((store) => store.lock)
   const [adding, setAdding] = useState(false)
@@ -25,6 +26,22 @@ export function Sidebar() {
         onClick={() => show({ name: 'transactions', accountId: null })}
       >
         All Transactions
+      </button>
+      <button
+        type="button"
+        className="sidebar-item"
+        aria-current={current(view.name === 'budgets')}
+        onClick={() => show({ name: 'budgets' })}
+      >
+        <span className="name">Budgets</span>
+        {(overBudget?.length ?? 0) > 0 && (
+          <span
+            className="badge over"
+            aria-label={`${overBudget?.length} over budget`}
+          >
+            {overBudget?.length}
+          </span>
+        )}
       </button>
       <button
         type="button"
