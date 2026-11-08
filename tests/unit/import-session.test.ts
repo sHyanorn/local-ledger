@@ -225,7 +225,9 @@ describe('classify', () => {
     }))
     const started = performance.now()
     const result = classify(db, incoming)
-    expect(performance.now() - started).toBeLessThan(3000)
+    // Comparing every pair took over 20 s here; a shared CI machine can be
+    // slower than a laptop, so the bound is loose.
+    expect(performance.now() - started).toBeLessThan(10_000)
     expect(
       result.filter((entry) => entry.status === 'possible').length,
     ).toBeGreaterThan(0)

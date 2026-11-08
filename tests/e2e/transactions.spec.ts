@@ -168,6 +168,8 @@ test('a change keeps the reader’s place, and focus goes back where it was', as
   home,
 }) => {
   const list = table(home).locator('.rows')
+  // The first page must be in before scrolling can ask for the next.
+  await expect(rows(home)).toHaveCount(200)
   await list.evaluate((element) => {
     element.scrollTop = element.scrollHeight
   })
