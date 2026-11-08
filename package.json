@@ -1,0 +1,37 @@
+{
+  "name": "local-ledger",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A local-first, fully encrypted personal finance desktop app",
+  "author": "Aaron Yang",
+  "license": "MIT",
+  "main": "./out/main/index.js",
+  "engines": {
+    "node": ">=24.12.0"
+  },
+  "scripts": {
+    "setup:electron": "node node_modules/electron/install.js",
+    "dev": "electron-vite dev",
+    "compile": "electron-vite build",
+    "start": "electron-vite preview",
+    "build": "npm run compile && electron-builder",
+    "build:dir": "npm run compile && electron-builder --dir"
+  },
+  "dependencies": {
+    "better-sqlite3-multiple-ciphers": "13.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.2.1",
+    "electron": "45.2.3",
+    "electron-builder": "26.18.1",
+    "electron-vite": "6.0.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.6",
+    "zustand": "5.1.0"
+  }
+}
