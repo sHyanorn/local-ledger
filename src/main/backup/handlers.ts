@@ -9,7 +9,12 @@ import { readChosen } from '../import/read-file'
 import type { Handle } from '../ipc'
 import { writeOwnerOnly } from '../owner-only'
 import { readBackup } from '../vault/backup'
-import { LockedError, type StagedBackup, type Vault } from '../vault/vault'
+import {
+  LockedError,
+  signalUntilChange,
+  type StagedBackup,
+  type Vault,
+} from '../vault/vault'
 
 export const BACKUP_EXTENSION = 'llbackup'
 /** Larger than any ledger this app is made for. */
@@ -20,19 +25,14 @@ export function handleBackup(
   window: () => BaseWindow | null,
   handle: Handle,
 ): { forget: () => void } {
-  // Replaced at every lock and unlock, so work begun before one stops.
-  let state = new AbortController()
+  const currentSignal = signalUntilChange(vault)
   /** The backup file chosen for a restore, and once checked, its staged copy. */
   let chosen: { file: Buffer; staged: StagedBackup | null } | null = null
   const forget = () => {
     if (chosen?.staged) vault.discardBackup(chosen.staged)
     chosen = null
   }
-  vault.onChange(() => {
-    state.abort()
-    state = new AbortController()
-    forget()
-  })
+  vault.onChange(() => forget())
   /** A restore runs from setup, from a vault that does not open, or from an open one. */
   const restoring = () => {
     const now = vault.state
@@ -46,7 +46,7 @@ export function handleBackup(
   }
 
   handle('backup:save', async ({ password }) => {
-    const signal = state.signal
+    const signal = currentSignal()
     const made = await vault.backup(password)
     if (!made.ok) {
       if (made.reason === 'locked') throw new LockedError()
@@ -73,7 +73,7 @@ export function handleBackup(
   handle('restore:open', async () => {
     restoring()
     idle()
-    const signal = state.signal
+    const signal = currentSignal()
     const picked = await showOpen(window(), {
       properties: ['openFile'],
       filters: [
@@ -98,7 +98,7 @@ export function handleBackup(
   handle('restore:check', async ({ password }) => {
     restoring()
     idle()
-    const signal = state.signal
+    const signal = currentSignal()
     const pending = chosen
     if (!pending) return { ok: false, reason: 'no-file' } as const
     const checked = await vault.checkBackup(pending.file, password)

@@ -754,6 +754,19 @@ export class Vault {
   }
 }
 
+/**
+ * The signal for work begun now, aborted at the vault's next lock or
+ * unlock, so that work stops there.
+ */
+export function signalUntilChange(vault: Vault): () => AbortSignal {
+  let controller = new AbortController()
+  vault.onChange(() => {
+    controller.abort()
+    controller = new AbortController()
+  })
+  return () => controller.signal
+}
+
 /** Why a database did not open, when it is damaged or newer than this app. */
 function openFailure(error: unknown): 'newer' | 'damaged' | null {
   if (error instanceof NewerSchemaError) return 'newer'

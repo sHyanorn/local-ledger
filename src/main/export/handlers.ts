@@ -10,7 +10,7 @@ import type { Currency } from '../../shared/money'
 import { showSave } from '../dialogs'
 import type { Handle } from '../ipc'
 import { writeOwnerOnly } from '../owner-only'
-import { LockedError, type Vault } from '../vault/vault'
+import { LockedError, signalUntilChange, type Vault } from '../vault/vault'
 import { printPdf } from './print'
 import reportCss from './report.css?raw'
 import { statementPage } from './report-page'
@@ -27,12 +27,7 @@ export function handleExport(
   window: () => BaseWindow | null,
   handle: Handle,
 ): void {
-  // Replaced at every lock and unlock, so work begun before one stops.
-  let state = new AbortController()
-  vault.onChange(() => {
-    state.abort()
-    state = new AbortController()
-  })
+  const currentSignal = signalUntilChange(vault)
   let busy = false
 
   handle('export:save', async ({ month, currency, format }) => {
@@ -40,7 +35,7 @@ export function handleExport(
     if (busy) return { ok: false, reason: 'busy' } as const
     busy = true
     try {
-      return await save(month, currency, format, state.signal)
+      return await save(month, currency, format, currentSignal())
     } finally {
       busy = false
     }
