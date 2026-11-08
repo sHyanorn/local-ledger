@@ -7,7 +7,8 @@ permissions:
   contents: read
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Every commit on main keeps a complete result.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   check:
     runs-on: ubuntu-24.04
@@ -25,9 +26,16 @@ jobs:
       - run: npm test
       - run: npm audit --audit-level=high
 
-  e2e:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
+  electron:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      # Linux runners have no display.
+      HEADLESS: ${{ runner.os == 'Linux' && 'xvfb-run --auto-servernum' || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -38,44 +46,22 @@ jobs:
       - run: npm run setup:electron
       # Ubuntu blocks unprivileged user namespaces, which the Chromium sandbox
       # needs; allow them so the app runs sandboxed as it does for users.
-      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-      - run: command -v xvfb-run || (sudo apt-get update && sudo apt-get install -y xvfb)
-      - run: xvfb-run --auto-servernum npm run test:e2e
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: failure()
-        with:
-          name: e2e-results
-          path: test-results
-          if-no-files-found: ignore
-
-  native:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npm run setup:electron
-      # Same reason as in the e2e job: let the Chromium sandbox start on Ubuntu.
       - if: runner.os == 'Linux'
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           command -v xvfb-run || (sudo apt-get update && sudo apt-get install -y xvfb)
-      - name: Encrypted database under Electron
-        if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum npm run test:native
-      - name: Encrypted database under Electron
-        if: runner.os != 'Linux'
-        run: npm run test:native
+      - name: End-to-end tests
+        run: ${{ env.HEADLESS }} npm run test:e2e
+      - name: Self-test of the unpackaged app
+        run: ${{ env.HEADLESS }} npm run test:native
       # Linux is not a release target; package and check the other two.
       - if: runner.os != 'Linux'
         run: npm run build:dir
       - if: runner.os != 'Linux'
         run: npm run test:package
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: test-results-${{ matrix.os }}
+          path: test-results
+          if-no-files-found: ignore
