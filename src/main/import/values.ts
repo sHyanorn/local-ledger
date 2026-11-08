@@ -29,10 +29,20 @@ const MONTHS = new Map<string, number>([
 // A time after the date, as some exports add: "29/05/2026 14:03" or "2:03 PM".
 const TIME = /\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]m)?$/i
 
-function iso(year: string, month: number, day: string): string | null {
+/**
+ * A two-digit year is this century's unless that is past next year, as in
+ * a statement from 1999 read in 2026.
+ */
+function fullYear(year: string): string {
+  if (year.length === 4) return year
+  const recent = 2000 + Number(year)
+  return String(recent > new Date().getFullYear() + 1 ? recent - 100 : recent)
+}
+
+function iso(year: string, month: number | string, day: string): string | null {
   if (!/^\d{1,2}$/.test(day) || !/^(\d{2}|\d{4})$/.test(year)) return null
-  const fullYear = year.length === 2 ? `20${year}` : year
-  const text = `${fullYear}-${String(month).padStart(2, '0')}-${day.padStart(2, '0')}`
+  if (typeof month === 'string' && !/^\d{1,2}$/.test(month)) return null
+  const text = `${fullYear(year)}-${String(Number(month)).padStart(2, '0')}-${day.padStart(2, '0')}`
   return isIsoDate(text) ? text : null
 }
 
@@ -64,11 +74,11 @@ function parseParts(parts: string[], order: DateOrder): string | null {
   if (!parts.every((part) => /^\d+$/.test(part))) return null
   switch (order) {
     case 'dmy':
-      return iso(c, Number(b), a)
+      return iso(c, b, a)
     case 'mdy':
-      return iso(c, Number(a), b)
+      return iso(c, a, b)
     case 'ymd':
-      return a.length === 4 ? iso(a, Number(b), c) : null
+      return a.length === 4 ? iso(a, b, c) : null
   }
 }
 
@@ -103,7 +113,8 @@ export function parseBankAmount(text: string): number | null {
   }
   // A sign may come before or after the currency: "-$5", "$-5", "AUD 5".
   value = value.replace(/^([+-]?)\s*(?:A?\$|AUD)\s*/i, '$1')
-  if (negate && /^[+-]/.test(value)) return null
+  // Parentheses, CR and DR already give the sign; another would contradict.
+  if ((parenthesized || marked) && /^[+-]/.test(value)) return null
   const cents = parseAmount(value)
   if (cents === null) return null
   return negate && cents !== 0 ? -cents : cents

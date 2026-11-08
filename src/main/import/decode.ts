@@ -17,12 +17,33 @@ function bomOf(bytes: Uint8Array): Encoding | null {
   return null
 }
 
+/**
+ * UTF-16 without a byte order mark: ASCII text in it has a zero byte in
+ * every other place, which text in any other encoding here does not.
+ */
+function utf16Of(bytes: Uint8Array): Encoding | null {
+  const sample = bytes.subarray(0, 4096)
+  let even = 0
+  let odd = 0
+  for (let i = 0; i < sample.length; i++) {
+    if (sample[i] === 0) {
+      if (i % 2 === 0) even++
+      else odd++
+    }
+  }
+  const half = sample.length / 2
+  if (half < 2) return null
+  if (odd > half * 0.3 && even === 0) return 'utf-16le'
+  if (even > half * 0.3 && odd === 0) return 'utf-16be'
+  return null
+}
+
 /** Text from the bytes, in the given encoding or the one detected. */
 export function decode(
   bytes: Uint8Array,
   encoding?: Encoding,
 ): { text: string; encoding: Encoding } {
-  const chosen = encoding ?? bomOf(bytes)
+  const chosen = encoding ?? bomOf(bytes) ?? utf16Of(bytes)
   if (chosen) {
     // TextDecoder drops a byte order mark that matches the encoding.
     return { text: new TextDecoder(chosen).decode(bytes), encoding: chosen }

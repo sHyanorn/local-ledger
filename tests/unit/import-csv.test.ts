@@ -67,6 +67,13 @@ describe('decode', () => {
     })
   })
 
+  it('recognizes UTF-16 without a byte order mark', () => {
+    const le = utf16('a,b\n', true).subarray(2)
+    const be = utf16('a,b\n', false).subarray(2)
+    expect(decode(le)).toEqual({ text: 'a,b\n', encoding: 'utf-16le' })
+    expect(decode(be)).toEqual({ text: 'a,b\n', encoding: 'utf-16be' })
+  })
+
   it('uses the encoding it is given', () => {
     expect(decode(bytes('Café'), 'windows-1252').text).toBe('CafÃ©')
   })
@@ -170,6 +177,7 @@ describe('parseDate', () => {
     ['May 29, 2026', 'dmy', '2026-05-29'],
     ['29/05/2026 14:03', 'dmy', '2026-05-29'],
     ['29/05/2026 2:03 PM', 'dmy', '2026-05-29'],
+    ['31/12/99', 'dmy', '1999-12-31'],
   ] as const)('reads %s (%s) as %s', (text, order, iso) => {
     expect(parseDate(text, order)).toBe(iso)
   })
@@ -184,6 +192,8 @@ describe('parseDate', () => {
     ['=29/05/2026', 'dmy'],
     ['29/05/1899', 'dmy'],
     ['29/05/202', 'dmy'],
+    ['29/012/2026', 'dmy'],
+    ['012/29/2026', 'mdy'],
   ] as const)('refuses %s (%s)', (text, order) => {
     expect(parseDate(text, order)).toBeNull()
   })
@@ -219,17 +229,29 @@ describe('parseBankAmount', () => {
     expect(parseBankAmount(text)).toBe(cents)
   })
 
-  it.each(['', '-', '=1+1', '1.234', '12,50', '(-12.50)', '@SUM(A1)', 'five'])(
-    'refuses %j',
-    (text) => {
-      expect(parseBankAmount(text)).toBeNull()
-    },
-  )
+  it.each([
+    '',
+    '-',
+    '=1+1',
+    '1.234',
+    '12,50',
+    '(-12.50)',
+    '-12.50 CR',
+    '+12.50 DR',
+    '@SUM(A1)',
+    'five',
+  ])('refuses %j', (text) => {
+    expect(parseBankAmount(text)).toBeNull()
+  })
 })
 
 describe('cleanText', () => {
   it('turns control characters into single spaces and composes', () => {
     expect(cleanText('  Fake\tCafé\r\nShop\u0000 ')).toBe('Fake Café Shop')
+  })
+
+  it('drops invisible format characters', () => {
+    expect(cleanText('Fake\u202eShop\u200b Cafe\u2066')).toBe('FakeShop Cafe')
   })
 
   it('keeps text that a spreadsheet would read as a formula', () => {

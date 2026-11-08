@@ -13,11 +13,14 @@ export interface ParsedRow {
 }
 
 /**
- * Text as stored: control characters become spaces, runs of space become
- * one, and the result is in composed form like every name in the ledger.
+ * Text as stored: invisible format characters (bidirectional overrides,
+ * zero-width spaces) are dropped, control characters become spaces, runs of
+ * space become one, and the result is in composed form like every name in
+ * the ledger.
  */
 export function cleanText(text: string): string {
   return text
+    .replace(/\p{Cf}/gu, '')
     .replace(/\p{Cc}/gu, ' ')
     .replace(/\s+/gu, ' ')
     .trim()
