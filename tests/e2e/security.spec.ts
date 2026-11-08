@@ -1,10 +1,12 @@
 import { spawnSync } from 'node:child_process'
 import { readFileSync, readlinkSync } from 'node:fs'
+import { _electron } from '@playwright/test'
 import electron from 'electron'
 import type { WebPreferences } from 'electron'
 import pkg from '../../package.json' with { type: 'json' }
 import { CONTENT_SECURITY_POLICY } from '../../src/main/security'
 import switches from '../../src/main/switches.json' with { type: 'json' }
+import { networkRequests } from '../native/net-log.mjs'
 import { expect, test } from './fixtures'
 
 const APP_URL = 'app://local-ledger/index.html'
@@ -16,6 +18,31 @@ declare global {
     violations?: string[]
   }
 }
+
+// Playwright reads fixture dependencies from the first pattern, so it stays.
+// oxlint-disable-next-line no-empty-pattern
+test('the app makes no network request', async ({}, testInfo) => {
+  // A fresh profile, so nothing Chromium cached on an earlier run hides a request.
+  const log = testInfo.outputPath('net-log.json')
+  const app = await _electron.launch({
+    args: [
+      `--log-net-log=${log}`,
+      `--user-data-dir=${testInfo.outputPath('profile')}`,
+      '.',
+    ],
+    chromiumSandbox: true,
+  })
+  try {
+    const page = await app.firstWindow()
+    await expect(
+      page.getByRole('heading', { name: 'Local Ledger' }),
+    ).toBeVisible()
+    await page.waitForTimeout(2_000)
+  } finally {
+    await app.close()
+  }
+  expect(networkRequests(log)).toEqual([])
+})
 
 test('the page has the app origin', async ({ page }) => {
   expect(await page.evaluate(() => location.origin)).toBe('app://local-ledger')

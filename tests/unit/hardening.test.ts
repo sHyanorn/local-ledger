@@ -19,6 +19,7 @@ function fakeSession() {
     setDevicePermissionHandler: record('devicePermission'),
     setDisplayMediaRequestHandler: record('displayMedia'),
     setSpellCheckerEnabled: vi.fn(),
+    setSpellCheckerLanguages: vi.fn(),
     webRequest: { onBeforeRequest: record('beforeRequest') },
   }
   hardenSession(session as unknown as Session)
@@ -73,10 +74,10 @@ describe('hardenSession', () => {
     expect(callback).toHaveBeenCalledWith({})
   })
 
-  it('turns spellcheck off', () => {
-    expect(fakeSession().session.setSpellCheckerEnabled).toHaveBeenCalledWith(
-      false,
-    )
+  it('turns spellcheck off with no dictionary to download', () => {
+    const { session } = fakeSession()
+    expect(session.setSpellCheckerEnabled).toHaveBeenCalledWith(false)
+    expect(session.setSpellCheckerLanguages).toHaveBeenCalledWith([])
   })
 
   it.each([

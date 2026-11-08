@@ -1,6 +1,6 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, session } from 'electron'
-import { hardenApp, hardenSession } from './hardening'
+import { app, BrowserWindow } from 'electron'
+import { hardenApp } from './hardening'
 import { registerAppScheme, serveAppScheme } from './protocol'
 import { APP_ORIGIN, refusedSwitches, windowWebPreferences } from './security'
 
@@ -23,10 +23,9 @@ function createWindow(): void {
 
 function start(): void {
   registerAppScheme()
-  hardenApp()
+  hardenApp(devOrigin)
 
   void app.whenReady().then(() => {
-    hardenSession(session.defaultSession, devOrigin)
     serveAppScheme(join(__dirname, '../renderer'))
     createWindow()
     app.on('activate', () => {
