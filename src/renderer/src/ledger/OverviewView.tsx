@@ -130,8 +130,9 @@ export function OverviewView() {
                         />
                       </svg>
                       <span className="figure">
-                        {formatAmount(budget.spentCents, budgets!.currency)} of{' '}
-                        {formatAmount(total, budgets!.currency)}
+                        {state === 'over'
+                          ? `${formatAmount(budget.spentCents - total, budgets!.currency)} over ${formatAmount(total, budgets!.currency)}`
+                          : `${formatAmount(budget.spentCents, budgets!.currency)} of ${formatAmount(total, budgets!.currency)}`}
                       </span>
                     </li>
                   )
