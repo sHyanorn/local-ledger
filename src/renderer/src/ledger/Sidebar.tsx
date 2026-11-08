@@ -7,6 +7,7 @@ import { useLedger } from './store'
 export function Sidebar() {
   const accounts = useLedger((store) => store.accounts)
   const view = useLedger((store) => store.view)
+  const transfersToReview = useLedger((store) => store.transfersToReview)
   const show = useLedger((store) => store.show)
   const lock = useVault((store) => store.lock)
   const [adding, setAdding] = useState(false)
@@ -24,6 +25,19 @@ export function Sidebar() {
         onClick={() => show({ name: 'transactions', accountId: null })}
       >
         All Transactions
+      </button>
+      <button
+        type="button"
+        className="sidebar-item"
+        aria-current={current(view.name === 'transfers')}
+        onClick={() => show({ name: 'transfers' })}
+      >
+        <span className="name">Transfers</span>
+        {transfersToReview > 0 && (
+          <span className="badge" aria-label={`${transfersToReview} to review`}>
+            {transfersToReview}
+          </span>
+        )}
       </button>
 
       <div className="sidebar-heading">

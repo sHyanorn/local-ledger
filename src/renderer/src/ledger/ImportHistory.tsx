@@ -73,5 +73,9 @@ function undoMessage(batch: ImportBatch): string {
     batch.edited > 0
       ? `, including ${count(batch.edited, 'one', 'ones')} you have changed`
       : ''
-  return `${count(batch.count, 'transaction')} from “${batch.fileName}” will be deleted${changed}.`
+  const paired =
+    batch.paired > 0
+      ? ` ${count(batch.paired, 'transfer')} they are part of will be unpaired.`
+      : ''
+  return `${count(batch.count, 'transaction')} from “${batch.fileName}” will be deleted${changed}.${paired}`
 }

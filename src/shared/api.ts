@@ -90,6 +90,20 @@ export interface LedgerApi {
     /** Stops suggesting rules for this payee. */
     decline(pattern: string): Promise<void>
   }
+  readonly transfers: {
+    /** Pairs that may be one transfer but have other candidates. */
+    possible(): Promise<Results['transfers:possible']>
+    /** Transactions this one could be paired with by hand. */
+    choices(transactionId: number): Promise<Results['transfers:choices']>
+    link(
+      transactionId: number,
+      otherId: number,
+    ): Promise<Results['transfers:link']>
+    /** Splits a transfer; the two are not offered as a pair again. */
+    unlink(transactionId: number): Promise<Results['transfers:unlink']>
+    /** Records that two transactions are not a transfer. */
+    reject(outId: number, inId: number): Promise<Results['transfers:reject']>
+  }
 }
 
 export interface ImportRequest {

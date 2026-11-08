@@ -156,6 +156,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
       transactions: methods('transactions'),
       imports: methods('imports'),
       rules: methods('rules'),
+      transfers: methods('transfers'),
       unlockReplaced: String(vault.unlock).includes('replaced'),
     }
   })
@@ -168,6 +169,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
       'transactions',
       'imports',
       'rules',
+      'transfers',
     ],
     version: pkg.version,
     vault: ['changePassword', 'create', 'lock', 'status', 'unlock'],
@@ -192,6 +194,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
       'suggest',
       'update',
     ],
+    transfers: ['choices', 'link', 'possible', 'reject', 'unlink'],
     unlockReplaced: false,
   })
 })
@@ -384,7 +387,7 @@ ledgerTest(
   'every data channel refuses while the vault is locked',
   async ({ page }) => {
     const results = await page.evaluate(async () => {
-      const { accounts, categories, transactions, imports, rules } =
+      const { accounts, categories, transactions, imports, rules, transfers } =
         window.ledger
       const request = {
         id: crypto.randomUUID(),
@@ -430,6 +433,11 @@ ledgerTest(
         () => rules.reach({ pattern: 'Fake', match: 'is' }),
         () => rules.suggest(1),
         () => rules.decline('Fake'),
+        () => transfers.possible(),
+        () => transfers.choices(1),
+        () => transfers.link(1, 2),
+        () => transfers.unlink(1),
+        () => transfers.reject(1, 2),
       ]
       return Promise.all(
         calls.map((call) =>
@@ -440,7 +448,7 @@ ledgerTest(
         ),
       )
     })
-    expect(results).toHaveLength(19)
+    expect(results).toHaveLength(24)
     for (const result of results) expect(result).toMatch(/Error: locked$/)
   },
 )

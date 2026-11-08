@@ -65,6 +65,16 @@ const api: LedgerApi = {
     suggest: (transactionId) => invoke('rules:suggest', { id: transactionId }),
     decline: (pattern) => invoke('rules:decline', { pattern }),
   },
+  transfers: {
+    possible: () => invoke('transfers:possible', undefined),
+    choices: (transactionId) =>
+      invoke('transfers:choices', { id: transactionId }),
+    link: (transactionId, otherId) =>
+      invoke('transfers:link', { id: transactionId, otherId }),
+    unlink: (transactionId) =>
+      invoke('transfers:unlink', { id: transactionId }),
+    reject: (outId, inId) => invoke('transfers:reject', { outId, inId }),
+  },
 }
 
 contextBridge.exposeInMainWorld('ledger', api)

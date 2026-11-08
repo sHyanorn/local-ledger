@@ -8,7 +8,8 @@ export function listBatches(db: Db): ImportBatch[] {
   return db
     .prepare(
       `SELECT b.id, b.file_name AS fileName, b.imported_at AS importedAt,
-         count(t.id) AS count, sum(t.edited) AS edited
+         count(t.id) AS count, sum(t.edited) AS edited,
+         sum(t.id IN (SELECT id FROM transfer_members)) AS paired
        FROM import_batches b JOIN transactions t ON t.import_batch_id = b.id
        GROUP BY b.id
        ORDER BY b.id DESC`,

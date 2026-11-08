@@ -102,6 +102,35 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX rules_priority ON rules (priority, id);
       CREATE TABLE rule_dismissals (key TEXT PRIMARY KEY) STRICT;
     `),
+
+  // 5: transfers between the user's accounts. A confirmed pair is one
+  // transfer, kept out of income and spending; a rejected pair is not
+  // offered again. Reports read report_transactions.
+  (db) =>
+    db.exec(`
+      CREATE TABLE transfer_links (
+        out_id INTEGER NOT NULL REFERENCES transactions (id) ON DELETE CASCADE,
+        in_id INTEGER NOT NULL REFERENCES transactions (id) ON DELETE CASCADE,
+        status TEXT NOT NULL CHECK (status IN ('confirmed', 'rejected')),
+        PRIMARY KEY (out_id, in_id),
+        CHECK (out_id <> in_id)
+      ) STRICT;
+      CREATE UNIQUE INDEX transfer_links_out
+        ON transfer_links (out_id) WHERE status = 'confirmed';
+      CREATE UNIQUE INDEX transfer_links_in
+        ON transfer_links (in_id) WHERE status = 'confirmed';
+      CREATE INDEX transfer_links_in_any ON transfer_links (in_id);
+      CREATE INDEX transactions_amount ON transactions (amount_cents, date);
+
+      CREATE VIEW transfer_members AS
+        SELECT out_id AS id FROM transfer_links WHERE status = 'confirmed'
+        UNION ALL
+        SELECT in_id FROM transfer_links WHERE status = 'confirmed';
+
+      CREATE VIEW report_transactions AS
+        SELECT * FROM transactions
+        WHERE id NOT IN (SELECT id FROM transfer_members);
+    `),
 ]
 
 export class NewerSchemaError extends Error {

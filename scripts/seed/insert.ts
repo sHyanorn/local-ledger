@@ -1,6 +1,7 @@
 // Writes a generated ledger into an open, empty database.
 import { createAccount } from '../../src/main/ledger/accounts'
 import { createCategory } from '../../src/main/ledger/categories'
+import { pairTransfers } from '../../src/main/ledger/transfers'
 import type { Db } from '../../src/main/vault/database'
 import type { SeedLedger } from './generate'
 
@@ -47,5 +48,7 @@ export function insertLedger(db: Db, ledger: SeedLedger): void {
         row.notes === '' ? null : row.notes,
       )
     }
+    // Transfers and card repayments pair as an import would pair them.
+    pairTransfers(db)
   })()
 }

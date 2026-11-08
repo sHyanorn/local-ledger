@@ -67,7 +67,7 @@ ledgerTest(
     expect(result).toEqual({
       file: { name: 'anz.csv', template: 'anz' },
       statuses: ['new', 'new', 'new'],
-      committed: { ok: true, id: expect.any(Number), count: 3 },
+      committed: { ok: true, id: expect.any(Number), count: 3, paired: 0 },
       batches: [{ fileName: 'anz.csv', count: 3, edited: 0 }],
       undone: { ok: true, count: 3 },
       after: [],

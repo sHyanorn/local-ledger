@@ -132,6 +132,8 @@ export const schemas = {
     .omit({ categoryId: true })
     .extend({ id: id.optional() }),
   ruleDismiss: z.strictObject({ pattern: text(DESCRIPTION_MAX, 1) }),
+  transferLink: z.strictObject({ id, otherId: id }),
+  transferReject: z.strictObject({ outId: id, inId: id }),
   transactionPage: z.strictObject({
     filter: transactionFilter,
     after: transactionCursor.optional(),

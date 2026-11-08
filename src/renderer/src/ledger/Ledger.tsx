@@ -4,6 +4,7 @@ import { Settings } from './Settings'
 import { Sidebar } from './Sidebar'
 import { useLedger } from './store'
 import { Transactions } from './Transactions'
+import { TransfersView } from './TransfersView'
 
 /** The unlocked vault: accounts in a sidebar, the selected view beside it. */
 export function Ledger() {
@@ -20,6 +21,8 @@ export function Ledger() {
       <main className="main">
         {view.name === 'settings' ? (
           <Settings />
+        ) : view.name === 'transfers' ? (
+          <TransfersView />
         ) : view.name === 'import' ? (
           <ImportView
             key={view.file.id}

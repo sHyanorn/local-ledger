@@ -358,7 +358,11 @@ function TransactionTable({
               </button>
             </span>
             <span role="cell">
-              <CategoryCell row={row} onChange={onCategory} />
+              <CategoryCell
+                row={row}
+                onChange={onCategory}
+                onTransfer={onEdit}
+              />
             </span>
             {showAccount && (
               <span role="cell" className="muted">
@@ -394,11 +398,15 @@ function TransactionTable({
 function CategoryCell({
   row,
   onChange,
+  onTransfer,
 }: {
   row: Transaction
   onChange: (row: Transaction, value: string) => void
+  /** A transfer has no category; its cell opens the transaction instead. */
+  onTransfer: (row: Transaction) => void
 }) {
   const categories = useLedger((store) => store.categories)
+  const accounts = useLedger((store) => store.accounts)
   const [picking, setPicking] = useState(false)
   const select = useRef<HTMLSelectElement>(null)
   const button = useRef<HTMLButtonElement>(null)
@@ -424,6 +432,22 @@ function CategoryCell({
   const close = () => {
     refocus.current = true
     setPicking(false)
+  }
+
+  if (row.transferAccountId !== null) {
+    const other = accounts.find(
+      (account) => account.id === row.transferAccountId,
+    )
+    return (
+      <button
+        type="button"
+        className="inline muted"
+        aria-label={`${row.description} is a transfer with ${other?.name ?? 'another account'}`}
+        onClick={() => onTransfer(row)}
+      >
+        Transfer · {other?.name}
+      </button>
+    )
   }
 
   if (!picking) {

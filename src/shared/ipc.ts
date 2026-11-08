@@ -15,6 +15,7 @@ import type {
   ImportPreview,
 } from './imports'
 import type { Rule, RuleReach, RuleSuggestion } from './rules'
+import type { PossibleTransfer, TransferSide } from './transfers'
 import type {
   Account,
   Category,
@@ -77,6 +78,11 @@ export const channels = {
   'rules:reach': schemas.ruleReach,
   'rules:suggest': schemas.id,
   'rules:decline': schemas.ruleDismiss,
+  'transfers:possible': z.undefined(),
+  'transfers:choices': schemas.id,
+  'transfers:link': schemas.transferLink,
+  'transfers:unlink': schemas.id,
+  'transfers:reject': schemas.transferReject,
 } as const
 
 export type Channel = keyof typeof channels
@@ -120,7 +126,7 @@ export interface Results {
     | { ok: true; preview: ImportPreview }
     | { ok: false; reason: FileProblem | 'not-found' }
   'import:commit':
-    | { ok: true; id: number; count: number }
+    | { ok: true; id: number; count: number; paired: number }
     | { ok: false; reason: FileProblem | 'not-found' | 'nothing' }
   'import:discard': void
   'import:batches': ImportBatch[]
@@ -136,4 +142,9 @@ export interface Results {
   'rules:reach': RuleReach
   'rules:suggest': RuleSuggestion | null
   'rules:decline': void
+  'transfers:possible': PossibleTransfer[]
+  'transfers:choices': TransferSide[]
+  'transfers:link': Outcome<'not-found' | 'not-a-pair'>
+  'transfers:unlink': Outcome<'not-found'>
+  'transfers:reject': Outcome<'not-found'>
 }

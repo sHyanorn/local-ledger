@@ -25,6 +25,13 @@ import {
   updateRule,
 } from './rules'
 import {
+  linkTransfer,
+  possibleTransfers,
+  rejectTransfer,
+  transferChoices,
+  unlinkTransfer,
+} from './transfers'
+import {
   createTransaction,
   deleteTransaction,
   pageTransactions,
@@ -88,6 +95,19 @@ export function handleLedger(vault: Vault, devOrigin?: string): void {
   )
   handle('rules:reach', (rule) => ruleReach(db(), rule), devOrigin)
   handle('rules:suggest', ({ id }) => suggestRule(db(), id), devOrigin)
+  handle('transfers:possible', () => possibleTransfers(db()), devOrigin)
+  handle('transfers:choices', ({ id }) => transferChoices(db(), id), devOrigin)
+  handle(
+    'transfers:link',
+    ({ id, otherId }) => linkTransfer(db(), id, otherId),
+    devOrigin,
+  )
+  handle('transfers:unlink', ({ id }) => unlinkTransfer(db(), id), devOrigin)
+  handle(
+    'transfers:reject',
+    ({ outId, inId }) => rejectTransfer(db(), outId, inId),
+    devOrigin,
+  )
   handle(
     'rules:decline',
     ({ pattern }) => declineSuggestion(db(), pattern),

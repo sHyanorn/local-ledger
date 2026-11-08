@@ -12,6 +12,16 @@ import {
   replacedBy,
 } from './fixtures'
 
+/** Uncategorized and not one side of a seeded transfer, which the seed pairs. */
+const SEEDED_TRANSFERS = new Set([
+  'Transfer to Savings',
+  'Transfer from Everyday',
+  'Card Repayment 4417',
+  'Payment Received, Thank You',
+])
+const needsCategory = (row: { category: string | null; description: string }) =>
+  row.category === null && !SEEDED_TRANSFERS.has(row.description)
+
 const table = (page: Page) => page.getByRole('table', { name: 'Transactions' })
 const rows = (page: Page) => table(page).getByRole('rowgroup').getByRole('row')
 const totals = (page: Page) => page.locator('.totals')
@@ -59,7 +69,7 @@ test('search, category, account and period narrow the list', async ({
   await home.getByRole('searchbox', { name: 'Search' }).fill('')
 
   await home.getByLabel('Category', { exact: true }).selectOption('none')
-  const uncategorized = all.filter((row) => row.category === null)
+  const uncategorized = all.filter(needsCategory)
   await expect(totals(home)).toContainText(
     `${n(uncategorized.length)} transactions`,
   )
@@ -194,9 +204,7 @@ test('a row recategorized out of the category shown leaves the list, and the tot
   ledger,
 }) => {
   await home.getByLabel('Category', { exact: true }).selectOption('none')
-  const uncategorized = ledger.transactions.filter(
-    (row) => row.category === null,
-  )
+  const uncategorized = ledger.transactions.filter(needsCategory)
   await expect(totals(home)).toContainText(
     `${n(uncategorized.length)} transactions`,
   )

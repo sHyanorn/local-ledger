@@ -732,3 +732,62 @@ select.inline:focus {
   flex: 1;
   min-width: 0;
 }
+
+/* Transfers */
+
+.badge {
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+.transfers {
+  display: grid;
+  gap: 12px;
+  max-width: 720px;
+  margin: 0;
+  padding: 16px;
+  list-style: none;
+}
+
+.transfers li {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.transfer-side {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr) 120px;
+  gap: 12px;
+  align-items: center;
+}
+
+.transfer-side .muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transfers .actions {
+  margin-top: 4px;
+}
+
+.transfer-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.transfer-field select {
+  flex: 1;
+  min-width: 0;
+}

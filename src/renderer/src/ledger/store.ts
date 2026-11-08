@@ -5,12 +5,16 @@ import type { Account, Category } from '../../../shared/ledger'
 export type View =
   | { name: 'transactions'; accountId: number | null }
   | { name: 'settings' }
+  /** Pairs that may be transfers, for the user to decide. */
+  | { name: 'transfers' }
   /** A file chosen for import, into the account shown when it was chosen. */
   | { name: 'import'; file: ImportFile; accountId: number | null }
 
 interface LedgerStore {
   accounts: Account[]
   categories: Category[]
+  /** Possible transfers waiting for the user. */
+  transfersToReview: number
   view: View
   show(view: View): void
   /** Reloads accounts and categories after a change. */
@@ -20,12 +24,14 @@ interface LedgerStore {
 export const useLedger = create<LedgerStore>((set, get) => ({
   accounts: [],
   categories: [],
+  transfersToReview: 0,
   view: { name: 'transactions', accountId: null },
   show: (view) => set({ view }),
   refresh: async () => {
-    const [accounts, categories] = await Promise.all([
+    const [accounts, categories, possible] = await Promise.all([
       window.ledger.accounts.list(),
       window.ledger.categories.list(),
+      window.ledger.transfers.possible(),
     ])
     const { view } = get()
     const gone =
@@ -35,6 +41,7 @@ export const useLedger = create<LedgerStore>((set, get) => ({
     set({
       accounts,
       categories,
+      transfersToReview: possible.length,
       ...(gone ? { view: { name: 'transactions', accountId: null } } : {}),
     })
   },

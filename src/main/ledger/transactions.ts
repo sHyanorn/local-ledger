@@ -13,7 +13,14 @@ import { isMissingReference } from './errors'
 
 const COLUMNS = `t.id, t.account_id AS accountId, t.date,
   t.amount_cents AS amountCents, t.description,
-  t.category_id AS categoryId, ifnull(t.notes, '') AS notes, a.currency`
+  t.category_id AS categoryId, ifnull(t.notes, '') AS notes, a.currency,
+  other.account_id AS transferAccountId`
+
+/** The other side of a transaction's transfer, when it has one. */
+const TRANSFER_JOIN = `
+  LEFT JOIN transfer_links lo ON lo.out_id = t.id AND lo.status = 'confirmed'
+  LEFT JOIN transfer_links li ON li.in_id = t.id AND li.status = 'confirmed'
+  LEFT JOIN transactions other ON other.id = coalesce(lo.in_id, li.out_id)`
 
 /** LIKE treats % and _ as wildcards; a search means them literally. */
 const escapeLike = (text: string) => text.replace(/[\\%_]/g, '\\$&')
@@ -29,7 +36,10 @@ function where(
     params.push(filter.accountId)
   }
   if (filter.category === 'none') {
-    clauses.push('t.category_id IS NULL')
+    // A transfer needs no category, so it is not left to categorize.
+    clauses.push(
+      't.category_id IS NULL AND t.id NOT IN (SELECT id FROM transfer_members)',
+    )
   } else if (filter.category !== undefined) {
     clauses.push(
       't.category_id IN (SELECT id FROM categories WHERE id = ? OR parent_id = ?)',
@@ -76,6 +86,7 @@ export function pageTransactions(
     .prepare(
       `SELECT ${COLUMNS}
        FROM transactions t JOIN accounts a ON a.id = t.account_id
+       ${TRANSFER_JOIN}
        ${sql}
        ORDER BY t.date DESC, t.id DESC
        LIMIT ?`,
@@ -137,9 +148,18 @@ export function updateTransaction(
   { id, ...fields }: TransactionFields & { id: number },
 ): Outcome<'not-found'> {
   try {
-    const { changes } = db
-      .prepare(
-        `UPDATE transactions SET account_id = @accountId, date = @date,
+    const values = { id, ...row(fields) }
+    // A new amount or account means it is no longer that transfer.
+    const unpair = db.prepare(
+      `DELETE FROM transfer_links
+       WHERE status = 'confirmed' AND (out_id = @id OR in_id = @id)
+         AND EXISTS (
+           SELECT 1 FROM transactions WHERE id = @id
+             AND (amount_cents IS NOT @amountCents
+               OR account_id IS NOT @accountId))`,
+    )
+    const update = db.prepare(
+      `UPDATE transactions SET account_id = @accountId, date = @date,
            amount_cents = @amountCents, description = @description,
            category_id = @categoryId, notes = @notes,
            edited = edited OR account_id IS NOT @accountId
@@ -147,8 +167,11 @@ export function updateTransaction(
              OR description IS NOT @description
              OR category_id IS NOT @categoryId OR notes IS NOT @notes
          WHERE id = @id`,
-      )
-      .run({ id, ...row(fields) })
+    )
+    const { changes } = db.transaction(() => {
+      unpair.run(values)
+      return update.run(values)
+    })()
     return changes > 0 ? { ok: true } : { ok: false, reason: 'not-found' }
   } catch (error) {
     if (isMissingReference(error)) return { ok: false, reason: 'not-found' }

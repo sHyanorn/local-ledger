@@ -104,4 +104,6 @@ export interface ImportBatch {
   count: number
   /** Of those, how many the user has changed since. */
   edited: number
+  /** Of those, how many are paired as transfers; undoing unpairs them. */
+  paired: number
 }

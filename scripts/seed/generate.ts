@@ -136,7 +136,7 @@ const SCHEDULED: Scheduled[] = [
     every: 0,
     day: 28,
   },
-  // A transfer appears in both accounts, uncategorized until M3 handles it.
+  // A transfer appears in both accounts; inserting the ledger pairs the two.
   {
     account: 'Everyday',
     category: null,

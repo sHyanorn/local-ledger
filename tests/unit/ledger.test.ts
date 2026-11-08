@@ -294,6 +294,7 @@ describe('transactions', () => {
       categoryId: null,
       notes: '',
       currency: 'CNY',
+      transferAccountId: null,
     })
     expect(
       db.prepare('SELECT notes FROM transactions').pluck().get(),

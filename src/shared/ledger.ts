@@ -45,6 +45,8 @@ export interface Transaction extends TransactionFields {
   id: number
   /** The account's currency. */
   currency: Currency
+  /** The other account, when this is one side of a transfer. */
+  transferAccountId: number | null
 }
 
 export interface TransactionPage {

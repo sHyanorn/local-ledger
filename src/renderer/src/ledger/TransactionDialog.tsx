@@ -12,6 +12,7 @@ import {
 import { formatDate } from './format'
 import { CategoryOptions } from './CategoryOptions'
 import { useLedger } from './store'
+import { TransferField } from './TransferField'
 
 /**
  * Adds a transaction, or with `transaction`, edits or deletes it. Amounts
@@ -192,20 +193,32 @@ export function TransactionDialog({
             />
           </label>
         </div>
-        <label>
-          Category
-          <select
-            value={categoryId ?? ''}
-            onChange={(event) =>
-              setCategoryId(
-                event.target.value === '' ? null : Number(event.target.value),
-              )
-            }
-          >
-            <option value="">Uncategorized</option>
-            <CategoryOptions />
-          </select>
-        </label>
+        {/* A transfer's category plays no part in reports, so it is not offered. */}
+        {transaction?.transferAccountId == null && (
+          <label>
+            Category
+            <select
+              value={categoryId ?? ''}
+              onChange={(event) =>
+                setCategoryId(
+                  event.target.value === '' ? null : Number(event.target.value),
+                )
+              }
+            >
+              <option value="">Uncategorized</option>
+              <CategoryOptions />
+            </select>
+          </label>
+        )}
+        {transaction && (
+          <TransferField
+            transaction={transaction}
+            onChanged={() => {
+              onSaved()
+              onClose()
+            }}
+          />
+        )}
         <label>
           Notes
           <textarea

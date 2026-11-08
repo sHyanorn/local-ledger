@@ -15,6 +15,7 @@ import {
 } from '../../shared/imports'
 import { mapping as mappingSchema } from '../../shared/schemas'
 import { firstRule, listRules } from '../ledger/rules'
+import { pairTransfers } from '../ledger/transfers'
 import type { Db } from '../vault/database'
 import { FileError, readTable, type Table } from './csv'
 import { classify, type IncomingRow } from './dedup'
@@ -229,7 +230,7 @@ export class ImportSession {
     db: Db,
     request: ImportRequest & { selected: number[] },
   ):
-    | { ok: true; id: number; count: number }
+    | { ok: true; id: number; count: number; paired: number }
     | Failure<FileProblem | 'not-found' | 'nothing'> {
     const built = this.#build(db, request)
     if (!built.ok) return built
@@ -273,7 +274,7 @@ export class ImportSession {
         batchId,
       )
       rememberMapping(db, pending, request.mapping)
-      return { id: batchId, count }
+      return { id: batchId, count, paired: pairTransfers(db) }
     })()
     this.clear()
     return { ok: true, ...imported }

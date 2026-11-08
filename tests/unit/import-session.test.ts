@@ -218,7 +218,7 @@ describe('ImportSession', () => {
       ...request(file, everyday),
       selected: everything(session, file, everyday),
     })
-    expect(committed).toEqual({ ok: true, id: 1, count: 6 })
+    expect(committed).toEqual({ ok: true, id: 1, count: 6, paired: 0 })
     expect(rows()).toHaveLength(6)
     // Two alike purchases on 3 May are both kept.
     expect(
