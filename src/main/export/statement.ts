@@ -6,6 +6,7 @@ import type { Currency } from '../../shared/money'
 import { formatMonth, shiftMonth } from '../../shared/months'
 import type { MonthReport, MonthTotals } from '../../shared/reports'
 import { reportData } from '../ledger/reports'
+import { TRANSFER_JOIN } from '../ledger/transactions'
 import { monthBudgets } from '../ledger/budgets'
 import { getSettings } from '../ledger/settings'
 import type { Db } from '../vault/database'
@@ -59,9 +60,7 @@ export function statement(
            ifnull(t.notes, '') AS notes, oa.name AS transferAccount
          FROM transactions t
          JOIN accounts a ON a.id = t.account_id
-         LEFT JOIN transfer_links lo ON lo.out_id = t.id AND lo.status = 'confirmed'
-         LEFT JOIN transfer_links li ON li.in_id = t.id AND li.status = 'confirmed'
-         LEFT JOIN transactions other ON other.id = coalesce(lo.in_id, li.out_id)
+         ${TRANSFER_JOIN}
          LEFT JOIN accounts oa ON oa.id = other.account_id
          WHERE a.currency = ? AND t.date >= ? AND t.date < ?
          ORDER BY t.date, t.id`,

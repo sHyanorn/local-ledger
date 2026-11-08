@@ -16,8 +16,8 @@ const COLUMNS = `t.id, t.account_id AS accountId, t.date,
   t.category_id AS categoryId, ifnull(t.notes, '') AS notes, a.currency,
   other.account_id AS transferAccountId`
 
-/** The other side of a transaction's transfer, when it has one. */
-const TRANSFER_JOIN = `
+/** The other side of a transaction's transfer, when it has one, as `other`. */
+export const TRANSFER_JOIN = `
   LEFT JOIN transfer_links lo ON lo.out_id = t.id AND lo.status = 'confirmed'
   LEFT JOIN transfer_links li ON li.in_id = t.id AND li.status = 'confirmed'
   LEFT JOIN transactions other ON other.id = coalesce(lo.in_id, li.out_id)`
