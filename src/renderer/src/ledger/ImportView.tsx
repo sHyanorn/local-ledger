@@ -19,7 +19,7 @@ import {
   type PreviewRow,
 } from '../../../shared/imports'
 import { formatAmount, type Currency } from '../../../shared/money'
-import { formatDate } from './format'
+import { count, formatDate } from './format'
 import {
   DATE_ORDER_NAMES,
   ENCODING_NAMES,
@@ -28,7 +28,7 @@ import {
   TEMPLATE_NAMES,
 } from './importing'
 import { ErrorText } from '../components/ErrorText'
-import { categoryName, count, useLedger } from './store'
+import { categoryName, useLedger } from './store'
 
 /** Why a preview or an import was refused. */
 const IMPORT_PROBLEMS = {

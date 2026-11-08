@@ -7,8 +7,8 @@ import {
 } from '../../../shared/settings'
 import { Confirm } from '../components/Dialog'
 import { ErrorText } from '../components/ErrorText'
-import { monthOf } from './format'
-import { count, useLedger } from './store'
+import { count, monthOf } from './format'
+import { useLedger } from './store'
 
 /** The home currency for budgets, and how long the computer may sit idle before the vault locks. */
 export function GeneralSection() {

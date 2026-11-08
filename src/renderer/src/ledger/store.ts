@@ -126,8 +126,3 @@ export function categoryName(
   const parent = categories.find((option) => option.id === category.parentId)
   return parent ? `${parent.name} › ${category.name}` : category.name
 }
-
-/** "1 transaction", "1,204 transactions". */
-export function count(n: number, noun: string, plural = `${noun}s`): string {
-  return `${n.toLocaleString('en-AU')} ${n === 1 ? noun : plural}`
-}

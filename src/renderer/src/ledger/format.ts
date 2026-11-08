@@ -47,3 +47,8 @@ export function monthOf(today = new Date()): string {
 }
 
 export { formatMonth, shiftMonth } from '../../../shared/months'
+
+/** "1 transaction", "1,204 transactions". */
+export function count(n: number, noun: string, plural = `${noun}s`): string {
+  return `${n.toLocaleString('en-AU')} ${n === 1 ? noun : plural}`
+}

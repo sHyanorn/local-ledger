@@ -4,7 +4,7 @@ import { PASSWORD_MAX, passwordLength } from '../../../shared/password'
 import { Dialog } from '../components/Dialog'
 import { ErrorText } from '../components/ErrorText'
 import { formatDate } from '../ledger/format'
-import { count } from '../ledger/store'
+import { count } from '../ledger/format'
 
 const OPEN_PROBLEMS = {
   'too-large': 'The file is too large to be a backup.',

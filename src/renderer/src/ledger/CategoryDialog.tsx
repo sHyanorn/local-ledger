@@ -4,7 +4,8 @@ import { Confirm, Dialog } from '../components/Dialog'
 import { ErrorText } from '../components/ErrorText'
 import { NAME_MAX } from '../../../shared/ledger'
 import type { Category } from '../../../shared/ledger'
-import { count, useLedger } from './store'
+import { useLedger } from './store'
+import { count } from './format'
 
 const PROBLEMS: Record<string, string> = {
   duplicate: 'A category with this name already exists here.',

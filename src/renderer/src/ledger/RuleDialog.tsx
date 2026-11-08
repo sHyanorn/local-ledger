@@ -10,7 +10,8 @@ import { Dialog } from '../components/Dialog'
 import { ErrorText } from '../components/ErrorText'
 import { CategoryOptions } from './CategoryOptions'
 import { MATCH_NAMES } from './rule-names'
-import { count, useLedger } from './store'
+import { useLedger } from './store'
+import { count } from './format'
 
 /**
  * Adds a rule, or with `rule`, edits or deletes it. `start` fills a new

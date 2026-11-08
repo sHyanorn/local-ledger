@@ -6,7 +6,8 @@ import { ACCOUNT_TYPES, NAME_MAX } from '../../../shared/ledger'
 import type { Account, AccountType } from '../../../shared/ledger'
 import { centsToDecimal, CURRENCIES, parseAmount } from '../../../shared/money'
 import type { Currency } from '../../../shared/money'
-import { count, useLedger } from './store'
+import { useLedger } from './store'
+import { count } from './format'
 
 const TYPE_LABELS: Record<AccountType, string> = {
   bank: 'Bank',

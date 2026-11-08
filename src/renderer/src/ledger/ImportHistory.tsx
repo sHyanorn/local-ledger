@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { isoDate } from '../../../shared/dates'
 import type { ImportBatch } from '../../../shared/imports'
 import { Confirm } from '../components/Dialog'
-import { formatDate } from './format'
-import { count, useLedger } from './store'
+import { count, formatDate } from './format'
+import { useLedger } from './store'
 
 /** Past imports, newest first, each of which can be undone. */
 export function ImportHistory() {

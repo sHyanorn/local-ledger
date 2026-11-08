@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { DismissButton } from '../components/NoticeBar'
 import type { RuleSuggestion } from '../../../shared/rules'
 import { RuleDialog } from './RuleDialog'
-import { categoryName, count, useLedger } from './store'
+import { categoryName, useLedger } from './store'
+import { count } from './format'
 
 /**
  * Offers a rule after the user categorized a transaction by hand. It never
