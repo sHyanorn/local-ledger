@@ -145,6 +145,21 @@ function checkFiles(resources) {
     !existsSync(join(resources, 'app-update.yml')),
     'no update feed is configured',
   )
+  // Only the build output, package.json and runtime dependencies: no
+  // sources, scripts, tests or demo data.
+  const roots = [...new Set(all.map((file) => file.split('/')[0]))].sort()
+  check(
+    roots.join() === 'node_modules,out,package.json',
+    `app.asar holds only out/, package.json and node_modules/ (found: ${roots.join(', ')})`,
+  )
+  check(
+    all.every(
+      (file) =>
+        !file.startsWith('out/') ||
+        /^out\/(main|preload|renderer)\//.test(file),
+    ),
+    'out/ holds only the main, preload and renderer builds',
+  )
 }
 
 /** Where the packaged app keeps its data when nothing overrides it. */
