@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Confirm, Dialog } from '../components/Dialog'
+import { ErrorText } from '../components/ErrorText'
 import { isIsoDate, isoDate } from '../../../shared/dates'
 import { DESCRIPTION_MAX, NOTES_MAX } from '../../../shared/ledger'
 import type { Transaction } from '../../../shared/ledger'
@@ -228,11 +229,7 @@ export function TransactionDialog({
             onChange={(event) => setNotes(event.target.value)}
           />
         </label>
-        {problem && (
-          <p className="error" role="alert">
-            {problem}
-          </p>
-        )}
+        <ErrorText message={problem} />
         <div className="actions">
           {transaction && (
             <button

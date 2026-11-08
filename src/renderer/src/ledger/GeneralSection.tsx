@@ -6,6 +6,7 @@ import {
   type Settings,
 } from '../../../shared/settings'
 import { Confirm } from '../components/Dialog'
+import { ErrorText } from '../components/ErrorText'
 import { monthOf } from './format'
 import { count, useLedger } from './store'
 
@@ -72,11 +73,7 @@ export function GeneralSection() {
             ))}
           </select>
         </label>
-        {problem && (
-          <p className="error" role="alert">
-            {problem}
-          </p>
-        )}
+        <ErrorText message={problem} />
       </div>
       {changing && (
         <Confirm

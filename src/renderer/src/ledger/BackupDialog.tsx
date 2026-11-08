@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { PASSWORD_MAX, passwordLength } from '../../../shared/password'
 import { Dialog } from '../components/Dialog'
+import { ErrorText } from '../components/ErrorText'
 
 const PROBLEMS = {
   'wrong-password': 'Wrong password.',
@@ -58,11 +59,7 @@ export function BackupDialog({ onDone }: { onDone: (saved: boolean) => void }) {
             autoFocus
           />
         </label>
-        {problem && (
-          <p className="error" role="alert">
-            {problem}
-          </p>
-        )}
+        <ErrorText message={problem} />
         <div className="actions">
           <button
             type="button"

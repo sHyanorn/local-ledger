@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { NoticeBar } from '../components/NoticeBar'
 import { groupedBars, horizontalBars, trendLine } from '../../../shared/charts'
 import type { Currency } from '../../../shared/money'
 import type { ReportData, TrendPoint } from '../../../shared/reports'
@@ -9,7 +10,8 @@ import {
   exactAmount,
   shortMonth,
 } from '../../../shared/chart-format'
-import { formatMonth, monthOf, shiftMonth } from './format'
+import { formatMonth, monthOf } from './format'
+import { MonthStepper } from './MonthStepper'
 import { categoryName, useLedger } from './store'
 
 export function ReportsView() {
@@ -84,25 +86,7 @@ export function ReportsView() {
               ))}
             </select>
           )}
-          <button
-            type="button"
-            className="icon"
-            aria-label="Previous Month"
-            title="Previous Month"
-            onClick={() => setMonth(shiftMonth(month, -1))}
-          >
-            ‹
-          </button>
-          <span aria-live="polite">{formatMonth(month)}</span>
-          <button
-            type="button"
-            className="icon"
-            aria-label="Next Month"
-            title="Next Month"
-            onClick={() => setMonth(shiftMonth(month, 1))}
-          >
-            ›
-          </button>
+          <MonthStepper month={month} onChange={setMonth} />
           <button
             type="button"
             className="secondary"
@@ -191,20 +175,7 @@ export function ReportsView() {
         )}
       </div>
       <div aria-live="polite">
-        {saved && (
-          <div className="suggestion" role="region" aria-label="Notice">
-            <p>{saved}</p>
-            <button
-              type="button"
-              className="icon"
-              aria-label="Dismiss"
-              title="Dismiss"
-              onClick={() => setSaved(null)}
-            >
-              ×
-            </button>
-          </div>
-        )}
+        <NoticeBar message={saved} onDismiss={() => setSaved(null)} />
       </div>
       {exporting && (
         <ExportDialog

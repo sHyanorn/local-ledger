@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import type { BackupSummary } from '../../../shared/backup'
 import { PASSWORD_MAX, passwordLength } from '../../../shared/password'
 import { Dialog } from '../components/Dialog'
+import { ErrorText } from '../components/ErrorText'
 import { formatDate } from '../ledger/format'
 
 const OPEN_PROBLEMS = {
@@ -143,11 +144,7 @@ export function RestoreDialog({
               />
             </label>
           )}
-          {problem && (
-            <p className="error" role="alert">
-              {problem}
-            </p>
-          )}
+          <ErrorText message={problem} />
           <div className="actions">
             <button
               type="button"
@@ -191,11 +188,7 @@ export function RestoreDialog({
               />
             </label>
           )}
-          {problem && (
-            <p className="error" role="alert">
-              {problem}
-            </p>
-          )}
+          <ErrorText message={problem} />
           <div className="actions">
             <button
               type="button"

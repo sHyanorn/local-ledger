@@ -28,6 +28,7 @@ import {
   TEMPLATE_NAMES,
 } from './importing'
 import { categoryName, count, useLedger } from './store'
+import { ErrorText } from '../components/ErrorText'
 
 /** Columns to start from when nothing about the file could be told. */
 function fallbackMapping(columns: number): Mapping {
@@ -269,11 +270,7 @@ export function ImportView({
         />
       )}
 
-      {problem && (
-        <p className="error import-problem" role="alert">
-          {problem}
-        </p>
-      )}
+      <ErrorText message={problem} className="import-problem" />
 
       {preview && (
         <p className="import-summary" aria-live="polite">

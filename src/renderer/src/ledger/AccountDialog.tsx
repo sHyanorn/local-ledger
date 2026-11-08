@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Confirm, Dialog } from '../components/Dialog'
+import { ErrorText } from '../components/ErrorText'
 import { ACCOUNT_TYPES, NAME_MAX } from '../../../shared/ledger'
 import type { Account, AccountType } from '../../../shared/ledger'
 import { centsToDecimal, CURRENCIES, parseAmount } from '../../../shared/money'
@@ -155,11 +156,7 @@ export function AccountDialog({
             onChange={(event) => setOpening(event.target.value)}
           />
         </label>
-        {problem && (
-          <p className="error" role="alert">
-            {problem}
-          </p>
-        )}
+        <ErrorText message={problem} />
         <div className="actions">
           {account && (
             <button

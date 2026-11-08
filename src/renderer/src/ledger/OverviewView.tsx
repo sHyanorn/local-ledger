@@ -3,6 +3,8 @@ import { budgetState, type MonthBudgets } from '../../../shared/budgets'
 import type { Transaction } from '../../../shared/ledger'
 import { formatAmount, type Currency } from '../../../shared/money'
 import type { ReportData } from '../../../shared/reports'
+import { BudgetBar } from './BudgetBar'
+import { budgetFigure, budgetShare } from './budget-figures'
 import { formatDate, formatMonth, monthOf } from './format'
 import { categoryName, useLedger } from './store'
 
@@ -98,41 +100,17 @@ export function OverviewView() {
               </div>
               <ul className="list">
                 {budgeted.map((budget) => {
-                  const state = budgetState(budget)
-                  const total = budget.budgetCents ?? 0
-                  const share =
-                    total === 0 ? 1 : Math.min(1, budget.spentCents / total)
                   return (
                     <li
                       key={budget.categoryId}
-                      className={`budget compact ${state}`}
+                      className={`budget compact ${budgetState(budget)}`}
                     >
                       <span className="name">
                         {categoryName(categories, budget.categoryId)}
                       </span>
-                      <svg
-                        className="bar"
-                        aria-hidden="true"
-                        width="100%"
-                        height="6"
-                      >
-                        <rect
-                          className="track"
-                          width="100%"
-                          height="6"
-                          rx="3"
-                        />
-                        <rect
-                          className="fill"
-                          width={`${share * 100}%`}
-                          height="6"
-                          rx="3"
-                        />
-                      </svg>
+                      <BudgetBar share={budgetShare(budget)} />
                       <span className="figure">
-                        {state === 'over'
-                          ? `${formatAmount(budget.spentCents - total, budgets!.currency)} over ${formatAmount(total, budgets!.currency)}`
-                          : `${formatAmount(budget.spentCents, budgets!.currency)} of ${formatAmount(total, budgets!.currency)}`}
+                        {budgetFigure(budget, budgets!.currency)}
                       </span>
                     </li>
                   )

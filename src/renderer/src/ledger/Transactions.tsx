@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { NoticeBar } from '../components/NoticeBar'
 import { isIsoDate } from '../../../shared/dates'
 import { SEARCH_MAX } from '../../../shared/ledger'
 import type { Transaction, TransactionFilter } from '../../../shared/ledger'
@@ -261,20 +262,7 @@ export function Transactions({ accountId }: { accountId: number | null }) {
         />
       )}
       <div aria-live="polite">
-        {notice && (
-          <div className="suggestion" role="region" aria-label="Notice">
-            <p>{notice}</p>
-            <button
-              type="button"
-              className="icon"
-              aria-label="Dismiss"
-              title="Dismiss"
-              onClick={() => setNotice(null)}
-            >
-              ×
-            </button>
-          </div>
-        )}
+        <NoticeBar message={notice} onDismiss={() => setNotice(null)} />
         {suggestion && (
           <RuleSuggestionBar
             key={`${suggestion.pattern}:${suggestion.categoryId}`}

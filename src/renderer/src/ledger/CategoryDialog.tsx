@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Confirm, Dialog } from '../components/Dialog'
+import { ErrorText } from '../components/ErrorText'
 import { NAME_MAX } from '../../../shared/ledger'
 import type { Category } from '../../../shared/ledger'
 import { count, useLedger } from './store'
@@ -140,11 +141,7 @@ export function CategoryDialog({
             ))}
           </select>
         </label>
-        {problem && (
-          <p className="error" role="alert">
-            {problem}
-          </p>
-        )}
+        <ErrorText message={problem} />
         <div className="actions">
           {category && (
             <button

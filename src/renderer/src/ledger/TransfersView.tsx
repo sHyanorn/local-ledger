@@ -3,6 +3,7 @@ import { formatAmount } from '../../../shared/money'
 import type { PossibleTransfer, TransferSide } from '../../../shared/transfers'
 import { formatDate } from './format'
 import { useLedger } from './store'
+import { ErrorText } from '../components/ErrorText'
 
 /**
  * Pairs that may be one transfer and are not decided: those with competing
@@ -58,11 +59,7 @@ export function TransfersView() {
       <header className="toolbar">
         <h1>Transfers</h1>
       </header>
-      {problem && (
-        <p className="error import-problem" role="alert">
-          {problem}
-        </p>
-      )}
+      <ErrorText message={problem} className="import-problem" />
       <div className="scroll">
         {pairs && pairs.length === 0 && (
           <p className="empty">No transfers to review</p>

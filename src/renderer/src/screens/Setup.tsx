@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { newPasswordProblem } from '../password-rules'
 import { useVault } from '../store'
 import { RestoreDialog } from './RestoreDialog'
+import { ErrorText } from '../components/ErrorText'
 
 export function Setup() {
   const create = useVault((store) => store.create)
@@ -53,11 +54,7 @@ export function Setup() {
             disabled={busy}
           />
         </label>
-        {message && (
-          <p className="error" role="alert">
-            {message}
-          </p>
-        )}
+        <ErrorText message={message} />
         <p className="consequence">
           If you forget this password, your data cannot be recovered.
         </p>

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import type { ExportFormat } from '../../../shared/export'
 import type { Currency } from '../../../shared/money'
 import { Dialog } from '../components/Dialog'
+import { ErrorText } from '../components/ErrorText'
 import { formatMonth } from './format'
 
 const FORMATS: { value: ExportFormat; label: string }[] = [
@@ -74,11 +75,7 @@ export function ExportDialog({
             </label>
           ))}
         </fieldset>
-        {problem && (
-          <p className="error" role="alert">
-            {problem}
-          </p>
-        )}
+        <ErrorText message={problem} />
         <div className="actions">
           <button
             type="button"

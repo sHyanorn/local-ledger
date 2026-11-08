@@ -7,6 +7,7 @@ import {
   type RuleReach,
 } from '../../../shared/rules'
 import { Dialog } from '../components/Dialog'
+import { ErrorText } from '../components/ErrorText'
 import { CategoryOptions } from './CategoryOptions'
 import { MATCH_NAMES } from './rule-names'
 import { count, useLedger } from './store'
@@ -148,11 +149,7 @@ export function RuleDialog({
             Categorize {count(shown.uncategorized, 'uncategorized transaction')}
           </label>
         )}
-        {problem && (
-          <p className="error" role="alert">
-            {problem}
-          </p>
-        )}
+        <ErrorText message={problem} />
         <div className="actions">
           {rule && (
             <button

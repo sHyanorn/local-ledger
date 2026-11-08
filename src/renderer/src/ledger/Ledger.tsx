@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
+import { NoticeBar } from '../components/NoticeBar'
 import { dropImportFile } from './importing'
 import { BudgetsView } from './BudgetsView'
 import { OverviewView } from './OverviewView'
@@ -123,24 +124,11 @@ export function Ledger() {
           )}
         </div>
         <div aria-live="polite">
-          {budgetNotice && (
-            <div
-              className="suggestion"
-              role="region"
-              aria-label="Budget notice"
-            >
-              <p>{budgetNotice}</p>
-              <button
-                type="button"
-                className="icon"
-                aria-label="Dismiss"
-                title="Dismiss"
-                onClick={() => setBudgetNotice(null)}
-              >
-                ×
-              </button>
-            </div>
-          )}
+          <NoticeBar
+            label="Budget notice"
+            message={budgetNotice}
+            onDismiss={() => setBudgetNotice(null)}
+          />
         </div>
       </main>
       {dragging && (

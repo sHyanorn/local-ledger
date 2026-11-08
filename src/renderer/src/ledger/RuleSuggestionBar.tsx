@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { DismissButton } from '../components/NoticeBar'
 import type { RuleSuggestion } from '../../../shared/rules'
 import { RuleDialog } from './RuleDialog'
 import { categoryName, count, useLedger } from './store'
@@ -49,15 +50,7 @@ export function RuleSuggestionBar({
       >
         Don’t Ask Again
       </button>
-      <button
-        type="button"
-        className="icon"
-        aria-label="Dismiss"
-        title="Dismiss"
-        onClick={() => onDone(false)}
-      >
-        ×
-      </button>
+      <DismissButton onClick={() => onDone(false)} />
       {editing &&
         (suggestion.rule ? (
           <RuleDialog

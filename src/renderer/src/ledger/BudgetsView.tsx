@@ -11,7 +11,10 @@ import {
   parseAmount,
   type Currency,
 } from '../../../shared/money'
-import { formatMonth, monthOf, shiftMonth } from './format'
+import { formatMonth, monthOf } from './format'
+import { MonthStepper } from './MonthStepper'
+import { BudgetBar } from './BudgetBar'
+import { budgetFigure, budgetShare } from './budget-figures'
 import { categoryTree, useLedger } from './store'
 
 /** Each category's spending this month against its budget, which the user sets here. */
@@ -61,25 +64,7 @@ export function BudgetsView() {
       <header className="toolbar">
         <h1>Budgets</h1>
         <div className="actions month-switch">
-          <button
-            type="button"
-            className="icon"
-            aria-label="Previous Month"
-            title="Previous Month"
-            onClick={() => setMonth(shiftMonth(month, -1))}
-          >
-            ‹
-          </button>
-          <span aria-live="polite">{formatMonth(month)}</span>
-          <button
-            type="button"
-            className="icon"
-            aria-label="Next Month"
-            title="Next Month"
-            onClick={() => setMonth(shiftMonth(month, 1))}
-          >
-            ›
-          </button>
+          <MonthStepper month={month} onChange={setMonth} />
         </div>
       </header>
       <div className="scroll">
@@ -128,12 +113,6 @@ function BudgetRow({
   const [text, setText] = useState('')
   const [problem, setProblem] = useState('')
   const state = budgetState(budget)
-  const share =
-    budget.budgetCents === null
-      ? 0
-      : budget.budgetCents === 0
-        ? 1
-        : Math.min(1, budget.spentCents / budget.budgetCents)
 
   const start = () => {
     setText(
@@ -159,13 +138,7 @@ function BudgetRow({
     }
   }
 
-  const money = (cents: number) => formatAmount(cents, currency)
-  const label =
-    budget.budgetCents === null
-      ? `${money(budget.spentCents)} spent`
-      : state === 'over'
-        ? `${money(budget.spentCents - budget.budgetCents)} over ${money(budget.budgetCents)}`
-        : `${money(budget.spentCents)} of ${money(budget.budgetCents)}`
+  const label = budgetFigure(budget, currency)
 
   return (
     <li className={`budget ${state}${child ? ' child' : ''}`}>
@@ -173,10 +146,7 @@ function BudgetRow({
       {budget.budgetCents === null ? (
         <span />
       ) : (
-        <svg className="bar" aria-hidden="true" width="100%" height="6">
-          <rect className="track" width="100%" height="6" rx="3" />
-          <rect className="fill" width={`${share * 100}%`} height="6" rx="3" />
-        </svg>
+        <BudgetBar share={budgetShare(budget)} />
       )}
       {editing ? (
         <form className="budget-form" onSubmit={save} noValidate>

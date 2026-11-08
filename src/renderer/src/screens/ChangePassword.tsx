@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { PASSWORD_MAX, passwordLength } from '../../../shared/password'
 import { newPasswordProblem } from '../password-rules'
+import { ErrorText } from '../components/ErrorText'
 
 export function ChangePassword({ onCancel }: { onCancel: () => void }) {
   const [current, setCurrent] = useState('')
@@ -89,11 +90,7 @@ export function ChangePassword({ onCancel }: { onCancel: () => void }) {
             disabled={busy}
           />
         </label>
-        {message && (
-          <p className="error" role="alert">
-            {message}
-          </p>
-        )}
+        <ErrorText message={message} />
         <div className="actions">
           <button
             type="button"

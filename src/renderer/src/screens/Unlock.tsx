@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useVault } from '../store'
+import { ErrorText } from '../components/ErrorText'
 
 const MESSAGES: Record<string, string> = {
   'wrong-password': 'Wrong password.',
@@ -34,11 +35,7 @@ export function Unlock() {
             autoFocus
           />
         </label>
-        {notice && MESSAGES[notice] && (
-          <p className="error" role="alert">
-            {MESSAGES[notice]}
-          </p>
-        )}
+        <ErrorText message={notice ? MESSAGES[notice] : null} />
         <button type="submit" disabled={busy || !password}>
           {busy ? 'Unlocking…' : 'Unlock'}
         </button>
