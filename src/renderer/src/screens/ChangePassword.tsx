@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { PASSWORD_MAX, passwordLength } from '../../../shared/password'
 import { newPasswordProblem } from '../password-rules'
@@ -10,29 +10,41 @@ export function ChangePassword({ onCancel }: { onCancel: () => void }) {
   const [submitted, setSubmitted] = useState(false)
   const [busy, setBusy] = useState(false)
   const [refused, setRefused] = useState<string | null>(null)
+  const currentField = useRef<HTMLInputElement>(null)
 
   const problem = newPasswordProblem(next, confirm)
+
+  // The page stays to report a failure, without the passwords on screen.
+  const fail = (message: string) => {
+    setRefused(message)
+    setCurrent('')
+    setNext('')
+    setConfirm('')
+    setSubmitted(false)
+  }
+  useEffect(() => {
+    if (refused) currentField.current?.focus()
+  }, [refused])
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setSubmitted(true)
     if (problem || !current) return
     // No password that long was ever accepted.
-    if (passwordLength(current) > PASSWORD_MAX)
-      return setRefused('Wrong password.')
+    if (passwordLength(current) > PASSWORD_MAX) return fail('Wrong password.')
     setBusy(true)
     setRefused(null)
     try {
       // On success the main process replaces this page.
       const result = await window.ledger.vault.changePassword(current, next)
       if (result.ok) return
-      setRefused(
+      fail(
         result.reason === 'wrong-password'
           ? 'Wrong password.'
           : 'The password could not be changed.',
       )
     } catch {
-      setRefused('The password could not be changed.')
+      fail('The password could not be changed.')
     } finally {
       setBusy(false)
     }
@@ -47,6 +59,7 @@ export function ChangePassword({ onCancel }: { onCancel: () => void }) {
         <label>
           Current password
           <input
+            ref={currentField}
             type="password"
             autoComplete="current-password"
             value={current}

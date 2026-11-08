@@ -287,6 +287,11 @@ test('a password change that fails says so, and the old password still works', a
     await expect(home.getByRole('alert')).toHaveText(
       'The password could not be changed.',
     )
+    for (const field of ['Current password', 'Confirm new password'])
+      await expect(home.getByLabel(field)).toHaveValue('')
+    await expect(home.getByLabel('New password', { exact: true })).toHaveValue(
+      '',
+    )
   } finally {
     chmodSync(vaultDir(userData), 0o700)
   }
@@ -319,9 +324,12 @@ test('changing the password re-keys the vault in a new page process', async ({
   await home.getByLabel('Confirm new password').fill(NEW)
   await home.getByRole('button', { name: 'Change Password' }).click()
   await expect(home.getByRole('alert')).toHaveText('Wrong password.')
+  await expect(home.getByLabel('Current password')).toBeFocused()
 
   const changingPid = await rendererPid(app)
   await home.getByLabel('Current password').fill(PASSWORD)
+  await home.getByLabel('New password', { exact: true }).fill(NEW)
+  await home.getByLabel('Confirm new password').fill(NEW)
   const changed = await replacedBy(app, () =>
     home.getByRole('button', { name: 'Change Password' }).click(),
   )
