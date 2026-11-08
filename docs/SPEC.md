@@ -38,7 +38,7 @@ A personal finance desktop app whose data stays on the local machine in a fully 
 
 - Multiple currencies (AUD, CNY), with manually entered exchange rates
 - Local machine-learning categorization (naive Bayes, fully offline)
-- Update notice: a menu item that opens the GitHub Releases page
+- Update notice: a menu item that opens the GitHub Releases page (implemented: Help → Check for Updates…, D036)
 
 ### Out of scope
 
@@ -82,10 +82,11 @@ budgets(id, category_id, month, amount_cents)
 import_batches(id, file_name, row_count, imported_at)
 import_mappings(signature, mapping)
 transfer_links(out_id, in_id, status)
+settings(key, value)
 report_transactions: transactions minus both sides of confirmed transfers
 ```
 
-All amounts are stored as integers (cents). An imported transaction's `hash` is its fingerprint (D025); `edited` marks a change by the user. Rules match by "contains", "starts with" or "is" (D026). Transfers are pairs of transactions (D027).
+All amounts are stored as integers (cents). An imported transaction's `hash` is its fingerprint (D025); `edited` marks a change by the user. Rules match by "contains", "starts with" or "is" (D026). Transfers are pairs of transactions (D027). Preferences are rows of `settings`, read with defaults for missing keys (D032).
 
 ## 6. Interface
 
