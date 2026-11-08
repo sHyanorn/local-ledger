@@ -43,7 +43,25 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run setup:electron
+      # Electron's install script and electron-builder both keep the Electron
+      # zip in this cache and check it against Electron's published checksums.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/electron
+            ~/Library/Caches/electron
+            ~/AppData/Local/electron/Cache
+          key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node_modules/electron/package.json', 'node_modules/app-builder-lib/package.json') }}
+      # GitHub release downloads fail with 5xx at times.
+      - name: Install Electron
+        shell: bash
+        run: |
+          for wait in 15 45 90; do
+            npm run setup:electron && exit 0
+            echo "Retrying in ${wait}s"
+            sleep "$wait"
+          done
+          npm run setup:electron
       # Ubuntu blocks unprivileged user namespaces, which the Chromium sandbox
       # needs; allow them so the app runs sandboxed as it does for users.
       - if: runner.os == 'Linux'

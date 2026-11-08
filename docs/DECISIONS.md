@@ -124,3 +124,8 @@
 - Date: 2026-11-08
 - Decision: an account's opening balance is a field of the account, not a transaction, so reports will not count it as income; the balance is the opening balance plus every transaction. Names are unique without regard to ASCII case; stored in composed form, names that look the same collide. An account can be deleted only without transactions, and its currency changes only while it has none. Categories nest two levels: a category with subcategories stays at the top. Deleting a category deletes its subcategories too; their transactions become uncategorized and their budgets go with them, and the confirmation says how many transactions it affects
 - Later: archiving accounts (Nice to have); rules that point to a deleted category (M3)
+
+## D022 Electron downloads in CI
+- Date: 2026-11-08
+- Decision: CI caches the Electron zip with `actions/cache` in @electron/get's default cache directory, where both Electron's install script and electron-builder keep it, keyed by OS, architecture and the installed versions of `electron` and `app-builder-lib`. A cached zip is checked against Electron's checksums before use, as a download is, and downloaded again on a mismatch. The install step retries three times, after 15, 45 and 90 seconds, since GitHub release downloads fail with 5xx at times. electron-builder retries its own downloads, including the checksum file it fetches on every build
+- Alternatives: a mirror such as `ELECTRON_MIRROR` (another party to trust); `electronDist` pointing electron-builder at `node_modules/electron/dist` (changes how releases are built)
