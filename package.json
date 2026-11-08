@@ -1,6 +1,6 @@
 {
   "name": "local-ledger",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "A local-first, fully encrypted personal finance desktop app",
   "author": "Aaron Yang",
