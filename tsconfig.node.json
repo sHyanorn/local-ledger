@@ -9,6 +9,12 @@
     "module": "preserve",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
+    // The package's exports map has no types condition.
+    "paths": {
+      "better-sqlite3-multiple-ciphers": [
+        "./node_modules/better-sqlite3-multiple-ciphers/index.d.ts"
+      ]
+    },
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
