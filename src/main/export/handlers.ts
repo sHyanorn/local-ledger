@@ -8,7 +8,7 @@ import type { ExportFormat } from '../../shared/export'
 import type { Outcome } from '../../shared/ipc'
 import type { Currency } from '../../shared/money'
 import { showSave } from '../dialogs'
-import { handle } from '../ipc'
+import type { Handle } from '../ipc'
 import { writeOwnerOnly } from '../owner-only'
 import { LockedError, type Vault } from '../vault/vault'
 import { printPdf } from './print'
@@ -25,7 +25,7 @@ const FILTERS: Record<ExportFormat, FileFilter> = {
 export function handleExport(
   vault: Vault,
   window: () => BaseWindow | null,
-  devOrigin?: string,
+  handle: Handle,
 ): void {
   // Replaced at every lock and unlock, so work begun before one stops.
   let state = new AbortController()
@@ -35,20 +35,16 @@ export function handleExport(
   })
   let busy = false
 
-  handle(
-    'export:save',
-    async ({ month, currency, format }) => {
-      vault.database() // Fails when locked, before any dialog opens.
-      if (busy) return { ok: false, reason: 'busy' } as const
-      busy = true
-      try {
-        return await save(month, currency, format, state.signal)
-      } finally {
-        busy = false
-      }
-    },
-    devOrigin,
-  )
+  handle('export:save', async ({ month, currency, format }) => {
+    vault.database() // Fails when locked, before any dialog opens.
+    if (busy) return { ok: false, reason: 'busy' } as const
+    busy = true
+    try {
+      return await save(month, currency, format, state.signal)
+    } finally {
+      busy = false
+    }
+  })
 
   async function save(
     month: string,

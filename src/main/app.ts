@@ -6,7 +6,7 @@ import { hardenApp } from './hardening'
 import { handleBackup } from './backup/handlers'
 import { handleExport } from './export/handlers'
 import { handleImport } from './import/handlers'
-import { handle } from './ipc'
+import { ipcHandlers } from './ipc'
 import { handleLedger } from './ledger/handlers'
 import { RELEASES_URL, setMenu } from './menu'
 import { registerAppScheme, serveAppScheme } from './protocol'
@@ -26,19 +26,18 @@ export function startApp(): void {
 
   void app.whenReady().then(() => {
     serveAppScheme(join(__dirname, '../renderer'))
+    const handle = ipcHandlers(devOrigin)
     const vault = new Vault(app.getPath('userData'), {
       derive: deriveInWorker,
     })
 
-    handle('vault:status', () => vault.state, devOrigin)
-    handle('vault:create', ({ password }) => vault.create(password), devOrigin)
-    handle('vault:unlock', ({ password }) => vault.unlock(password), devOrigin)
-    handle(
-      'vault:change-password',
-      ({ current, next }) => vault.changePassword(current, next),
-      devOrigin,
+    handle('vault:status', () => vault.state)
+    handle('vault:create', ({ password }) => vault.create(password))
+    handle('vault:unlock', ({ password }) => vault.unlock(password))
+    handle('vault:change-password', ({ current, next }) =>
+      vault.changePassword(current, next),
     )
-    handleLedger(vault, devOrigin)
+    handleLedger(vault, handle)
 
     const webPreferences = windowWebPreferences(
       join(__dirname, '../preload/index.js'),
@@ -55,9 +54,9 @@ export function startApp(): void {
       })
     }
     open()
-    handleImport(vault, () => window?.window ?? null, devOrigin)
-    handleExport(vault, () => window?.window ?? null, devOrigin)
-    const backups = handleBackup(vault, () => window?.window ?? null, devOrigin)
+    handleImport(vault, () => window?.window ?? null, handle)
+    handleExport(vault, () => window?.window ?? null, handle)
+    const backups = handleBackup(vault, () => window?.window ?? null, handle)
     vault.onChange(() => window?.replaceView())
     // Also replaces a page that was already locked, so a password typed
     // but not submitted does not survive a lock.
@@ -67,7 +66,7 @@ export function startApp(): void {
       backups.forget()
       if (!vault.lock()) window?.replaceView()
     }
-    handle('vault:lock', lock, devOrigin)
+    handle('vault:lock', lock)
     setMenu({
       lock,
       command: (name) => {

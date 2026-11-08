@@ -41,10 +41,17 @@ export function guard<C extends Channel>(
   }
 }
 
-export function handle<C extends Channel>(
+/** Registers a guarded handler for a channel. */
+export type Handle = <C extends Channel>(
   channel: C,
   handler: Handler<C>,
-  devOrigin?: string,
-): void {
-  ipcMain.handle(channel, guard(channel, handler, devOrigin))
+) => void
+
+/**
+ * Registers handlers that answer this app's frames and, while developing,
+ * the dev server's.
+ */
+export function ipcHandlers(devOrigin?: string): Handle {
+  return (channel, handler) =>
+    ipcMain.handle(channel, guard(channel, handler, devOrigin))
 }
