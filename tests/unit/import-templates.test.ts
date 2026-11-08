@@ -225,3 +225,118 @@ describe('guessed layouts', () => {
     expect(tidy?.dateOrders).toEqual(['dmy'])
   })
 })
+
+describe('tolerance of export variations', () => {
+  type Variant = {
+    name: string
+    cell?: (value: string, column: number, template: string) => string
+    quote?: 'all' | 'needed'
+    eol?: '\n' | '\r\n'
+    bom?: boolean
+    finalBreak?: boolean
+  }
+  const DATE_COLUMN: Record<string, number> = {
+    commbank: 0,
+    nab: 0,
+    anz: 0,
+    westpac: 1,
+  }
+  const AMOUNT_COLUMNS: Record<string, number[]> = {
+    commbank: [1, 3],
+    nab: [1, 6],
+    anz: [1],
+    westpac: [3, 4, 5],
+  }
+  const thousands = (value: string) =>
+    value.replace(
+      /^([+-]?)(\d+)(\.\d+)?$/,
+      (_, sign: string, whole: string, fraction = '') =>
+        `${sign}${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}${fraction}`,
+    )
+  const variants: Variant[] = [
+    { name: 'every field quoted', quote: 'all' },
+    { name: 'only needed quotes', quote: 'needed' },
+    { name: 'CRLF and a byte order mark', eol: '\r\n', bom: true },
+    { name: 'no final line break', finalBreak: false },
+    {
+      name: 'two-digit years',
+      cell: (value, column, template) =>
+        column === DATE_COLUMN[template]
+          ? value.replace(/\/20(\d\d)$/, '/$1').replace(/ 20(\d\d)$/, ' $1')
+          : value,
+    },
+    {
+      name: 'four-digit years',
+      cell: (value, column, template) =>
+        column === DATE_COLUMN[template]
+          ? value.replace(/^(\d\d? [A-Za-z]+) (\d\d)$/, '$1 20$2')
+          : value,
+    },
+    {
+      name: 'thousands separators',
+      cell: (value, column, template) =>
+        AMOUNT_COLUMNS[template]?.includes(column)
+          ? thousands(value.replaceAll(',', ''))
+          : value,
+    },
+    {
+      name: 'no plus sign on credits',
+      cell: (value, column, template) =>
+        AMOUNT_COLUMNS[template]?.includes(column)
+          ? value.replace(/^\+/, '')
+          : value,
+    },
+  ]
+  const samples = [
+    'commbank.csv',
+    'nab.csv',
+    'nab-2022.csv',
+    'anz.csv',
+    'anz-extended.csv',
+    'westpac.csv',
+  ]
+
+  function write(rows: Row[], template: string, variant: Variant): Uint8Array {
+    const eol = variant.eol ?? '\n'
+    const lines = rows.map((row) =>
+      row.cells
+        .map((cell, column) => {
+          const value = variant.cell
+            ? variant.cell(cell, column, template)
+            : cell
+          const needed = /[",\r\n]/.test(value)
+          return variant.quote === 'all' || needed
+            ? `"${value.replaceAll('"', '""')}"`
+            : value
+        })
+        .join(','),
+    )
+    const text = lines.join(eol) + (variant.finalBreak === false ? '' : eol)
+    const bytes = new TextEncoder().encode(text)
+    return variant.bom ? new Uint8Array([0xef, 0xbb, 0xbf, ...bytes]) : bytes
+  }
+
+  for (const name of samples) {
+    const base = read(name)
+    const expected = base.rows.map(({ date, cents, description }) => ({
+      date,
+      cents,
+      description,
+    }))
+    it.each(variants)(`${name} with $name`, (variant) => {
+      const template = base.layout.template!
+      const table = readTable(write(base.table.rows, template, variant))
+      const layout = detectLayout(table.rows)
+      expect(layout?.template).toBe(template)
+      const parsed = applyMapping(table.rows, layout!.mapping)
+      expect(parsed.errors).toEqual([])
+      expect(
+        parsed.rows.map(({ date, cents, description }) => ({
+          date,
+          cents,
+          description,
+        })),
+      ).toEqual(expected)
+    })
+  }
+})
