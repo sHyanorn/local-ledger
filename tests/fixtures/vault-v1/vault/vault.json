@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "generation": 1,
+  "kdf": {
+    "algorithm": "argon2id",
+    "memoryKiB": 19456,
+    "iterations": 2,
+    "parallelism": 1,
+    "salt": "EJIJy+S7drYnFCxBIDZhMQ=="
+  },
+  "key": {
+    "nonce": "tkdBgxDCE9HHyPb4",
+    "sealed": "5AuqARdi24aV2d1mC9pfOWWW9FKJdskOCv+yMr+pRtdgU8RyaB/CD174qwkrXtcm"
+  }
+}
