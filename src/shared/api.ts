@@ -1,6 +1,7 @@
 import type { ImportTarget, Mapping, Encoding } from './imports'
 import type { Results, VaultState } from './ipc'
 import type { RuleFields, RuleMatch } from './rules'
+import type { Currency } from './money'
 import type {
   AccountFields,
   CategoryFields,
@@ -99,6 +100,16 @@ export interface LedgerApi {
       month: string,
       amountCents: number | null,
     ): Promise<Results['budgets:set']>
+  }
+  readonly reports: {
+    /** The month's income, spending and categories, and the twelve months to it. */
+    month(month: string, currency: Currency): Promise<Results['reports:month']>
+    /** A category's spending in each of the twelve months to this one. */
+    trend(
+      categoryId: number,
+      month: string,
+      currency: Currency,
+    ): Promise<Results['reports:trend']>
   }
   readonly transfers: {
     /** Pairs that may be one transfer but have other candidates. */

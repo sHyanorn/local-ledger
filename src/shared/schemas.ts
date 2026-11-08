@@ -139,6 +139,12 @@ export const schemas = {
   ruleDismiss: z.strictObject({ pattern: text(DESCRIPTION_MAX, 1) }),
   transferLink: z.strictObject({ id, otherId: id }),
   budgetMonth: z.strictObject({ month }),
+  report: z.strictObject({ month, currency: z.enum(CURRENCIES) }),
+  trend: z.strictObject({
+    categoryId: id,
+    month,
+    currency: z.enum(CURRENCIES),
+  }),
   budgetSet: z.strictObject({
     categoryId: id,
     month,

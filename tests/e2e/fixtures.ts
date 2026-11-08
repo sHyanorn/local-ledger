@@ -144,6 +144,16 @@ export const ledgerTest = test.extend<{ ledger: SeedLedger; home: Page }>({
       page.getByRole('button', { name: 'Unlock' }).click(),
     )
     await expect(home.getByRole('navigation', { name: 'Ledger' })).toBeVisible()
+    // Overview opens first; most tests start from the transaction list.
+    await expect(
+      home
+        .getByRole('navigation', { name: 'Ledger' })
+        .getByRole('button', { name: 'Overview' }),
+    ).toHaveAttribute('aria-current', 'page')
+    await home
+      .getByRole('navigation', { name: 'Ledger' })
+      .getByRole('button', { name: 'All Transactions' })
+      .click()
     // A CSP violation is logged as a console error, so this also fails a
     // test whose page tried eval or a remote load.
     const problems: string[] = []

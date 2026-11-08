@@ -17,6 +17,7 @@ import type {
 import type { Rule, RuleReach, RuleSuggestion } from './rules'
 import type { PossibleTransfer, TransferSide } from './transfers'
 import type { MonthBudgets } from './budgets'
+import type { ReportData, TrendPoint } from './reports'
 import type {
   Account,
   Category,
@@ -87,6 +88,8 @@ export const channels = {
   'transfers:reject': schemas.transferReject,
   'budgets:month': schemas.budgetMonth,
   'budgets:set': schemas.budgetSet,
+  'reports:month': schemas.report,
+  'reports:trend': schemas.trend,
 } as const
 
 export type Channel = keyof typeof channels
@@ -154,4 +157,6 @@ export interface Results {
   'transfers:reject': Outcome<'not-found'>
   'budgets:month': MonthBudgets
   'budgets:set': Outcome<'not-found'>
+  'reports:month': ReportData
+  'reports:trend': TrendPoint[]
 }

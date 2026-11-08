@@ -158,6 +158,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
       rules: methods('rules'),
       transfers: methods('transfers'),
       budgets: methods('budgets'),
+      reports: methods('reports'),
       unlockReplaced: String(vault.unlock).includes('replaced'),
     }
   })
@@ -171,6 +172,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
       'imports',
       'rules',
       'budgets',
+      'reports',
       'transfers',
     ],
     version: pkg.version,
@@ -198,6 +200,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
     ],
     transfers: ['choices', 'count', 'link', 'possible', 'reject', 'unlink'],
     budgets: ['month', 'set'],
+    reports: ['month', 'trend'],
     unlockReplaced: false,
   })
 })
@@ -445,6 +448,8 @@ ledgerTest(
         () => transfers.reject(1, 2),
         () => window.ledger.budgets.month('2026-05'),
         () => window.ledger.budgets.set(1, '2026-05', 100),
+        () => window.ledger.reports.month('2026-05', 'AUD'),
+        () => window.ledger.reports.trend(1, '2026-05', 'AUD'),
       ]
       return Promise.all(
         calls.map((call) =>
@@ -455,7 +460,7 @@ ledgerTest(
         ),
       )
     })
-    expect(results).toHaveLength(28)
+    expect(results).toHaveLength(30)
     for (const result of results) expect(result).toMatch(/Error: locked$/)
   },
 )

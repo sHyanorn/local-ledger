@@ -6,6 +6,8 @@ import { formatMonth, monthOf } from './format'
 import type { Account, Category } from '../../../shared/ledger'
 
 export type View =
+  | { name: 'overview' }
+  | { name: 'reports' }
   | { name: 'transactions'; accountId: number | null }
   | { name: 'settings' }
   /** Pairs that may be transfers, for the user to decide. */
@@ -37,7 +39,7 @@ export const useLedger = create<LedgerStore>((set, get) => ({
   overBudget: null,
   notice: null,
   setNotice: (notice) => set({ notice }),
-  view: { name: 'transactions', accountId: null },
+  view: { name: 'overview' },
   show: (view) => set({ view }),
   refresh: async () => {
     const month = monthOf()

@@ -70,6 +70,11 @@ const api: LedgerApi = {
     set: (categoryId, month, amountCents) =>
       invoke('budgets:set', { categoryId, month, amountCents }),
   },
+  reports: {
+    month: (month, currency) => invoke('reports:month', { month, currency }),
+    trend: (categoryId, month, currency) =>
+      invoke('reports:trend', { categoryId, month, currency }),
+  },
   transfers: {
     possible: () => invoke('transfers:possible', undefined),
     count: () => invoke('transfers:count', undefined),

@@ -20,6 +20,14 @@ export function Sidebar() {
       <button
         type="button"
         className="sidebar-item"
+        aria-current={current(view.name === 'overview')}
+        onClick={() => show({ name: 'overview' })}
+      >
+        Overview
+      </button>
+      <button
+        type="button"
+        className="sidebar-item"
         aria-current={current(
           view.name === 'transactions' && view.accountId === null,
         )}
@@ -42,6 +50,14 @@ export function Sidebar() {
             {overBudget?.length}
           </span>
         )}
+      </button>
+      <button
+        type="button"
+        className="sidebar-item"
+        aria-current={current(view.name === 'reports')}
+        onClick={() => show({ name: 'reports' })}
+      >
+        Reports
       </button>
       <button
         type="button"

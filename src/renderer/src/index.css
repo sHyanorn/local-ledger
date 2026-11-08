@@ -877,3 +877,88 @@ select.inline:focus {
 .badge.over {
   background: var(--danger);
 }
+
+/* Overview and reports */
+
+.overview,
+.reports {
+  display: grid;
+  gap: 24px;
+  max-width: 760px;
+  padding: 16px;
+}
+
+.overview h1 {
+  font-variant-numeric: tabular-nums;
+}
+
+.cards {
+  display: grid;
+  gap: 12px;
+}
+
+.card-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.card {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.card strong {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.card .positive {
+  color: var(--positive);
+}
+
+.budget.compact {
+  grid-template-columns: minmax(0, 1fr) minmax(80px, 1.2fr) 190px;
+}
+
+.list-row.recent {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) 120px;
+}
+
+.list-row.recent .amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.reports section {
+  display: grid;
+  gap: 8px;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.legend .key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 10px;
+  border-radius: 2px;
+}
+
+.legend .key.income {
+  background: var(--positive);
+}
+
+.legend .key.spending {
+  background: var(--accent);
+}
