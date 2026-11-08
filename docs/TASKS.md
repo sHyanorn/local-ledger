@@ -38,6 +38,8 @@
 
 ## M5 Polish and release
 - [ ] Apple-style UI polish, dark mode, keyboard shortcuts; a setting for the auto-lock time; dropping a CSV file on the window to import it
+- [ ] Import preview at the 50,000-row limit: it takes about 3 s to show and about 0.5 s per checkbox; consider a virtualized list
+- [ ] Delimiter detection: a two-line tab-separated file with comma thousands separators can be read as comma-separated, and a semicolon file with unquoted semicolons in descriptions splits wrongly
 - [ ] Encrypted backup and restore
 - [ ] Release workflow: macOS and Windows installers, checksums and provenance attestation (D006)
 - [ ] Playwright end-to-end tests
