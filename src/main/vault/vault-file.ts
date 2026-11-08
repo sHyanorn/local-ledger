@@ -14,7 +14,8 @@ export interface VaultFile {
   key: Sealed
 }
 
-const bytes = (length: number) =>
+/** Base64 text of exactly `length` bytes, read as a Buffer. */
+export const base64Bytes = (length: number) =>
   z
     .base64()
     .transform((text) => Buffer.from(text, 'base64'))
@@ -23,20 +24,33 @@ const bytes = (length: number) =>
 const bounded = ({ min, max }: { min: number; max: number }) =>
   z.int().min(min).max(max)
 
-const schema = z.strictObject({
-  version: z.literal(1),
-  generation: z.int().min(1).max(Number.MAX_SAFE_INTEGER),
-  kdf: z.strictObject({
+/** Argon2id settings and salt, as vault.json and backup headers store them. */
+export const kdfSchema = z
+  .strictObject({
     algorithm: z.literal('argon2id'),
     memoryKiB: bounded(KDF_BOUNDS.memoryKiB),
     iterations: bounded(KDF_BOUNDS.iterations),
     parallelism: bounded(KDF_BOUNDS.parallelism),
-    salt: bytes(SALT_BYTES),
-  }),
-  key: z.strictObject({
-    nonce: bytes(12),
-    sealed: bytes(48),
-  }),
+    salt: base64Bytes(SALT_BYTES),
+  })
+  .transform(({ memoryKiB, iterations, parallelism, salt }) => ({
+    memoryKiB,
+    iterations,
+    parallelism,
+    salt,
+  }))
+
+/** A data key sealed with AES-256-GCM: the nonce, then the key and its tag. */
+export const sealedSchema = z.strictObject({
+  nonce: base64Bytes(12),
+  sealed: base64Bytes(48),
+})
+
+const schema = z.strictObject({
+  version: z.literal(1),
+  generation: z.int().min(1).max(Number.MAX_SAFE_INTEGER),
+  kdf: kdfSchema,
+  key: sealedSchema,
 })
 
 /**
@@ -71,16 +85,7 @@ export function parseVaultFile(text: string): VaultFile | null {
   const parsed = schema.safeParse(json)
   if (!parsed.success) return null
   const { generation, kdf, key } = parsed.data
-  return {
-    generation,
-    kdf: {
-      memoryKiB: kdf.memoryKiB,
-      iterations: kdf.iterations,
-      parallelism: kdf.parallelism,
-      salt: kdf.salt,
-    },
-    key,
-  }
+  return { generation, kdf, key }
 }
 
 export function serializeVaultFile({

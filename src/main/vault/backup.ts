@@ -7,7 +7,8 @@
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { open, seal, type Sealed } from './envelope'
-import { KDF_BOUNDS, SALT_BYTES, type KdfParams } from './kdf'
+import type { KdfParams } from './kdf'
+import { base64Bytes, kdfSchema, sealedSchema } from './vault-file'
 
 const MAGIC = Buffer.from('LLBACKUP')
 const HEADER_MAX = 4096
@@ -21,29 +22,14 @@ export interface BackupHeader {
   key: Sealed
 }
 
-const bytes = (length: number) =>
-  z
-    .base64()
-    .transform((text) => Buffer.from(text, 'base64'))
-    .refine((buffer) => buffer.length === length)
-
-const bounded = ({ min, max }: { min: number; max: number }) =>
-  z.int().min(min).max(max)
-
 const schema = z.strictObject({
   format: z.literal('local-ledger backup'),
   version: z.literal(1),
   schema: z.int().min(1).max(10_000),
   size: z.int().min(1).max(Number.MAX_SAFE_INTEGER),
-  sha256: bytes(32),
-  kdf: z.strictObject({
-    algorithm: z.literal('argon2id'),
-    memoryKiB: bounded(KDF_BOUNDS.memoryKiB),
-    iterations: bounded(KDF_BOUNDS.iterations),
-    parallelism: bounded(KDF_BOUNDS.parallelism),
-    salt: bytes(SALT_BYTES),
-  }),
-  key: z.strictObject({ nonce: bytes(12), sealed: bytes(48) }),
+  sha256: base64Bytes(32),
+  kdf: kdfSchema,
+  key: sealedSchema,
 })
 
 function associatedData(header: Omit<BackupHeader, 'key'>): Buffer {
@@ -130,24 +116,13 @@ export function readBackup(file: Buffer): ReadBackup | null {
   }
   const parsed = schema.safeParse(json)
   if (!parsed.success) return null
-  const { kdf, key, ...rest } = parsed.data
+  const { schema: schemaVersion, size, sha256, kdf, key } = parsed.data
   const database = file.subarray(start + length)
-  if (database.length !== rest.size) return null
-  if (!createHash('sha256').update(database).digest().equals(rest.sha256))
+  if (database.length !== size) return null
+  if (!createHash('sha256').update(database).digest().equals(sha256))
     return null
   return {
-    header: {
-      schema: rest.schema,
-      size: rest.size,
-      sha256: rest.sha256,
-      kdf: {
-        memoryKiB: kdf.memoryKiB,
-        iterations: kdf.iterations,
-        parallelism: kdf.parallelism,
-        salt: kdf.salt,
-      },
-      key,
-    },
+    header: { schema: schemaVersion, size, sha256, kdf, key },
     database,
   }
 }
