@@ -1,8 +1,15 @@
-import { writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { ElectronApplication, Page } from '@playwright/test'
 import { DEMO_PASSWORD } from '../../scripts/seed/demo'
-import { expect, ledgerTest, replacedBy } from './fixtures'
+import {
+  expect,
+  ledgerTest,
+  rendererPid,
+  expectExited,
+  replacedBy,
+} from './fixtures'
 
 const sample = (name: string) => resolve(__dirname, '../fixtures/csv', name)
 
@@ -176,5 +183,66 @@ ledgerTest(
     await expect(alert).toBeVisible()
     await expect(alert).toContainText('The file could not be read as CSV.')
     await alert.getByRole('button', { name: 'OK' }).click()
+  },
+)
+
+ledgerTest(
+  'after a lock, no imported or waiting file text is reachable in the main process',
+  async ({ app, home }, testInfo) => {
+    const control = `Control ${randomUUID()}`
+    await app.evaluate(
+      (_electron, value) => {
+        Object.assign(globalThis, { residueControl: value })
+      },
+      `${'-'.repeat(4096)}${control}`,
+    )
+    const imported = `Imported ${randomUUID()}`
+    const waiting = `Waiting ${randomUUID()}`
+    const file = (name: string, description: string) => {
+      const path = testInfo.outputPath(name)
+      writeFileSync(path, `01/05/2026,"-1.00","${description}"\n`)
+      return path
+    }
+    const accountId = await everydayId(home)
+    const open = async (path: string) => {
+      await chooseFile(app, path)
+      return home.evaluate(async (accountId) => {
+        const opened = await window.ledger.imports.open()
+        if (!opened.ok) throw new Error(opened.reason)
+        return {
+          id: opened.file.id,
+          encoding: opened.file.encoding,
+          mapping: opened.file.mapping!,
+          targets: [{ key: '', accountId }],
+        }
+      }, accountId)
+    }
+    const request = await open(file('imported.csv', imported))
+    await home.evaluate(
+      (request) => window.ledger.imports.commit(request, [0]),
+      request,
+    )
+    await open(file('waiting.csv', waiting))
+
+    const shown = await rendererPid(app)
+    const locked = await replacedBy(app, () =>
+      home
+        .getByRole('navigation', { name: 'Ledger' })
+        .getByRole('button', { name: 'Lock' })
+        .click(),
+    )
+    await expectExited(shown)
+    await expect(locked.getByLabel('Master password')).toBeVisible()
+
+    const snapshotFile = testInfo.outputPath('main.heapsnapshot')
+    await app.evaluate((_electron, path) => {
+      process.getBuiltinModule('v8').writeHeapSnapshot(path)
+    }, snapshotFile)
+    const snapshot = readFileSync(snapshotFile, 'utf8')
+    expect(snapshot.includes(control), 'the control is found').toBe(true)
+    expect(snapshot.includes(imported), 'imported text is reachable').toBe(
+      false,
+    )
+    expect(snapshot.includes(waiting), 'waiting text is reachable').toBe(false)
   },
 )
