@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Category } from '../../../shared/ledger'
 import { ChangePassword } from '../screens/ChangePassword'
+import { RestoreDialog } from '../screens/RestoreDialog'
 import { BackupDialog } from './BackupDialog'
 import { CategoryDialog } from './CategoryDialog'
 import { GeneralSection } from './GeneralSection'
@@ -16,6 +17,7 @@ export function Settings() {
   const [changingPassword, setChangingPassword] = useState(false)
   const [backingUp, setBackingUp] = useState(false)
   const [backedUp, setBackedUp] = useState(false)
+  const [restoring, setRestoring] = useState(false)
 
   if (changingPassword) {
     return <ChangePassword onCancel={() => setChangingPassword(false)} />
@@ -88,6 +90,13 @@ export function Settings() {
               <button
                 type="button"
                 className="secondary"
+                onClick={() => setRestoring(true)}
+              >
+                Restore from Backup…
+              </button>
+              <button
+                type="button"
+                className="secondary"
                 onClick={() => setChangingPassword(true)}
               >
                 Change Master Password…
@@ -99,6 +108,9 @@ export function Settings() {
           </section>
         </div>
       </div>
+      {restoring && (
+        <RestoreDialog replacing onClose={() => setRestoring(false)} />
+      )}
       {backingUp && (
         <BackupDialog
           onDone={(saved) => {

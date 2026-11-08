@@ -78,6 +78,12 @@ const api: LedgerApi = {
   backup: {
     save: (password) => invoke('backup:save', { password }),
   },
+  restore: {
+    open: () => invoke('restore:open', undefined),
+    check: (password) => invoke('restore:check', { password }),
+    commit: (currentPassword) => invoke('restore:commit', { currentPassword }),
+    discard: () => invoke('restore:discard', undefined),
+  },
   settings: {
     get: () => invoke('settings:get', undefined),
     update: (changes) => invoke('settings:update', changes),

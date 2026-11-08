@@ -42,7 +42,7 @@
 - [ ] Delimiter detection: a two-line tab-separated file with comma thousands separators can be read as comma-separated, and a semicolon file with unquoted semicolons in descriptions splits wrongly
 - [x] A home-currency setting for budgets (D028, D032)
 - [ ] Open an exported workbook in Excel and Numbers, which have not been tried (D030)
-- [ ] Encrypted backup and restore
+- [x] Encrypted backup and restore (D033, D034)
 - [ ] Release workflow: macOS and Windows installers, checksums and provenance attestation (D006)
 - [ ] Playwright end-to-end tests
 - [ ] Complete `docs/SECURITY_DESIGN.md`

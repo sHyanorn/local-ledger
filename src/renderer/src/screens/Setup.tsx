@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { newPasswordProblem } from '../password-rules'
 import { useVault } from '../store'
+import { RestoreDialog } from './RestoreDialog'
 
 export function Setup() {
   const create = useVault((store) => store.create)
@@ -10,6 +11,7 @@ export function Setup() {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [restoring, setRestoring] = useState(false)
 
   const problem = newPasswordProblem(password, confirm)
   const message =
@@ -62,7 +64,18 @@ export function Setup() {
         <button type="submit" disabled={busy}>
           {busy ? 'Creating…' : 'Create Vault'}
         </button>
+        <button
+          type="button"
+          className="link"
+          onClick={() => setRestoring(true)}
+          disabled={busy}
+        >
+          Restore from Backup…
+        </button>
       </form>
+      {restoring && (
+        <RestoreDialog replacing={false} onClose={() => setRestoring(false)} />
+      )}
     </main>
   )
 }

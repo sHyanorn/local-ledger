@@ -18,6 +18,7 @@ import type { Rule, RuleReach, RuleSuggestion } from './rules'
 import type { PossibleTransfer, TransferSide } from './transfers'
 import type { MonthBudgets } from './budgets'
 import type { ReportData, TrendPoint } from './reports'
+import type { BackupSummary } from './backup'
 import type { Settings } from './settings'
 import type {
   Account,
@@ -94,6 +95,12 @@ export const channels = {
   'export:save': schemas.exportSave,
   'settings:get': z.undefined(),
   'backup:save': z.strictObject({ password: givenPassword }),
+  'restore:open': z.undefined(),
+  'restore:check': z.strictObject({ password: givenPassword }),
+  'restore:commit': z.strictObject({
+    currentPassword: givenPassword.nullable(),
+  }),
+  'restore:discard': z.undefined(),
   'settings:update': schemas.settingsUpdate,
 } as const
 
@@ -166,6 +173,22 @@ export interface Results {
   'reports:trend': TrendPoint[]
   'export:save': Outcome<'cancelled' | 'busy' | 'unwritable'>
   'settings:get': Settings
+  'restore:open':
+    | { ok: true; name: string }
+    | {
+        ok: false
+        reason: 'cancelled' | 'too-large' | 'unreadable' | 'invalid'
+      }
+  'restore:check':
+    | { ok: true; summary: BackupSummary }
+    | {
+        ok: false
+        reason: 'no-file' | 'invalid' | 'wrong-password' | 'newer' | 'damaged'
+      }
+  'restore:commit': Outcome<
+    'not-checked' | 'wrong-password' | 'exists' | 'damaged'
+  >
+  'restore:discard': void
   'backup:save': Outcome<
     'wrong-password' | 'damaged' | 'cancelled' | 'unwritable'
   >

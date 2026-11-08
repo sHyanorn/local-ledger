@@ -52,3 +52,21 @@ export async function openKey(
     sealingKey.fill(0)
   }
 }
+
+/** A given data key sealed under the password with a fresh salt, for a generation. */
+export async function sealDataKey(
+  password: string,
+  dataKey: Uint8Array,
+  generation: number,
+  derive: Derive,
+  params: KdfParams = DEFAULT_KDF,
+): Promise<VaultFile> {
+  const salt = randomFillSync(Buffer.alloc(SALT_BYTES))
+  const header = { generation, kdf: { ...params, salt } }
+  const sealingKey = await derive(encodePassword(password), salt, params)
+  try {
+    return { ...header, key: seal(sealingKey, dataKey, associatedData(header)) }
+  } finally {
+    sealingKey.fill(0)
+  }
+}

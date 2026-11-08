@@ -10,6 +10,7 @@ import { MAX_FILE_BYTES } from './csv'
  */
 export async function readChosen(
   path: string,
+  limit = MAX_FILE_BYTES,
 ): Promise<Uint8Array | 'too-large' | 'unreadable'> {
   let handle: FileHandle | undefined
   try {
@@ -25,23 +26,36 @@ export async function readChosen(
     ) {
       return 'unreadable'
     }
-    const buffer = Buffer.alloc(MAX_FILE_BYTES + 1)
+    // Sized for what the file says it holds; a file that grows is read on
+    // into further chunks, never past the limit.
+    const chunks: Buffer[] = []
     let total = 0
-    while (total < buffer.length) {
+    let chunk = Buffer.alloc(Math.min(limit, opened.size) + 1)
+    let filled = 0
+    while (total <= limit) {
+      if (filled === chunk.length) {
+        chunks.push(chunk)
+        chunk = Buffer.alloc(Math.min(limit + 1 - total, 1 << 20))
+        filled = 0
+      }
       const { bytesRead } = await handle.read(
-        buffer,
-        total,
-        buffer.length - total,
+        chunk,
+        filled,
+        chunk.length - filled,
         null,
       )
       if (bytesRead === 0) break
+      filled += bytesRead
       total += bytesRead
     }
-    if (total > MAX_FILE_BYTES) {
-      buffer.fill(0)
+    chunks.push(chunk.subarray(0, filled))
+    const bytes = chunks.length === 1 ? chunks[0]! : Buffer.concat(chunks)
+    if (chunks.length > 1) for (const each of chunks) each.fill(0)
+    if (total > limit) {
+      bytes.fill(0)
       return 'too-large'
     }
-    return buffer.subarray(0, total)
+    return bytes
   } catch {
     return 'unreadable'
   } finally {

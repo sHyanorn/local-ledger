@@ -992,3 +992,16 @@ select.inline:focus {
 .form.general .error {
   grid-column: 1 / -1;
 }
+
+.file-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.file-choice .muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

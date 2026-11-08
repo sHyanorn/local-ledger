@@ -10,10 +10,12 @@ import {
   readdirSync,
   readFileSync,
   renameSync,
+  writeFileSync,
   rmSync,
   statSync,
 } from 'node:fs'
 import { join } from 'node:path'
+import type { BackupSummary } from '../../shared/backup'
 import type { Outcome, VaultState } from '../../shared/ipc'
 import { errorCode } from '../error-code'
 import { changeKey, DamagedError, openDatabase } from './database'
@@ -26,11 +28,11 @@ import {
   writeFileAtomic,
 } from './files'
 import type { Checkpoint } from './files'
-import { writeBackup } from './backup'
-import { open } from './envelope'
+import { openBackupKey, readBackup, writeBackup } from './backup'
+import { open, seal } from './envelope'
 import { DEFAULT_KDF, encodePassword } from './kdf'
 import type { Derive, KdfParams } from './kdf'
-import { createKey, openKey } from './keys'
+import { createKey, openKey, sealDataKey } from './keys'
 import type { NewKey } from './keys'
 import { NewerSchemaError } from './migrations'
 import {
@@ -43,6 +45,22 @@ import type { VaultFile } from './vault-file'
 
 export const VAULT_DIR = 'vault'
 const STAGING_PREFIX = 'vault.creating-'
+/** A backup being checked before a restore; never a vault on its own. */
+const RESTORING_PREFIX = 'vault.restoring-'
+/** Where a restore moves the vault it replaces; the app never deletes it. */
+export const REPLACED_PREFIX = 'vault-before-restore-'
+
+/**
+ * A backup checked and staged for a restore. Its database is opened, checked
+ * and brought up to this app's schema; `file` seals its data key under the
+ * backup's own password.
+ */
+export interface StagedBackup {
+  dir: string
+  file: VaultFile
+  dataKey: Buffer
+  summary: BackupSummary
+}
 /** Files an interrupted change can leave behind. */
 const LEFTOVER = /^(ledger-\d+\.db(\.tmp)?(-journal)?|vault\.json\.tmp)$/
 /** Operations waiting or running at once; the page sends one at a time. */
@@ -108,6 +126,7 @@ export class Vault {
     this.kdf = kdf
     this.checkpoint = checkpoint
     this.#recoverStaged()
+    this.#removeRestoring()
   }
 
   get unlocked(): boolean {
@@ -294,6 +313,155 @@ export class Vault {
         sealingKey.fill(0)
         dataKey?.fill(0)
       }
+    })
+  }
+
+  /**
+   * Checks a backup file with its password and stages its database in a
+   * directory of its own: the key opens, the database opens and passes
+   * integrity_check, and its schema is not newer than this app's. Nothing
+   * of the vault changes. The caller discards the result or restores it.
+   */
+  checkBackup(
+    bytes: Buffer,
+    password: string,
+  ): Promise<
+    | { ok: true; staged: StagedBackup }
+    | { ok: false; reason: 'invalid' | 'wrong-password' | 'newer' | 'damaged' }
+  > {
+    return this.#run(async () => {
+      const backup = readBackup(bytes)
+      if (!backup) return { ok: false, reason: 'invalid' }
+      const { header } = backup
+      const sealingKey = await this.derive(
+        encodePassword(password),
+        header.kdf.salt,
+        header.kdf,
+      )
+      let dataKey: Buffer | null = null
+      let dir: string | null = null
+      try {
+        dataKey = openBackupKey(header, sealingKey)
+        if (!dataKey) return { ok: false, reason: 'wrong-password' }
+        this.#removeRestoring()
+        dir = mkdtempSync(join(this.root, RESTORING_PREFIX))
+        const path = join(dir, databaseName(1))
+        writeFileSync(path, backup.database, { mode: 0o600 })
+        let summary: BackupSummary
+        try {
+          const db = openDatabase(path, dataKey)
+          try {
+            if (db.pragma('integrity_check', { simple: true }) !== 'ok')
+              return { ok: false, reason: 'damaged' }
+            summary = db
+              .prepare(
+                `SELECT (SELECT count(*) FROM accounts) AS accounts,
+                   (SELECT count(*) FROM transactions) AS transactions,
+                   (SELECT max(date) FROM transactions) AS lastDate`,
+              )
+              .get() as BackupSummary
+          } finally {
+            db.close()
+          }
+        } catch (error) {
+          if (error instanceof NewerSchemaError)
+            return { ok: false, reason: 'newer' }
+          if (error instanceof DamagedError)
+            return { ok: false, reason: 'damaged' }
+          throw error
+        }
+        syncFile(path)
+        // Sealed now, so a restore with the backup's password needs nothing
+        // more from the user; the password is not kept.
+        const file = {
+          generation: 1,
+          kdf: header.kdf,
+          key: seal(
+            sealingKey,
+            dataKey,
+            associatedData({ generation: 1, kdf: header.kdf }),
+          ),
+        }
+        const staged = { dir, file, dataKey, summary }
+        dir = null
+        dataKey = null
+        return { ok: true, staged }
+      } finally {
+        sealingKey.fill(0)
+        dataKey?.fill(0)
+        if (dir) rmSync(dir, { recursive: true, force: true })
+      }
+    })
+  }
+
+  /** Removes a staged backup and wipes its key. */
+  discardBackup(staged: StagedBackup): void {
+    staged.dataKey.fill(0)
+    rmSync(staged.dir, { recursive: true, force: true })
+  }
+
+  /**
+   * Puts a staged backup in place of the vault. With the current password,
+   * from an open vault, the data key is sealed under that password, so it
+   * stays the one to use; without one, only when there is no vault, under
+   * the backup's. The vault it replaces is renamed, never deleted. A crash
+   * before that rename leaves the old vault; after it, startup finishes the
+   * restore from the staged vault.
+   */
+  restore(
+    staged: StagedBackup,
+    currentPassword: string | null,
+  ): Promise<Outcome<'wrong-password' | 'exists' | 'locked' | 'damaged'>> {
+    return this.#run(async (cancelled) => {
+      if (cancelled()) return { ok: false, reason: 'locked' }
+      let file = staged.file
+      if (currentPassword === null) {
+        if (existsSync(this.dir)) return { ok: false, reason: 'exists' }
+      } else {
+        if (!this.#db) return { ok: false, reason: 'locked' }
+        const current = this.#readFile()
+        if (!current) return { ok: false, reason: 'damaged' }
+        const key = await openKey(current, currentPassword, this.derive)
+        if (!key) return { ok: false, reason: 'wrong-password' }
+        key.fill(0)
+        file = await sealDataKey(
+          currentPassword,
+          staged.dataKey,
+          1,
+          this.derive,
+          this.kdf,
+        )
+        if (cancelled() || !this.#db) return { ok: false, reason: 'locked' }
+      }
+      if (
+        !writeFileAtomic(join(staged.dir, VAULT_FILE), serializeVaultFile(file))
+      )
+        throw new Error('the restored vault could not be flushed')
+      this.#removeStaging()
+      const whole = mkdtempSync(join(this.root, STAGING_PREFIX))
+      rmSync(whole, { recursive: true })
+      renameSync(staged.dir, whole)
+      flushDirectory(this.root)
+      this.checkpoint('restore staged')
+      if (this.#db) this.#close(this.#db)
+      this.#db = null
+      if (existsSync(this.dir)) {
+        renameSync(this.dir, join(this.root, replacedName(new Date())))
+        flushDirectory(this.root)
+        this.checkpoint('vault moved aside')
+      }
+      renameSync(whole, this.dir)
+      // The restored vault is in place: the page shows it either way.
+      try {
+        flushDirectory(this.root)
+        const opened = this.#openWithKey(file, staged.dataKey)
+        if (!opened.ok)
+          throw new Error(`the restored vault did not open: ${opened.reason}`)
+      } finally {
+        staged.dataKey.fill(0)
+        if (!this.#db) this.#emit()
+      }
+      return { ok: true }
     })
   }
 
@@ -520,6 +688,22 @@ export class Vault {
     }
   }
 
+  /**
+   * Removes backups staged for a restore that did not happen. They are
+   * copies of backup files the user still has.
+   */
+  #removeRestoring(): void {
+    try {
+      for (const name of readdirSync(this.root)) {
+        if (name.startsWith(RESTORING_PREFIX)) {
+          rmSync(join(this.root, name), { recursive: true, force: true })
+        }
+      }
+    } catch {
+      // No user data directory yet.
+    }
+  }
+
   /** A listener that fails does not undo a change that has happened. */
   #emit(): void {
     const state = this.state
@@ -544,4 +728,9 @@ function wholeVaultTime(dir: string): number | null {
   } catch {
     return null
   }
+}
+
+/** The name a restore gives the vault it replaces, such as vault-before-restore-2026-11-08T10-30-00. */
+export function replacedName(now: Date): string {
+  return `${REPLACED_PREFIX}${now.toISOString().slice(0, 19).replaceAll(':', '-')}`
 }

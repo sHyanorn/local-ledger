@@ -120,6 +120,19 @@ export interface LedgerApi {
      */
     save(password: string): Promise<Results['backup:save']>
   }
+  readonly restore: {
+    /** Asks for a backup file and keeps it in the main process. */
+    open(): Promise<Results['restore:open']>
+    /** Opens the chosen backup with its password and says what it holds. */
+    check(password: string): Promise<Results['restore:check']>
+    /**
+     * Puts the checked backup in place of the vault, which is moved aside.
+     * From an open vault, with its current password, which the restored
+     * vault keeps; at setup, with null, and the backup's password applies.
+     */
+    commit(currentPassword: string | null): Promise<Results['restore:commit']>
+    discard(): Promise<void>
+  }
   readonly settings: {
     get(): Promise<Results['settings:get']>
     /** Stores the given settings and returns them all. */

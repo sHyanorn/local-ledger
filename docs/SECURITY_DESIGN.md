@@ -16,6 +16,7 @@ Not protected against:
 - A weak master password. Argon2id slows guessing; it does not make a guessable password safe.
 - A forgotten master password. There is no recovery.
 - Files the user exports or imports. They are plaintext wherever the user keeps them.
+- Old copies: a backup still opens with the password it was made under, and a vault replaced by a restore with the password it had.
 
 ## Key hierarchy
 
@@ -70,6 +71,14 @@ What it cannot do, and does not claim:
 - A file is refused whole past 10 MB, 50,000 rows, 64 columns or 64 KB in one record. Fields are split by `csv-parse`; dates and amounts are read strictly. Every request from the page is validated with zod, and an import is computed again in the main process from the settings of the last preview, refusing any others, before anything is written.
 - Text from a file is stored without control characters, bidirectional controls or zero-width spaces, and shown only as text, so a cell such as `=HYPERLINK(...)` does nothing in the app. Exports neutralize such text for spreadsheets (below).
 - The source file stays where it is, unencrypted, and its name is stored inside the vault for the import history. Deleting or protecting the original is up to the user.
+
+## Backups and restores
+
+- A backup (`.llbackup`) is the encrypted database exactly as the vault holds it, plus a header that seals the data key under the master password the way `vault.json` does. The sealing's associated data covers the format, the schema version, the database's length and SHA-256, and the Argon2id settings, so a cut or altered file, or a header and database from different backups, do not open. Making one asks for the current master password; nothing is decrypted, and the file is written owner-only where the user picks.
+- SQLCipher authenticates each page with the data key, but not the database as a whole against an older copy of the same pages; the SHA-256 in the sealed header binds a backup's pages together.
+- A restore checks the backup with its own password (key, `integrity_check`, schema version) before anything changes, and stages it in a separate directory that a later start removes if the restore does not happen. On confirmation the current vault is renamed to `vault-before-restore-<date and time>` and never deleted by the app; deleting it is up to the user. A crash leaves either the old vault in use or, at the next start, the restored one.
+- From Settings, the restored vault keeps the current master password: the user enters it, and the backup's data key is sealed again under it. The backup file still opens with the password it was made with. From the setup page, with no vault, the restored vault opens with the backup's password. The locked page offers no restore.
+- A lock or unlock drops a chosen or checked backup: the staged copy is removed and its key zeroed.
 
 ## Exporting
 
