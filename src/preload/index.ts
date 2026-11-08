@@ -3,6 +3,7 @@ import type { LedgerApi } from '../shared/api'
 
 declare const __APP_VERSION__: string
 
-const api: LedgerApi = Object.freeze({ version: __APP_VERSION__ })
+// contextBridge hands the page a frozen copy of this object.
+const api: LedgerApi = { version: __APP_VERSION__ }
 
 contextBridge.exposeInMainWorld('ledger', api)

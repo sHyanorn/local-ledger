@@ -1,36 +1,46 @@
-// Fails when a file in the repository turns off the Chromium sandbox, so no
-// test, script or workflow can pass by running without it. Markdown is
-// skipped. A line that only reads the switch carries ALLOW to be exempt.
+// Fails when a file in the repository weakens the Chromium sandbox, so no
+// test, script or workflow can pass by running without it. Markdown and the
+// list of refused switches itself are skipped.
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { relative } from 'node:path'
+import { relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import switches from '../src/main/switches.json' with { type: 'json' }
 
-const FLAG =
-  /no[-_]?sandbox|disable-setuid-sandbox|electron_disable_sandbox|sandbox\s*:\s*false/i
-const ALLOW = 'sandbox-check: allow'
+const LIST = 'src/main/switches.json'
+const FLAG = new RegExp(
+  [
+    // Matches no-sandbox, NO_SANDBOX and noSandbox alike.
+    ...switches.sandboxOff.map((name) => name.split('-').join('[-_]?')),
+    'electron[-_]?disable[-_]?sandbox',
+    'sandbox\\s*:\\s*false',
+  ].join('|'),
+  'i',
+)
 
 /**
  * @param {string} text
- * @returns {number[]} 1-based numbers of the lines that turn the sandbox off
+ * @returns {number[]} 1-based numbers of the lines that weaken the sandbox
  */
 export function findSandboxFlags(text) {
   return text
     .split('\n')
-    .flatMap((line, index) =>
-      FLAG.test(line) && !line.includes(ALLOW) ? [index + 1] : [],
-    )
+    .flatMap((line, index) => (FLAG.test(line) ? [index + 1] : []))
 }
 
 function main() {
   const self = relative(process.cwd(), fileURLToPath(import.meta.url))
+    .split(sep)
+    .join('/')
   const files = execFileSync(
     'git',
     ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
     { encoding: 'utf8' },
   )
     .split('\0')
-    .filter((file) => file && file !== self && !file.endsWith('.md'))
+    .filter(
+      (file) => file && file !== self && file !== LIST && !file.endsWith('.md'),
+    )
   let found = 0
   for (const file of files) {
     let text

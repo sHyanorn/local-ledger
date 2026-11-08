@@ -1,4 +1,4 @@
-import { join, sep } from 'node:path'
+import { join, sep, win32 } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   APP_ORIGIN,
@@ -7,11 +7,37 @@ import {
   isAllowedRequest,
   isAppUrl,
   isTrustedSender,
+  refusedSwitches,
   resolveAppAsset,
   windowWebPreferences,
 } from '../../src/main/security'
+import switches from '../../src/main/switches.json' with { type: 'json' }
 
 const DEV = 'http://localhost:5173'
+
+describe('refusedSwitches', () => {
+  const present =
+    (...names: string[]) =>
+    (name: string) =>
+      names.includes(name)
+
+  it.each(switches.sandboxOff)('refuses --%s in every build', (name) => {
+    expect(refusedSwitches(present(name), false)).toEqual([name])
+    expect(refusedSwitches(present(name), true)).toEqual([name])
+  })
+
+  it.each(switches.remoteDebugging)(
+    'refuses --%s only when packaged',
+    (name) => {
+      expect(refusedSwitches(present(name), true)).toEqual([name])
+      expect(refusedSwitches(present(name), false)).toEqual([])
+    },
+  )
+
+  it('accepts other switches', () => {
+    expect(refusedSwitches(present('lang', 'enable-logging'), true)).toEqual([])
+  })
+})
 
 describe('windowWebPreferences', () => {
   it('isolates and sandboxes the renderer', () => {
@@ -170,6 +196,39 @@ describe('resolveAppAsset', () => {
   it('rejects URLs of other origins', () => {
     expect(resolveAppAsset(root, 'app://other/index.html')).toBeNull()
     expect(resolveAppAsset(root, 'file:///etc/passwd')).toBeNull()
+  })
+
+  describe('with Windows path rules', () => {
+    const root = 'C:\\Ledger\\resources\\renderer'
+    const resolve = (path: string) =>
+      resolveAppAsset(root, `${APP_ORIGIN}${path}`, win32)
+
+    it('maps app URLs to files under root', () => {
+      expect(resolve('/')).toBe(`${root}\\index.html`)
+      expect(resolve('/assets/index-1.js')).toBe(`${root}\\assets\\index-1.js`)
+    })
+
+    it.each([
+      '/..%2f..%2f..%2fledger.db',
+      '/assets/..%2f..%2f..%2f..%2fUsers%2fme%2fledger.db',
+    ])('keeps %s under root', (path) => {
+      const file = resolve(path)
+      expect(file === null || file.startsWith(`${root}\\`)).toBe(true)
+    })
+
+    it.each([
+      '/..%5c..%5cledger.db',
+      '/%5c%5cserver%5cshare%5cledger.db',
+      '/C:%2fUsers%2fme%2fledger.db',
+      '/D:ledger.db',
+      '/index.html::$DATA',
+      '/CON',
+      '/nul.txt',
+      '/assets/COM1.js',
+      '/assets/lpt9',
+    ])('rejects %s', (path) => {
+      expect(resolve(path)).toBeNull()
+    })
   })
 })
 

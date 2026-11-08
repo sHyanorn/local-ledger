@@ -2,6 +2,10 @@ import type { Session } from 'electron'
 import { describe, expect, it, vi } from 'vitest'
 import { hardenSession } from '../../src/main/hardening'
 
+// Outside Electron the real module only resolves the binary, and fetches it
+// when missing; nothing here needs it.
+vi.mock('electron', () => ({ app: {} }))
+
 type Handler = (...args: any[]) => unknown
 
 function fakeSession() {

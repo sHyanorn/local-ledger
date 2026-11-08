@@ -2,22 +2,10 @@ import { join } from 'node:path'
 import { app, BrowserWindow, session } from 'electron'
 import { hardenApp, hardenSession } from './hardening'
 import { registerAppScheme, serveAppScheme } from './protocol'
-import { APP_ORIGIN, windowWebPreferences } from './security'
-
-// Refuse to start without the Chromium sandbox. This reads the switch, never sets it.
-const sandboxOff = app.commandLine.hasSwitch('no-sandbox') // sandbox-check: allow
-if (sandboxOff) {
-  console.error(
-    'Local Ledger does not run with the Chromium sandbox turned off.',
-  )
-  app.exit(1)
-}
+import { APP_ORIGIN, refusedSwitches, windowWebPreferences } from './security'
 
 const devUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL
 const devOrigin = devUrl === undefined ? undefined : new URL(devUrl).origin
-
-registerAppScheme()
-hardenApp()
 
 function createWindow(): void {
   const window = new BrowserWindow({
@@ -33,15 +21,31 @@ function createWindow(): void {
   void window.loadURL(devUrl ?? `${APP_ORIGIN}/index.html`)
 }
 
-void app.whenReady().then(() => {
-  hardenSession(session.defaultSession, devOrigin)
-  serveAppScheme(join(__dirname, '../renderer'))
-  createWindow()
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
-})
+function start(): void {
+  registerAppScheme()
+  hardenApp()
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+  void app.whenReady().then(() => {
+    hardenSession(session.defaultSession, devOrigin)
+    serveAppScheme(join(__dirname, '../renderer'))
+    createWindow()
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
+  })
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit()
+  })
+}
+
+const refused = refusedSwitches(
+  (name) => app.commandLine.hasSwitch(name),
+  app.isPackaged,
+)
+if (refused.length > 0) {
+  console.error(`Refusing to start with --${refused.join(', --')}.`)
+  app.exit(1)
+} else {
+  start()
+}

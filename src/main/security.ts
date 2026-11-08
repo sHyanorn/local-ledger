@@ -1,7 +1,8 @@
 // Security policy as plain functions, kept free of Electron runtime imports
 // so unit tests can check it directly. hardening.ts and protocol.ts apply it.
-import { extname, isAbsolute, join, posix, relative, sep } from 'node:path'
+import nodePath from 'node:path'
 import type { WebPreferences } from 'electron'
+import switches from './switches.json'
 
 export const APP_SCHEME = 'app'
 export const APP_HOST = 'local-ledger'
@@ -19,6 +20,21 @@ export const CONTENT_SECURITY_POLICY = [
   "frame-ancestors 'none'",
   "object-src 'none'",
 ].join('; ')
+
+/**
+ * Command line switches the app refuses to start with: those that weaken the
+ * Chromium sandbox, and in packaged builds those that open a debugging port.
+ * The unpackaged build keeps the port, which Playwright drives it through.
+ */
+export function refusedSwitches(
+  hasSwitch: (name: string) => boolean,
+  packaged: boolean,
+): string[] {
+  const names = packaged
+    ? [...switches.sandboxOff, ...switches.remoteDebugging]
+    : switches.sandboxOff
+  return names.filter(hasSwitch)
+}
 
 export function windowWebPreferences(
   preload: string,
@@ -92,22 +108,36 @@ export function isTrustedSender(
 
 /**
  * Maps an app:// URL to a file under root, or null when the URL is not the
- * app's or the path would leave root.
+ * app's or the path would leave root. `path` is replaceable so tests can
+ * apply Windows rules on any platform.
  */
-export function resolveAppAsset(root: string, url: string): string | null {
+export function resolveAppAsset(
+  root: string,
+  url: string,
+  path: nodePath.PlatformPath = nodePath,
+): string | null {
   if (!isAppUrl(url)) return null
-  let path: string
+  let pathname: string
   try {
-    path = decodeURIComponent(new URL(url).pathname)
+    pathname = decodeURIComponent(new URL(url).pathname)
   } catch {
     return null
   }
-  // Backslashes and colons have meaning in Windows paths; no asset uses them.
-  if (/[\0\\:]/.test(path)) return null
-  const normalized = posix.normalize(path === '/' ? '/index.html' : path)
-  const file = join(root, normalized)
-  const inside = relative(root, file)
-  if (inside === '' || isAbsolute(inside) || inside.split(sep)[0] === '..')
+  // Build output uses only these characters; anything else, such as the
+  // backslashes, colons and NUL that mean something to file systems, is refused.
+  if (!/^\/[\w./-]*$/.test(pathname)) return null
+  // Windows treats these names as devices, not files.
+  if (/\/(con|prn|aux|nul|com\d|lpt\d)(\.|\/|$)/i.test(pathname)) return null
+  const normalized = path.posix.normalize(
+    pathname === '/' ? '/index.html' : pathname,
+  )
+  const file = path.join(root, normalized)
+  const inside = path.relative(root, file)
+  if (
+    inside === '' ||
+    path.isAbsolute(inside) ||
+    inside.split(path.sep)[0] === '..'
+  )
     return null
   return file
 }
@@ -125,6 +155,7 @@ const CONTENT_TYPES: Record<string, string> = {
 
 export function contentType(file: string): string {
   return (
-    CONTENT_TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream'
+    CONTENT_TYPES[nodePath.extname(file).toLowerCase()] ??
+    'application/octet-stream'
   )
 }

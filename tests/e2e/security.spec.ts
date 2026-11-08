@@ -1,11 +1,15 @@
+import { spawnSync } from 'node:child_process'
 import { readFileSync, readlinkSync } from 'node:fs'
-import { _electron as electron } from '@playwright/test'
+import electron from 'electron'
 import type { WebPreferences } from 'electron'
 import pkg from '../../package.json' with { type: 'json' }
 import { CONTENT_SECURITY_POLICY } from '../../src/main/security'
+import switches from '../../src/main/switches.json' with { type: 'json' }
 import { expect, test } from './fixtures'
 
 const APP_URL = 'app://local-ledger/index.html'
+// Outside Electron, the electron package exports the path of its binary.
+const electronBinary = electron as unknown as string
 
 declare global {
   interface Window {
@@ -68,11 +72,12 @@ test('every app response carries the CSP', async ({ page }) => {
 test('the protocol serves only files of the renderer build', async ({
   app,
 }) => {
-  const statuses = await app.evaluate(async ({ net }) => {
+  const responses = await app.evaluate(async ({ net }) => {
     const requests: [string, string][] = [
       ['GET', '/index.html'],
       ['GET', '/missing.js'],
-      // The main and preload bundles sit next to the renderer build.
+      // The main and preload bundles sit next to the renderer build. Chromium
+      // resolves plain and %2e dot segments itself; the rest reach the handler.
       ['GET', '/../main/index.js'],
       ['GET', '/%2e%2e/main/index.js'],
       ['GET', '/..%2fmain%2findex.js'],
@@ -84,11 +89,16 @@ test('the protocol serves only files of the renderer build', async ({
         const response = await net.fetch(`app://local-ledger${path}`, {
           method,
         })
-        return response.status
+        return [
+          response.status,
+          response.headers.get('content-security-policy') !== null,
+        ]
       }),
     )
   })
-  expect(statuses).toEqual([200, 404, 404, 404, 404, 404, 405])
+  expect(responses).toEqual(
+    [200, 404, 404, 404, 404, 404, 405].map((status) => [status, true]),
+  )
 })
 
 test('the renderer has no Node.js', async ({ page }) => {
@@ -101,13 +111,19 @@ test('the renderer has no Node.js', async ({ page }) => {
   expect(types).toEqual(Array(5).fill('undefined'))
 })
 
-test('preload exposes only the frozen ledger API', async ({ page }) => {
-  const api = await page.evaluate(() => ({
-    keys: Object.keys(window.ledger),
-    frozen: Object.isFrozen(window.ledger),
-    version: window.ledger.version,
-  }))
-  expect(api).toEqual({ keys: ['version'], frozen: true, version: pkg.version })
+test('preload exposes only the ledger API, read-only', async ({ page }) => {
+  const api = await page.evaluate(() => {
+    const ledger = window.ledger as unknown as Record<string, unknown>
+    try {
+      ledger.version = 'changed'
+      ledger.extra = true
+      delete ledger.version
+    } catch {
+      // Writes to a frozen object throw in strict mode code.
+    }
+    return { keys: Object.keys(ledger), version: ledger.version }
+  })
+  expect(api).toEqual({ keys: ['version'], version: pkg.version })
 })
 
 test('the window runs isolated and sandboxed', async ({ app }) => {
@@ -279,14 +295,18 @@ test('permission requests are denied', async ({ page }) => {
   })
 })
 
-test('the app refuses to start with the sandbox turned off', async () => {
-  // Built from parts so the repository check does not flag this test.
-  const sandboxOff = ['--no', 'sandbox'].join('-')
-  await expect(
-    electron.launch({
-      args: [sandboxOff, '.'],
-      chromiumSandbox: true,
+for (const name of switches.sandboxOff) {
+  test(`the app refuses to start with --${name}`, async () => {
+    // Either the main process refuses, or on Linux Chromium aborts first
+    // because no other sandbox is left.
+    const refusal = new RegExp(
+      `Refusing to start with --${name}\\.|Rather than run without sandboxing`,
+    )
+    const result = spawnSync(electronBinary, [`--${name}`, '.'], {
+      encoding: 'utf8',
       timeout: 15_000,
-    }),
-  ).rejects.toThrow(/does not run with the Chromium sandbox turned off/)
-})
+    })
+    expect(result.status).not.toBe(0)
+    expect(`${result.stdout}${result.stderr}`).toMatch(refusal)
+  })
+}

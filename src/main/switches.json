@@ -1,0 +1,13 @@
+{
+  "sandboxOff": [
+    "no-sandbox",
+    "no-zygote-sandbox",
+    "disable-namespace-sandbox",
+    "disable-seccomp-filter-sandbox",
+    "disable-setuid-sandbox",
+    "disable-gpu-sandbox",
+    "in-process-gpu",
+    "single-process"
+  ],
+  "remoteDebugging": ["remote-debugging-port", "remote-debugging-pipe"]
+}
