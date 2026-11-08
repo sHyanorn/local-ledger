@@ -34,9 +34,12 @@ const config: Configuration = {
     // Ad-hoc signature: unsigned apps do not run on Apple Silicon (D006).
     identity: '-',
     hardenedRuntime: true,
+    // No spaces, so release file names need no quoting.
+    artifactName: 'local-ledger-${version}-mac-${arch}.${ext}',
   },
   win: {
     target: ['nsis'],
+    artifactName: 'local-ledger-${version}-windows-${arch}-setup.${ext}',
   },
 }
 

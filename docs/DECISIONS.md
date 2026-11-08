@@ -205,3 +205,8 @@
 - Date: 2026-11-08
 - Decision: colors are CSS variables with a dark set chosen by `prefers-color-scheme`, so the app follows the system appearance; charts and the printed statement use the same variables. Every page's toolbar is 52 px. Motion is limited to a page fading in, a sidebar selection, and a dialog appearing, all 150 ms, and none when the system asks for reduced motion. On macOS the window has the sidebar vibrancy material and the page leaves the sidebar clear; elsewhere the sidebar is a solid panel color. The vibrancy is unverified on a real Mac
 - Alternatives: a theme setting inside the app (the system setting already covers it); a component library (dependencies, and inline styles the CSP refuses)
+
+## D038 Release workflow
+- Date: 2026-11-08
+- Decision: a `v*` tag runs `release.yml`: macOS 15 on Apple silicon and on Intel each build a DMG, Windows 2025 builds an x64 NSIS installer, and each runner first runs the self-test of the unpackaged app and then the package checks against what it built. A final job writes `SHA256SUMS`, records a build provenance attestation for every file in it, and creates a draft release; publishing the draft is a manual step. The tag must equal `v` plus the package version. Run by hand (`workflow_dispatch`), the workflow builds and checksums the same files and keeps them as workflow artifacts, with no attestation (attestations go to a public log) and no release. File names carry no spaces: `local-ledger-<version>-mac-<arch>.dmg`, `local-ledger-<version>-windows-x64-setup.exe`
+- Alternatives: building the Intel DMG on Apple silicon (its self-test would then run under Rosetta, if at all); a third-party release action (the `gh` CLI on the runner does the same)
