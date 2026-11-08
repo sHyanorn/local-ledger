@@ -22,11 +22,21 @@ export function ReportsView() {
   const [chosen, setCurrency] = useState<Currency | null>(null)
   const currency = chosen ?? currencies[0] ?? 'AUD'
   const [month, setMonth] = useState(monthOf)
-  const [data, setData] = useState<ReportData | null>(null)
+  const [answer, setData] = useState<ReportData | null>(null)
+  // An answer for another month or currency is not shown under this one.
+  const data =
+    answer?.report.month === month && answer.report.currency === currency
+      ? answer
+      : null
   const topLevel = categories.filter((category) => category.parentId === null)
   const [trendCategory, setTrendCategory] = useState<number | null>(null)
   const trendId = trendCategory ?? topLevel[0]?.id ?? null
-  const [trend, setTrend] = useState<TrendPoint[] | null>(null)
+  const [trendAnswer, setTrend] = useState<{
+    key: string
+    points: TrendPoint[]
+  } | null>(null)
+  const trendKey = `${trendId}:${month}:${currency}`
+  const trend = trendAnswer?.key === trendKey ? trendAnswer.points : null
   const [exporting, setExporting] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
 
@@ -45,13 +55,13 @@ export function ReportsView() {
     if (trendId === null) return
     let current = true
     window.ledger.reports.trend(trendId, month, currency).then(
-      (answer) => current && setTrend(answer),
+      (points) => current && setTrend({ key: trendKey, points }),
       () => current && setTrend(null),
     )
     return () => {
       current = false
     }
-  }, [trendId, month, currency, categories])
+  }, [trendId, month, currency, categories, trendKey])
 
   const axis = compactAmount(currency)
   const exact = exactAmount(currency)

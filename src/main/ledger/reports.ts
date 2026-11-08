@@ -57,6 +57,16 @@ function totals(
   return { month, incomeCents, spendingCents }
 }
 
+/** The month's spending in one currency, as its report counts it. */
+export function monthSpending(
+  db: Db,
+  month: string,
+  currency: Currency,
+): number {
+  return totals(month, nets(db, currency, month, month).get(month))
+    .spendingCents
+}
+
 /** The month's report and the totals of the twelve months to it. */
 export function reportData(
   db: Db,

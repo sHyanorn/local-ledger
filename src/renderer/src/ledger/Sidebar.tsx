@@ -43,11 +43,9 @@ export function Sidebar() {
       >
         <span className="name">Budgets</span>
         {(overBudget?.length ?? 0) > 0 && (
-          <span
-            className="badge over"
-            aria-label={`${overBudget?.length} over budget`}
-          >
+          <span className="badge over">
             {overBudget?.length}
+            <span className="visually-hidden"> over budget</span>
           </span>
         )}
       </button>

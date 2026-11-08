@@ -263,8 +263,15 @@ button.icon:hover {
 }
 
 .main {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   overflow: hidden;
+}
+
+.main > .view {
+  flex: 1;
+  min-height: 0;
 }
 
 .content {
@@ -961,4 +968,14 @@ select.inline:focus {
 
 .legend .key.spending {
   background: var(--accent);
+}
+
+/* Read by screen readers, not shown. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

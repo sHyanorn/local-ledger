@@ -21,7 +21,9 @@ export function BudgetsView() {
   const categories = useLedger((store) => store.categories)
   const refresh = useLedger((store) => store.refresh)
   const [month, setMonth] = useState(monthOf)
-  const [budgets, setBudgets] = useState<MonthBudgets | null>(null)
+  const [answer, setBudgets] = useState<MonthBudgets | null>(null)
+  // An answer for another month is not shown under this one.
+  const budgets = answer?.month === month ? answer : null
   const [generation, setGeneration] = useState(0)
 
   useEffect(() => {

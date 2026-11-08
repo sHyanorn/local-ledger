@@ -13,6 +13,8 @@ import { TransfersView } from './TransfersView'
 export function Ledger() {
   const view = useLedger((store) => store.view)
   const refresh = useLedger((store) => store.refresh)
+  const budgetNotice = useLedger((store) => store.budgetNotice)
+  const setBudgetNotice = useLedger((store) => store.setBudgetNotice)
 
   useEffect(() => {
     void refresh()
@@ -22,25 +24,47 @@ export function Ledger() {
     <div className="ledger">
       <Sidebar />
       <main className="main">
-        {view.name === 'settings' ? (
-          <Settings />
-        ) : view.name === 'overview' ? (
-          <OverviewView />
-        ) : view.name === 'reports' ? (
-          <ReportsView />
-        ) : view.name === 'budgets' ? (
-          <BudgetsView />
-        ) : view.name === 'transfers' ? (
-          <TransfersView />
-        ) : view.name === 'import' ? (
-          <ImportView
-            key={view.file.id}
-            file={view.file}
-            accountId={view.accountId}
-          />
-        ) : (
-          <Transactions accountId={view.accountId} />
-        )}
+        <div className="view">
+          {view.name === 'settings' ? (
+            <Settings />
+          ) : view.name === 'overview' ? (
+            <OverviewView />
+          ) : view.name === 'reports' ? (
+            <ReportsView />
+          ) : view.name === 'budgets' ? (
+            <BudgetsView />
+          ) : view.name === 'transfers' ? (
+            <TransfersView />
+          ) : view.name === 'import' ? (
+            <ImportView
+              key={view.file.id}
+              file={view.file}
+              accountId={view.accountId}
+            />
+          ) : (
+            <Transactions accountId={view.accountId} />
+          )}
+        </div>
+        <div aria-live="polite">
+          {budgetNotice && (
+            <div
+              className="suggestion"
+              role="region"
+              aria-label="Budget notice"
+            >
+              <p>{budgetNotice}</p>
+              <button
+                type="button"
+                className="icon"
+                aria-label="Dismiss"
+                title="Dismiss"
+                onClick={() => setBudgetNotice(null)}
+              >
+                ×
+              </button>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   )

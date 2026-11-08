@@ -26,11 +26,16 @@ interface LedgerStore {
   /** A message about the last change, such as an import, shown under the list until dismissed. */
   notice: string | null
   setNotice(notice: string | null): void
+  /** A category that has just gone over its budget, shown over any view until dismissed. */
+  budgetNotice: string | null
+  setBudgetNotice(notice: string | null): void
   view: View
   show(view: View): void
   /** Reloads accounts and categories after a change. */
   refresh(): Promise<void>
 }
+
+let refreshes = 0
 
 export const useLedger = create<LedgerStore>((set, get) => ({
   accounts: [],
@@ -39,9 +44,13 @@ export const useLedger = create<LedgerStore>((set, get) => ({
   overBudget: null,
   notice: null,
   setNotice: (notice) => set({ notice }),
+  budgetNotice: null,
+  setBudgetNotice: (budgetNotice) => set({ budgetNotice }),
   view: { name: 'overview' },
   show: (view) => set({ view }),
   refresh: async () => {
+    // Answers can arrive out of order; only the latest request's counts.
+    const ticket = ++refreshes
     const month = monthOf()
     const [accounts, categories, transfersToReview, budgets] =
       await Promise.all([
@@ -50,6 +59,7 @@ export const useLedger = create<LedgerStore>((set, get) => ({
         window.ledger.transfers.count(),
         window.ledger.budgets.month(month),
       ])
+    if (ticket !== refreshes) return
     const { view, overBudget: before } = get()
     const over = budgets.categories.filter(
       (budget) => budgetState(budget) === 'over',
@@ -62,7 +72,7 @@ export const useLedger = create<LedgerStore>((set, get) => ({
     const name = categories.find((c) => c.id === first?.categoryId)?.name
     if (first && name && first.budgetCents !== null) {
       set({
-        notice: `${name} is ${formatAmount(first.spentCents - first.budgetCents, HOME_CURRENCY)} over its budget for ${formatMonth(month)}.`,
+        budgetNotice: `${name} is ${formatAmount(first.spentCents - first.budgetCents, HOME_CURRENCY)} over its budget for ${formatMonth(month)}.`,
       })
     }
     const gone =

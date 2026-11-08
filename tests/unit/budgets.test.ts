@@ -112,6 +112,9 @@ describe('spending', () => {
     add(everyday, '2026-05-02', -2500, food)
     add(travel, '2026-05-02', -8800, food)
     add(travel, '2026-05-03', 100, null)
+    // A refund nets in its category, as in Reports.
+    add(travel, '2026-05-06', -3000, coffee)
+    add(travel, '2026-05-07', 1000, coffee)
     add(everyday, '2026-05-04', -700, null)
     // A transfer whose sides are categorized does not count.
     add(everyday, '2026-05-05', -50000, food)
@@ -120,13 +123,18 @@ describe('spending', () => {
     const may = monthBudgets(db, '2026-05')
     expect(of(may, food)?.spentCents).toBe(2500)
     expect(may.uncategorizedCents).toBe(700)
-    expect(may.otherCurrencies).toEqual([{ currency: 'CNY', spentCents: 8800 }])
+    expect(may.otherCurrencies).toEqual([
+      { currency: 'CNY', spentCents: 8800 + 2000 },
+    ])
   })
 
   it('crosses from under to close at 90% and over past 100%', () => {
     expect(
       budgetState({ categoryId: 1, budgetCents: null, spentCents: 5 }),
     ).toBe('none')
+    expect(budgetState({ categoryId: 1, budgetCents: 0, spentCents: 0 })).toBe(
+      'under',
+    )
     expect(
       budgetState({ categoryId: 1, budgetCents: 1000, spentCents: 899 }),
     ).toBe('under')

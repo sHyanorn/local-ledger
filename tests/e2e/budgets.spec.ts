@@ -21,7 +21,9 @@ ledgerTest(
     await groceries.getByLabel(/^Budget for Groceries from/).fill('1')
     await groceries.getByRole('button', { name: 'Save' }).click()
     await expect(groceries).toContainText(/over \$1\.00/)
-    await expect(sidebar(home).getByLabel('1 over budget')).toBeVisible()
+    await expect(
+      sidebar(home).getByRole('button', { name: 'Budgets 1 over budget' }),
+    ).toBeVisible()
 
     // Moving on a month keeps the budget; ending it there leaves this month's.
     await home.getByRole('button', { name: 'Next Month' }).click()
@@ -64,9 +66,22 @@ ledgerTest(
     await dialog.getByLabel('Amount').fill('100000')
     await dialog.getByLabel('Category').selectOption({ label: 'Food › Coffee' })
     await dialog.getByRole('button', { name: 'Add Transaction' }).click()
-    const notice = home.getByRole('region', { name: 'Notice' })
+    const notice = home.getByRole('region', { name: 'Budget notice' })
     await expect(notice).toContainText(
       /^Coffee is \$[\d,.]+ over its budget for /,
     )
+
+    // Said once: a further change while still over says nothing more.
+    await notice.getByRole('button', { name: 'Dismiss' }).click()
+    await home.getByRole('button', { name: 'Add Transaction' }).click()
+    await dialog.getByLabel('Description').fill('Fake Grinder')
+    await dialog.getByLabel('Amount').fill('5')
+    await dialog.getByLabel('Category').selectOption({ label: 'Food › Coffee' })
+    await dialog.getByRole('button', { name: 'Add Transaction' }).click()
+    await expect(dialog).toBeHidden()
+    await expect(
+      home.getByRole('row').filter({ hasText: 'Fake Grinder' }),
+    ).toBeVisible()
+    await expect(notice).toBeHidden()
   },
 )

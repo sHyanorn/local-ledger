@@ -8,6 +8,7 @@ import type { Currency } from '../../shared/money'
 import { shiftMonth } from '../../shared/months'
 import type { Db } from '../vault/database'
 import { isMissingReference } from './errors'
+import { monthSpending } from './reports'
 
 export function monthBudgets(db: Db, month: string): MonthBudgets {
   const range = [`${month}-01`, `${shiftMonth(month, 1)}-01`]
@@ -57,18 +58,20 @@ export function monthBudgets(db: Db, month: string): MonthBudgets {
     )
     .pluck()
     .get(HOME_CURRENCY, ...range) as number
-  const others = db
-    .prepare(
-      `SELECT a.currency, -sum(t.amount_cents) AS spentCents
-       FROM report_transactions t JOIN accounts a ON a.id = t.account_id
-       WHERE a.currency <> ? AND t.date >= ? AND t.date < ?
-         AND t.amount_cents < 0
-       GROUP BY a.currency ORDER BY a.currency`,
-    )
-    .all(HOME_CURRENCY, ...range) as {
-    currency: Currency
-    spentCents: number
-  }[]
+  // Spending as Reports counts it: refunds netted within each category.
+  const others = (
+    db
+      .prepare(
+        'SELECT DISTINCT currency FROM accounts WHERE currency <> ? ORDER BY currency',
+      )
+      .pluck()
+      .all(HOME_CURRENCY) as Currency[]
+  )
+    .map((currency) => ({
+      currency,
+      spentCents: monthSpending(db, month, currency),
+    }))
+    .filter((other) => other.spentCents > 0)
   return {
     month,
     categories: categories.map((category) => ({
