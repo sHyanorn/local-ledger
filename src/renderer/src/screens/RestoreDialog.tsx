@@ -4,6 +4,7 @@ import { PASSWORD_MAX, passwordLength } from '../../../shared/password'
 import { Dialog } from '../components/Dialog'
 import { ErrorText } from '../components/ErrorText'
 import { formatDate } from '../ledger/format'
+import { count } from '../ledger/store'
 
 const OPEN_PROBLEMS = {
   'too-large': 'The file is too large to be a backup.',
@@ -25,9 +26,6 @@ const COMMIT_PROBLEMS = {
   exists: 'A vault already exists here.',
   damaged: 'The vault could not be replaced.',
 } as const
-
-const plural = (n: number, noun: string) =>
-  `${n.toLocaleString('en-AU')} ${noun}${n === 1 ? '' : 's'}`
 
 /**
  * Restores a backup: choose the file, open it with its password, then
@@ -113,7 +111,7 @@ export function RestoreDialog({
   }
 
   const contents = summary
-    ? `${plural(summary.accounts, 'account')} and ${plural(summary.transactions, 'transaction')}${summary.lastDate ? `, the latest on ${formatDate(summary.lastDate)}` : ''}`
+    ? `${count(summary.accounts, 'account')} and ${count(summary.transactions, 'transaction')}${summary.lastDate ? `, the latest on ${formatDate(summary.lastDate)}` : ''}`
     : null
 
   return (

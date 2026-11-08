@@ -9,7 +9,7 @@ import { ImportHistory } from './ImportHistory'
 import { RulesSection } from './RulesSection'
 import { categoryTree, useLedger } from './store'
 
-type Editing = { category?: Category; parentId?: number | null } | null
+type Editing = { category?: Category } | null
 
 export function Settings() {
   const categories = useLedger((store) => store.categories)

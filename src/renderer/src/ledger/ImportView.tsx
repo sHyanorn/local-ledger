@@ -27,8 +27,16 @@ import {
   rowProblem,
   TEMPLATE_NAMES,
 } from './importing'
-import { categoryName, count, useLedger } from './store'
 import { ErrorText } from '../components/ErrorText'
+import { categoryName, count, useLedger } from './store'
+
+/** Why a preview or an import was refused. */
+const IMPORT_PROBLEMS = {
+  ...FILE_PROBLEMS,
+  'not-found': 'The file is no longer open. Choose it again.',
+  nothing: 'No rows are selected.',
+  changed: 'The rows changed. Check them and import again.',
+}
 
 /** Columns to start from when nothing about the file could be told. */
 function fallbackMapping(columns: number): Mapping {
@@ -97,11 +105,7 @@ export function ImportView({
         if (!result.ok) {
           setAnswer(null)
           setSelected(new Set())
-          setProblem(
-            result.reason === 'not-found'
-              ? 'The file is no longer open. Choose it again.'
-              : FILE_PROBLEMS[result.reason],
-          )
+          setProblem(IMPORT_PROBLEMS[result.reason])
           return
         }
         setProblem('')
@@ -147,15 +151,7 @@ export function ImportView({
     try {
       const result = await window.ledger.imports.commit(request, [...selected])
       if (!result.ok) {
-        setProblem(
-          result.reason === 'nothing'
-            ? 'No rows are selected.'
-            : result.reason === 'not-found'
-              ? 'The file is no longer open. Choose it again.'
-              : result.reason === 'changed'
-                ? 'The rows changed. Check them and import again.'
-                : FILE_PROBLEMS[result.reason],
-        )
+        setProblem(IMPORT_PROBLEMS[result.reason])
         return
       }
       await refresh()

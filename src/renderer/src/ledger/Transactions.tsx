@@ -2,7 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { NoticeBar } from '../components/NoticeBar'
 import { isIsoDate } from '../../../shared/dates'
 import { SEARCH_MAX } from '../../../shared/ledger'
-import type { Transaction, TransactionFilter } from '../../../shared/ledger'
+import type {
+  CurrencyTotal,
+  Transaction,
+  TransactionFilter,
+} from '../../../shared/ledger'
 import type { RuleSuggestion } from '../../../shared/rules'
 import { formatAmount } from '../../../shared/money'
 import { Confirm } from '../components/Dialog'
@@ -292,19 +296,12 @@ export function Transactions({ accountId }: { accountId: number | null }) {
 }
 
 /** "1,204 transactions · $12,345.67 · CNY 1,383.14": each currency on its own. */
-function totalsText(
-  totals: { currency: string; count: number; cents: number }[],
-) {
+function totalsText(totals: CurrencyTotal[]) {
   const transactions = totals.reduce((sum, total) => sum + total.count, 0)
   if (transactions === 0) return ''
   return [
     count(transactions, 'transaction'),
-    ...totals.map((total) =>
-      formatAmount(
-        total.cents,
-        total.currency as Parameters<typeof formatAmount>[1],
-      ),
-    ),
+    ...totals.map((total) => formatAmount(total.cents, total.currency)),
   ].join(' · ')
 }
 

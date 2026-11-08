@@ -939,10 +939,6 @@ select.inline:focus {
   padding: 16px;
 }
 
-.overview h1 {
-  font-variant-numeric: tabular-nums;
-}
-
 .cards {
   display: grid;
   gap: 12px;

@@ -51,21 +51,16 @@ export function RuleSuggestionBar({
         Don’t Ask Again
       </button>
       <DismissButton onClick={() => onDone(false)} />
-      {editing &&
-        (suggestion.rule ? (
-          <RuleDialog
-            rule={suggestion.rule}
-            start={{ categoryId: suggestion.categoryId }}
-            onSaved={() => onDone(true)}
-            onClose={() => setEditing(false)}
-          />
-        ) : (
-          <RuleDialog
-            start={suggestion}
-            onSaved={() => onDone(true)}
-            onClose={() => setEditing(false)}
-          />
-        ))}
+      {editing && (
+        <RuleDialog
+          rule={suggestion.rule ?? undefined}
+          start={
+            suggestion.rule ? { categoryId: suggestion.categoryId } : suggestion
+          }
+          onSaved={() => onDone(true)}
+          onClose={() => setEditing(false)}
+        />
+      )}
     </div>
   )
 }

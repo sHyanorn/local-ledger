@@ -70,7 +70,7 @@ export function AccountDialog({
       }
       onClose()
     } catch {
-      setProblem(PROBLEMS.failed ?? null)
+      setProblem(PROBLEMS.failed)
     } finally {
       setBusy(false)
     }

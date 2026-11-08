@@ -16,19 +16,15 @@ const PROBLEMS: Record<string, string> = {
 /** Creates a category, or with `category`, edits or deletes it. */
 export function CategoryDialog({
   category,
-  parentId: initialParent = null,
   onClose,
 }: {
   category?: Category
-  parentId?: number | null
   onClose: () => void
 }) {
   const categories = useLedger((store) => store.categories)
   const refresh = useLedger((store) => store.refresh)
   const [name, setName] = useState(category?.name ?? '')
-  const [parentId, setParentId] = useState(
-    category ? category.parentId : initialParent,
-  )
+  const [parentId, setParentId] = useState(category?.parentId ?? null)
   const [problem, setProblem] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -58,7 +54,7 @@ export function CategoryDialog({
       await refresh()
       onClose()
     } catch {
-      setProblem(PROBLEMS.failed ?? null)
+      setProblem(PROBLEMS.failed)
     } finally {
       setBusy(false)
     }
