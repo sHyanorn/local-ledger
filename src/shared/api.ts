@@ -18,6 +18,8 @@ type Updated<T> = T & { id: number }
 /** The API that preload exposes to the renderer as `window.ledger`. */
 export interface LedgerApi {
   readonly version: string
+  /** The operating system, as Node names it: darwin, win32 or linux. */
+  readonly platform: string
   readonly commands: {
     /** Calls back with each menu command; returns a function that stops. */
     on(listener: (command: Command) => void): () => void

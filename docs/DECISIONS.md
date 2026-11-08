@@ -200,3 +200,8 @@
 - Date: 2026-11-08
 - Decision: shortcuts are accelerators on app menu items, so they show in the menu and work the same from the keyboard or a click: ⌘1 to ⌘5 for Overview, All Transactions, Budgets, Reports and Transfers, ⌘N for a new transaction, ⌘F for search, ⌘, for Settings and ⌘L to lock (Ctrl on Windows). The main process sends the command's name to the page only while the vault is open; preload passes on only names from a fixed list, never the event. Help → Check for Updates… opens the releases page in the browser (D006)
 - Alternatives: keyboard listeners in the page (shortcuts hidden from the menu, and fired twice where the menu also handles them)
+
+## D037 Look and motion
+- Date: 2026-11-08
+- Decision: colors are CSS variables with a dark set chosen by `prefers-color-scheme`, so the app follows the system appearance; charts and the printed statement use the same variables. Every page's toolbar is 52 px. Motion is limited to a page fading in, a sidebar selection, and a dialog appearing, all 150 ms, and none when the system asks for reduced motion. On macOS the window has the sidebar vibrancy material and the page leaves the sidebar clear; elsewhere the sidebar is a solid panel color. The vibrancy is unverified on a real Mac
+- Alternatives: a theme setting inside the app (the system setting already covers it); a component library (dependencies, and inline styles the CSP refuses)

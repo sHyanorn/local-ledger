@@ -24,6 +24,10 @@ export class AppWindow {
       title: 'Local Ledger',
       show: false,
       backgroundColor: background(),
+      // A translucent sidebar, as macOS apps have; the page leaves it clear.
+      ...(MAC
+        ? { vibrancy: 'sidebar', visualEffectState: 'followWindow' }
+        : {}),
     })
     this.window.on('resize', () => this.#fit())
     // A BaseWindow leaves its views' pages running when it closes.
@@ -47,7 +51,7 @@ export class AppWindow {
     this.#view = null
     try {
       const view = new WebContentsView({ webPreferences: this.#webPreferences })
-      view.setBackgroundColor(background())
+      view.setBackgroundColor(MAC ? '#00000000' : background())
       this.window.contentView.addChildView(view)
       this.#view = view
       this.#fit()
@@ -74,6 +78,8 @@ export class AppWindow {
     this.#view?.setBounds({ x: 0, y: 0, width, height })
   }
 }
+
+const MAC = process.platform === 'darwin'
 
 function background(): string {
   return nativeTheme.shouldUseDarkColors ? '#1e1e1e' : '#ffffff'

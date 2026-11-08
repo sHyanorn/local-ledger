@@ -101,7 +101,7 @@ export function Ledger() {
     >
       <Sidebar />
       <main className="main">
-        <div className="view">
+        <div className="view" key={view.name}>
           {view.name === 'settings' ? (
             <Settings />
           ) : view.name === 'overview' ? (

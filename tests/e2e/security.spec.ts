@@ -170,6 +170,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
   expect(api).toEqual({
     keys: [
       'version',
+      'platform',
       'commands',
       'vault',
       'accounts',

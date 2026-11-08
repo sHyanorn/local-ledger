@@ -13,6 +13,7 @@ const invoke = <C extends Channel>(
 // contextBridge hands the page a frozen copy of this object.
 const api: LedgerApi = {
   version: __APP_VERSION__,
+  platform: process.platform,
   commands: {
     on: (listener) => {
       // Only the names of known commands reach the page, never the event.

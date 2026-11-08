@@ -17,6 +17,14 @@
   --positive: #248a3d;
   --selected: color-mix(in srgb, var(--accent) 14%, transparent);
   --hover: color-mix(in srgb, var(--fg) 6%, transparent);
+  /* One duration for every transition: pages, selection, dialogs. */
+  --motion: 150ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion: 0ms;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -153,9 +161,14 @@ textarea:focus {
 
 .toolbar {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  gap: 12px;
+  box-sizing: border-box;
+  /* The same height on every page, with or without buttons. */
+  min-height: 52px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -209,6 +222,7 @@ textarea:focus {
 }
 
 .sidebar-item {
+  transition: background-color var(--motion) ease-out;
   display: flex;
   justify-content: space-between;
   gap: 8px;
@@ -271,6 +285,17 @@ button.icon:hover {
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
+  background: var(--bg);
+}
+
+.main > .view {
+  animation: view-in var(--motion) ease-out;
+}
+
+@keyframes view-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .main > .view {
@@ -357,6 +382,21 @@ button.icon:hover {
 
 .dialog::backdrop {
   background: rgb(0 0 0 / 25%);
+}
+
+.dialog[open] {
+  animation: dialog-in var(--motion) ease-out;
+}
+
+.dialog[open]::backdrop {
+  animation: view-in var(--motion) ease-out;
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
 }
 
 .dialog > h2 {
@@ -1026,4 +1066,17 @@ select.inline:focus {
   font-size: 15px;
   font-weight: 600;
   color: var(--accent);
+}
+
+/* macOS: the window's vibrancy shows through the sidebar (D037). */
+:root[data-platform='darwin'] body {
+  background: transparent;
+}
+
+:root[data-platform='darwin'] .sidebar {
+  background: transparent;
+}
+
+:root[data-platform='darwin'] .gate {
+  background: var(--bg);
 }
