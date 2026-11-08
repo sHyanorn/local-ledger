@@ -8,7 +8,37 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { Derive } from '../../src/main/vault/kdf'
 import { FAST, OLD, NEW } from '../support/vault'
 
-const seen = vi.hoisted(() => ({ keys: [] as Uint8Array[], sealFails: false }))
+const seen = vi.hoisted(() => ({
+  keys: [] as Uint8Array[],
+  sealFails: false,
+  /** Also record new random keys, such as the one a backup check draws. */
+  randomKeys: false,
+  /** Results for the next integrity checks, in order; empty runs them. */
+  integrity: [] as boolean[],
+}))
+
+vi.mock('node:crypto', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:crypto')>()
+  const fill = actual.randomFillSync as (...args: unknown[]) => Buffer
+  return {
+    ...actual,
+    randomFillSync: ((...args: unknown[]) => {
+      const filled = fill(...args)
+      if (seen.randomKeys && filled.length === 32) seen.keys.push(filled)
+      return filled
+    }) as typeof actual.randomFillSync,
+  }
+})
+vi.mock('../../src/main/vault/database', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../src/main/vault/database')>()
+  return {
+    ...actual,
+    passesIntegrityCheck: (
+      db: Parameters<typeof actual.passesIntegrityCheck>[0],
+    ) => seen.integrity.shift() ?? actual.passesIntegrityCheck(db),
+  }
+})
 
 // Data keys as they come out of vault.json, and new ones.
 vi.mock('../../src/main/vault/envelope', async (importOriginal) => {
@@ -83,6 +113,8 @@ afterEach(() => {
   vi.restoreAllMocks()
   seen.keys = []
   seen.sealFails = false
+  seen.randomKeys = false
+  seen.integrity = []
   rmSync(root, { recursive: true, force: true })
 })
 
@@ -154,3 +186,27 @@ it('after a create whose sealing failed', async () => {
   // The sealing key and the data key it was to seal.
   expectAllWiped(2)
 })
+
+it.each([
+  ['before', [false], 4],
+  ['after', [true, false], 5],
+] as const)(
+  'after a backup check whose integrity check failed %s the rekey',
+  async (_, results, count) => {
+    const vault = new Vault(root, { derive, kdf: FAST })
+    await vault.create(OLD)
+    const made = await vault.backup(OLD)
+    if (!made.ok) throw new Error(made.reason)
+    vault.lock()
+    seen.keys = []
+    seen.randomKeys = true
+    seen.integrity = [...results]
+    expect(await vault.checkBackup(made.file, OLD)).toEqual({
+      ok: false,
+      reason: 'damaged',
+    })
+    // The sealing key, the backup's data key, the literal that opened its
+    // copy and the fresh key, with the rekey literal once it was used.
+    expectAllWiped(count)
+  },
+)

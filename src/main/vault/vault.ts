@@ -358,6 +358,7 @@ export class Vault {
         // which old copies of vault.json or the backup itself still unseal,
         // must not open the vault this becomes.
         const fresh = randomFillSync(Buffer.alloc(KEY_BYTES))
+        let rekeyed = false
         try {
           const db = openDatabase(path, dataKey)
           try {
@@ -376,11 +377,14 @@ export class Vault {
           } finally {
             db.close()
           }
+          rekeyed = true
         } catch (error) {
-          fresh.fill(0)
           const reason = openFailure(error)
           if (reason) return { ok: false, reason }
           throw error
+        } finally {
+          // Every way out but a checked, rekeyed copy leaves the key unused.
+          if (!rekeyed) fresh.fill(0)
         }
         dataKey.fill(0)
         dataKey = fresh
