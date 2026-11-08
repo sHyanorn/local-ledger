@@ -226,6 +226,67 @@ describe('guessed layouts', () => {
   })
 })
 
+describe('layouts as public sample files write them', () => {
+  it('takes a header added to a CommBank or ANZ file as a header', () => {
+    const commbank = detectLayout(
+      rows(
+        ['Date', 'Amount', 'Description', 'Balance'],
+        ['29/05/2026', '-15.26', 'Fake Shop', '+0.00'],
+        ['28/05/2026', '+2500.00', 'Fake Pay', '+15.26'],
+      ),
+    )
+    expect(commbank).toMatchObject({
+      template: 'commbank',
+      mapping: { header: true },
+    })
+    const anz = detectLayout(
+      rows(
+        ['Date', 'Amount', 'Description'],
+        ['29/05/2026', '-15.26', 'Fake Shop'],
+      ),
+    )
+    expect(anz).toMatchObject({ template: 'anz', mapping: { header: true } })
+    expect(
+      applyMapping(
+        rows(
+          ['Date', 'Amount', 'Description'],
+          ['29/05/2026', '-15.26', 'Fake Shop'],
+        ),
+        anz!.mapping,
+      ).errors,
+    ).toEqual([])
+  })
+
+  it('reads NAB with spaced fields, whole amounts and one decimal', () => {
+    const table = readTable(
+      new TextEncoder().encode(
+        'Date,Amount,Account Number, ,Transaction Type,Transaction Details,Balance,Category,Merchant Name\n' +
+          '29 Mar 24, 12.5 ,Card ending 0000, ,CREDIT, FAKE REFUND ,-1200,Refunds,\n' +
+          '30 Mar 24,-1200,Card ending 0000, ,CARD PURCHASE,FAKE STORE,-2400,Shopping,Fake Store\n',
+      ),
+    )
+    const layout = detectLayout(table.rows)
+    expect(layout?.template).toBe('nab')
+    expect(applyMapping(table.rows, layout!.mapping)).toEqual({
+      rows: [
+        {
+          line: 2,
+          date: '2024-03-29',
+          cents: 1250,
+          description: 'FAKE REFUND',
+        },
+        {
+          line: 3,
+          date: '2024-03-30',
+          cents: -120000,
+          description: 'FAKE STORE',
+        },
+      ],
+      errors: [],
+    })
+  })
+})
+
 describe('tolerance of export variations', () => {
   type Variant = {
     name: string

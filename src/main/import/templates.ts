@@ -118,7 +118,11 @@ function bankLayout(rows: readonly Row[]): Layout | null {
     )
   }
 
-  const sample = data(false)
+  // These banks write no header, but a file someone has opened and saved
+  // may have gained one: a first row with neither a date nor an amount.
+  const header =
+    dateOrders([first[0] ?? '']).length === 0 && !isAmount(first[1])
+  const sample = data(header)
   const dated = mostly(
     sample,
     (row) =>
@@ -127,7 +131,7 @@ function bankLayout(rows: readonly Row[]): Layout | null {
   )
   if (!dated) return null
   const mapping = {
-    header: false,
+    header,
     date: 0,
     description: [2],
     amount: { kind: 'signed', column: 1, negate: false },
