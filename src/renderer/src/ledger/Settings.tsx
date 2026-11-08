@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Category } from '../../../shared/ledger'
 import { ChangePassword } from '../screens/ChangePassword'
 import { CategoryDialog } from './CategoryDialog'
+import { GeneralSection } from './GeneralSection'
 import { ImportHistory } from './ImportHistory'
 import { RulesSection } from './RulesSection'
 import { categoryTree, useLedger } from './store'
@@ -39,6 +40,7 @@ export function Settings() {
       </header>
       <div className="scroll">
         <div className="settings">
+          <GeneralSection />
           <section aria-labelledby="categories-heading">
             <div className="section-heading">
               <h2 id="categories-heading">Categories</h2>

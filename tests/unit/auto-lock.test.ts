@@ -67,3 +67,22 @@ describe('watchForLock', () => {
     expect(lock).not.toHaveBeenCalled()
   })
 })
+
+describe('a lock time from the settings', () => {
+  it('is read on every poll, so a change applies at once', () => {
+    const power = new FakePower()
+    const lock = vi.fn<() => void>()
+    vi.useFakeTimers()
+    let minutes = 5
+    const stop = watchForLock(power as unknown as PowerMonitor, lock, {
+      idleLimit: () => minutes * 60,
+    })
+    power.idle = 60
+    vi.advanceTimersByTime(IDLE_POLL_MS)
+    expect(lock).not.toHaveBeenCalled()
+    minutes = 1
+    vi.advanceTimersByTime(IDLE_POLL_MS)
+    expect(lock).toHaveBeenCalledOnce()
+    stop()
+  })
+})

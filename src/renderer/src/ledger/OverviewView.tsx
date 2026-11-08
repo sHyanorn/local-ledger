@@ -1,9 +1,5 @@
 import { useEffect, useState } from 'react'
-import {
-  budgetState,
-  HOME_CURRENCY,
-  type MonthBudgets,
-} from '../../../shared/budgets'
+import { budgetState, type MonthBudgets } from '../../../shared/budgets'
 import type { Transaction } from '../../../shared/ledger'
 import { formatAmount, type Currency } from '../../../shared/money'
 import type { ReportData } from '../../../shared/reports'
@@ -15,12 +11,11 @@ export function OverviewView() {
   const accounts = useLedger((store) => store.accounts)
   const categories = useLedger((store) => store.categories)
   const show = useLedger((store) => store.show)
+  const home = useLedger((store) => store.settings.homeCurrency)
   const month = monthOf()
   const currencies = [
     ...new Set(accounts.map((account) => account.currency)),
-  ].sort((a, b) =>
-    a === HOME_CURRENCY ? -1 : b === HOME_CURRENCY ? 1 : a.localeCompare(b),
-  )
+  ].sort((a, b) => (a === home ? -1 : b === home ? 1 : a.localeCompare(b)))
   const [reports, setReports] = useState<ReportData[]>([])
   const [budgets, setBudgets] = useState<MonthBudgets | null>(null)
   const [recent, setRecent] = useState<Transaction[]>([])
@@ -67,7 +62,7 @@ export function OverviewView() {
             {reports
               .filter(
                 ({ report }) =>
-                  report.currency === HOME_CURRENCY ||
+                  report.currency === home ||
                   report.incomeCents !== 0 ||
                   report.spendingCents !== 0,
               )
@@ -135,8 +130,8 @@ export function OverviewView() {
                         />
                       </svg>
                       <span className="figure">
-                        {formatAmount(budget.spentCents, HOME_CURRENCY)} of{' '}
-                        {formatAmount(total, HOME_CURRENCY)}
+                        {formatAmount(budget.spentCents, budgets!.currency)} of{' '}
+                        {formatAmount(total, budgets!.currency)}
                       </span>
                     </li>
                   )

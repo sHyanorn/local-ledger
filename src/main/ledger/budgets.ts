@@ -1,17 +1,19 @@
 // Monthly budgets per category, measured against spending in the home
-// currency. Spending reads report_transactions, so paired transfers never
+// currency, a setting. Spending reads report_transactions, so paired transfers never
 // count; refunds reduce it, and it is never below zero. A category's
 // spending includes its subcategories', and each can have its own budget.
-import { HOME_CURRENCY, type MonthBudgets } from '../../shared/budgets'
+import type { MonthBudgets } from '../../shared/budgets'
 import type { Outcome } from '../../shared/ipc'
 import type { Currency } from '../../shared/money'
 import { shiftMonth } from '../../shared/months'
 import type { Db } from '../vault/database'
 import { isMissingReference } from './errors'
 import { monthSpending } from './reports'
+import { getSettings } from './settings'
 
 export function monthBudgets(db: Db, month: string): MonthBudgets {
   const range = [`${month}-01`, `${shiftMonth(month, 1)}-01`]
+  const home = getSettings(db).homeCurrency
   const categories = db
     .prepare('SELECT id, parent_id AS parentId FROM categories')
     .all() as { id: number; parentId: number | null }[]
@@ -25,7 +27,7 @@ export function monthBudgets(db: Db, month: string): MonthBudgets {
              AND t.category_id IS NOT NULL
            GROUP BY t.category_id`,
         )
-        .all(HOME_CURRENCY, ...range) as { id: number; cents: number }[]
+        .all(home, ...range) as { id: number; cents: number }[]
     ).map((row) => [row.id, row.cents]),
   )
   // A category's own transactions and its subcategories'.
@@ -57,7 +59,7 @@ export function monthBudgets(db: Db, month: string): MonthBudgets {
          AND t.category_id IS NULL`,
     )
     .pluck()
-    .get(HOME_CURRENCY, ...range) as number
+    .get(home, ...range) as number
   // Spending as Reports counts it: refunds netted within each category.
   const others = (
     db
@@ -65,7 +67,7 @@ export function monthBudgets(db: Db, month: string): MonthBudgets {
         'SELECT DISTINCT currency FROM accounts WHERE currency <> ? ORDER BY currency',
       )
       .pluck()
-      .all(HOME_CURRENCY) as Currency[]
+      .all(home) as Currency[]
   )
     .map((currency) => ({
       currency,
@@ -74,6 +76,7 @@ export function monthBudgets(db: Db, month: string): MonthBudgets {
     .filter((other) => other.spentCents > 0)
   return {
     month,
+    currency: home,
     categories: categories.map((category) => ({
       categoryId: category.id,
       budgetCents: budgets.get(category.id) ?? null,

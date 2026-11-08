@@ -2,6 +2,7 @@ import type { ImportTarget, Mapping, Encoding } from './imports'
 import type { Results, VaultState } from './ipc'
 import type { RuleFields, RuleMatch } from './rules'
 import type { ExportFormat } from './export'
+import type { Settings } from './settings'
 import type { Currency } from './money'
 import type {
   AccountFields,
@@ -111,6 +112,11 @@ export interface LedgerApi {
       month: string,
       currency: Currency,
     ): Promise<Results['reports:trend']>
+  }
+  readonly settings: {
+    get(): Promise<Results['settings:get']>
+    /** Stores the given settings and returns them all. */
+    update(changes: Partial<Settings>): Promise<Results['settings:update']>
   }
   readonly export: {
     /**

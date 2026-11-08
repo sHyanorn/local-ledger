@@ -1,6 +1,6 @@
 import type { PowerMonitor } from 'electron'
 
-/** Locks after this much time without input anywhere on the computer. */
+/** Locks after this much time without input anywhere on the computer, unless set otherwise. */
 export const IDLE_LIMIT_SECONDS = 5 * 60
 export const IDLE_POLL_MS = 5_000
 
@@ -14,11 +14,18 @@ type Power = Pick<PowerMonitor, 'getSystemIdleTime' | 'on' | 'off'>
 export function watchForLock(
   power: Power,
   lock: () => void,
-  { idleLimit = IDLE_LIMIT_SECONDS, pollMs = IDLE_POLL_MS } = {},
+  {
+    idleLimit = () => IDLE_LIMIT_SECONDS,
+    pollMs = IDLE_POLL_MS,
+  }: {
+    /** Seconds; read on every poll, so a changed setting applies at once. */
+    idleLimit?: () => number
+    pollMs?: number
+  } = {},
 ): () => void {
   let idle = false
   const timer = setInterval(() => {
-    const now = power.getSystemIdleTime() >= idleLimit
+    const now = power.getSystemIdleTime() >= idleLimit()
     if (now && !idle) lock()
     idle = now
   }, pollMs)

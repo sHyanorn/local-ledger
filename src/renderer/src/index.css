@@ -979,3 +979,12 @@ select.inline:focus {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+.form.general {
+  grid-template-columns: repeat(2, minmax(0, 220px));
+  width: 100%;
+}
+
+.form.general .error {
+  grid-column: 1 / -1;
+}

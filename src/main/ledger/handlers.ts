@@ -10,6 +10,7 @@ import {
 } from './accounts'
 import { monthBudgets, setBudget } from './budgets'
 import { categoryTrend, reportData } from './reports'
+import { getSettings, updateSettings } from './settings'
 import {
   createCategory,
   deleteCategory,
@@ -100,6 +101,12 @@ export function handleLedger(vault: Vault, devOrigin?: string): void {
   handle('rules:suggest', ({ id }) => suggestRule(db(), id), devOrigin)
   handle('budgets:month', ({ month }) => monthBudgets(db(), month), devOrigin)
   handle('budgets:set', (budget) => setBudget(db(), budget), devOrigin)
+  handle('settings:get', () => getSettings(db()), devOrigin)
+  handle(
+    'settings:update',
+    (changes) => updateSettings(db(), changes),
+    devOrigin,
+  )
   handle(
     'reports:month',
     ({ month, currency }) => reportData(db(), month, currency),

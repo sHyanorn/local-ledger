@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import {
   budgetState,
-  HOME_CURRENCY,
   type CategoryBudget,
   type MonthBudgets,
 } from '../../../shared/budgets'
@@ -10,16 +9,16 @@ import {
   centsToDecimal,
   formatAmount,
   parseAmount,
+  type Currency,
 } from '../../../shared/money'
 import { formatMonth, monthOf, shiftMonth } from './format'
 import { categoryTree, useLedger } from './store'
-
-const money = (cents: number) => formatAmount(cents, HOME_CURRENCY)
 
 /** Each category's spending this month against its budget, which the user sets here. */
 export function BudgetsView() {
   const categories = useLedger((store) => store.categories)
   const refresh = useLedger((store) => store.refresh)
+  const home = useLedger((store) => store.settings.homeCurrency)
   const [month, setMonth] = useState(monthOf)
   const [answer, setBudgets] = useState<MonthBudgets | null>(null)
   // An answer for another month is not shown under this one.
@@ -50,6 +49,7 @@ export function BudgetsView() {
         category={category}
         budget={budget}
         month={month}
+        currency={budgets?.currency ?? home}
         child={child}
         onSaved={saved}
       />
@@ -95,7 +95,8 @@ export function BudgetsView() {
               ])}
             </ul>
             <p className="muted budget-extra">
-              Uncategorized {money(budgets.uncategorizedCents)}
+              Uncategorized{' '}
+              {formatAmount(budgets.uncategorizedCents, budgets.currency)}
               {budgets.otherCurrencies.map(
                 (other) =>
                   ` · ${formatAmount(other.spentCents, other.currency)} in ${other.currency}, not counted`,
@@ -112,12 +113,14 @@ function BudgetRow({
   category,
   budget,
   month,
+  currency,
   child,
   onSaved,
 }: {
   category: Category
   budget: CategoryBudget
   month: string
+  currency: Currency
   child: boolean
   onSaved: () => void
 }) {
@@ -156,6 +159,7 @@ function BudgetRow({
     }
   }
 
+  const money = (cents: number) => formatAmount(cents, currency)
   const label =
     budget.budgetCents === null
       ? `${money(budget.spentCents)} spent`

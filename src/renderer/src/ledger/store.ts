@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { budgetState, HOME_CURRENCY } from '../../../shared/budgets'
+import { budgetState } from '../../../shared/budgets'
+import { DEFAULT_SETTINGS, type Settings } from '../../../shared/settings'
 import type { ImportFile } from '../../../shared/imports'
 import { formatAmount } from '../../../shared/money'
 import { formatMonth, monthOf } from './format'
@@ -21,6 +22,7 @@ interface LedgerStore {
   categories: Category[]
   /** Possible transfers waiting for the user. */
   transfersToReview: number
+  settings: Settings
   /** Categories over their budget this month; null until first loaded. */
   overBudget: number[] | null
   /** A message about the last change, such as an import, shown under the list until dismissed. */
@@ -41,6 +43,7 @@ export const useLedger = create<LedgerStore>((set, get) => ({
   accounts: [],
   categories: [],
   transfersToReview: 0,
+  settings: DEFAULT_SETTINGS,
   overBudget: null,
   notice: null,
   setNotice: (notice) => set({ notice }),
@@ -52,12 +55,13 @@ export const useLedger = create<LedgerStore>((set, get) => ({
     // Answers can arrive out of order; only the latest request's counts.
     const ticket = ++refreshes
     const month = monthOf()
-    const [accounts, categories, transfersToReview, budgets] =
+    const [accounts, categories, transfersToReview, budgets, settings] =
       await Promise.all([
         window.ledger.accounts.list(),
         window.ledger.categories.list(),
         window.ledger.transfers.count(),
         window.ledger.budgets.month(month),
+        window.ledger.settings.get(),
       ])
     if (ticket !== refreshes) return
     const { view, overBudget: before } = get()
@@ -72,7 +76,7 @@ export const useLedger = create<LedgerStore>((set, get) => ({
     const name = categories.find((c) => c.id === first?.categoryId)?.name
     if (first && name && first.budgetCents !== null) {
       set({
-        budgetNotice: `${name} is ${formatAmount(first.spentCents - first.budgetCents, HOME_CURRENCY)} over its budget for ${formatMonth(month)}.`,
+        budgetNotice: `${name} is ${formatAmount(first.spentCents - first.budgetCents, budgets.currency)} over its budget for ${formatMonth(month)}.`,
       })
     }
     const gone =
@@ -83,6 +87,7 @@ export const useLedger = create<LedgerStore>((set, get) => ({
       accounts,
       categories,
       transfersToReview,
+      settings,
       overBudget: over.map((budget) => budget.categoryId),
       ...(gone ? { view: { name: 'transactions', accountId: null } } : {}),
     })

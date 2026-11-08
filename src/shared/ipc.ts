@@ -18,6 +18,7 @@ import type { Rule, RuleReach, RuleSuggestion } from './rules'
 import type { PossibleTransfer, TransferSide } from './transfers'
 import type { MonthBudgets } from './budgets'
 import type { ReportData, TrendPoint } from './reports'
+import type { Settings } from './settings'
 import type {
   Account,
   Category,
@@ -91,6 +92,8 @@ export const channels = {
   'reports:month': schemas.report,
   'reports:trend': schemas.trend,
   'export:save': schemas.exportSave,
+  'settings:get': z.undefined(),
+  'settings:update': schemas.settingsUpdate,
 } as const
 
 export type Channel = keyof typeof channels
@@ -161,4 +164,6 @@ export interface Results {
   'reports:month': ReportData
   'reports:trend': TrendPoint[]
   'export:save': Outcome<'cancelled' | 'busy' | 'unwritable'>
+  'settings:get': Settings
+  'settings:update': Settings
 }

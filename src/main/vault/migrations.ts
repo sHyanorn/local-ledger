@@ -147,6 +147,15 @@ export const migrations: readonly Migration[] = [
       DROP TABLE budgets;
       ALTER TABLE budgets_new RENAME TO budgets;
     `),
+
+  // 7: preferences, one row per key, read with defaults for missing keys.
+  (db) =>
+    db.exec(`
+      CREATE TABLE settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      ) STRICT;
+    `),
 ]
 
 export class NewerSchemaError extends Error {

@@ -12,6 +12,7 @@ import {
   SEARCH_MAX,
 } from './ledger'
 import { EXPORT_FORMATS } from './export'
+import { IDLE_LOCK_CHOICES } from './settings'
 import { CURRENCIES, MAX_CENTS } from './money'
 
 const id = z.number().int().positive().max(Number.MAX_SAFE_INTEGER)
@@ -140,6 +141,14 @@ export const schemas = {
   ruleDismiss: z.strictObject({ pattern: text(DESCRIPTION_MAX, 1) }),
   transferLink: z.strictObject({ id, otherId: id }),
   budgetMonth: z.strictObject({ month }),
+  settingsUpdate: z
+    .strictObject({
+      homeCurrency: z.enum(CURRENCIES).optional(),
+      idleLockMinutes: z
+        .union(IDLE_LOCK_CHOICES.map((choice) => z.literal(choice)))
+        .optional(),
+    })
+    .refine((changes) => Object.keys(changes).length > 0),
   exportSave: z.strictObject({
     month,
     currency: z.enum(CURRENCIES),

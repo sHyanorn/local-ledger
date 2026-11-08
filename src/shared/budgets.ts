@@ -1,9 +1,6 @@
 // Budgets as the page sees them. Free of zod, like ledger.ts.
 import type { Currency } from './money'
 
-/** Budgets and the spending they are measured against are in this currency. */
-export const HOME_CURRENCY: Currency = 'AUD'
-
 /** A budget is close to spent from this share of it. */
 export const CLOSE_SHARE = 0.9
 
@@ -17,6 +14,8 @@ export interface CategoryBudget {
 
 export interface MonthBudgets {
   month: string
+  /** The home currency, which budgets and their spending are in. */
+  currency: Currency
   categories: CategoryBudget[]
   /** Home-currency spending this month without a category. */
   uncategorizedCents: number

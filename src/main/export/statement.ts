@@ -1,16 +1,13 @@
 // A month's statement in one currency, for the Excel and PDF exports: the
 // report's figures, budgets when the currency is the home one, and every
 // transaction of the month, transfers included and marked as such.
-import {
-  budgetState,
-  HOME_CURRENCY,
-  type CategoryBudget,
-} from '../../shared/budgets'
+import { budgetState, type CategoryBudget } from '../../shared/budgets'
 import type { Currency } from '../../shared/money'
 import { formatMonth, shiftMonth } from '../../shared/months'
 import type { MonthReport, MonthTotals } from '../../shared/reports'
 import { reportData } from '../ledger/reports'
 import { monthBudgets } from '../ledger/budgets'
+import { getSettings } from '../ledger/settings'
 import type { Db } from '../vault/database'
 import type { Sheet } from './xlsx'
 
@@ -88,7 +85,7 @@ export function statement(
           : fullName(categoryId),
   }))
   const budgets =
-    currency === HOME_CURRENCY
+    currency === getSettings(db).homeCurrency
       ? monthBudgets(db, month)
           .categories.filter((budget) => budget.budgetCents !== null)
           .map((budget) => ({ ...budget, name: fullName(budget.categoryId) }))

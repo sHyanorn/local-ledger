@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { app, powerMonitor } from 'electron'
-import { watchForLock } from './auto-lock'
+import { IDLE_LIMIT_SECONDS, watchForLock } from './auto-lock'
+import { getSettings } from './ledger/settings'
 import { hardenApp } from './hardening'
 import { handleExport } from './export/handlers'
 import { handleImport } from './import/handlers'
@@ -62,7 +63,16 @@ export function startApp(): void {
     }
     handle('vault:lock', lock, devOrigin)
     setMenu({ lock, packaged: app.isPackaged })
-    watchForLock(powerMonitor, lock)
+    watchForLock(powerMonitor, lock, {
+      // The vault's own setting while it is open; locking again is harmless.
+      idleLimit: () => {
+        try {
+          return getSettings(vault.database()).idleLockMinutes * 60
+        } catch {
+          return IDLE_LIMIT_SECONDS
+        }
+      },
+    })
 
     app.on('second-instance', () => {
       if (!window) return open()
