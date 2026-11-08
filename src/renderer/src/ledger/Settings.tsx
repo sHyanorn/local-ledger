@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Category } from '../../../shared/ledger'
 import { ChangePassword } from '../screens/ChangePassword'
+import { BackupDialog } from './BackupDialog'
 import { CategoryDialog } from './CategoryDialog'
 import { GeneralSection } from './GeneralSection'
 import { ImportHistory } from './ImportHistory'
@@ -13,6 +14,8 @@ export function Settings() {
   const categories = useLedger((store) => store.categories)
   const [editing, setEditing] = useState<Editing>(null)
   const [changingPassword, setChangingPassword] = useState(false)
+  const [backingUp, setBackingUp] = useState(false)
+  const [backedUp, setBackedUp] = useState(false)
 
   if (changingPassword) {
     return <ChangePassword onCancel={() => setChangingPassword(false)} />
@@ -71,16 +74,39 @@ export function Settings() {
           <ImportHistory />
           <section aria-labelledby="security-heading">
             <h2 id="security-heading">Security</h2>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => setChangingPassword(true)}
-            >
-              Change Master Password…
-            </button>
+            <div className="actions start">
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setBackedUp(false)
+                  setBackingUp(true)
+                }}
+              >
+                Back Up…
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setChangingPassword(true)}
+              >
+                Change Master Password…
+              </button>
+            </div>
+            <p className="muted" role="status">
+              {backedUp ? 'Backup saved.' : ''}
+            </p>
           </section>
         </div>
       </div>
+      {backingUp && (
+        <BackupDialog
+          onDone={(saved) => {
+            setBackingUp(false)
+            setBackedUp(saved)
+          }}
+        />
+      )}
       {editing && (
         <CategoryDialog {...editing} onClose={() => setEditing(null)} />
       )}

@@ -2,13 +2,13 @@
 // the main process asks the user where to save it, builds the file, and
 // writes it there. The file is not encrypted (SECURITY_DESIGN). A lock or
 // unlock while this runs cancels it, and nothing is written.
-import { open } from 'node:fs/promises'
 import { dialog, type BaseWindow, type FileFilter } from 'electron'
 import chartCss from '../../renderer/src/charts.css?raw'
 import type { ExportFormat } from '../../shared/export'
 import type { Outcome } from '../../shared/ipc'
 import type { Currency } from '../../shared/money'
 import { handle } from '../ipc'
+import { writeOwnerOnly } from '../owner-only'
 import { LockedError, type Vault } from '../vault/vault'
 import { printPdf } from './print'
 import reportCss from './report.css?raw'
@@ -92,19 +92,5 @@ export function handleExport(
     } finally {
       bytes.fill(0)
     }
-  }
-}
-
-/**
- * Writes the file readable by the user only, as the vault is: the mode is
- * set before writing, also on a file that already existed with another.
- */
-async function writeOwnerOnly(path: string, bytes: Uint8Array): Promise<void> {
-  const file = await open(path, 'w', 0o600)
-  try {
-    if (process.platform !== 'win32') await file.chmod(0o600)
-    await file.writeFile(bytes)
-  } finally {
-    await file.close()
   }
 }

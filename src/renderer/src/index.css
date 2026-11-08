@@ -165,6 +165,10 @@ textarea:focus {
   justify-content: flex-end;
 }
 
+.actions.start {
+  justify-content: flex-start;
+}
+
 /* The unlocked ledger: a sidebar and the selected view. */
 
 .ledger {

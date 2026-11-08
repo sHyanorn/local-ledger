@@ -3,6 +3,7 @@ import { app, powerMonitor } from 'electron'
 import { IDLE_LIMIT_SECONDS, watchForLock } from './auto-lock'
 import { getSettings } from './ledger/settings'
 import { hardenApp } from './hardening'
+import { handleBackup } from './backup/handlers'
 import { handleExport } from './export/handlers'
 import { handleImport } from './import/handlers'
 import { handle } from './ipc'
@@ -55,6 +56,7 @@ export function startApp(): void {
     open()
     handleImport(vault, () => window?.window ?? null, devOrigin)
     handleExport(vault, () => window?.window ?? null, devOrigin)
+    handleBackup(vault, () => window?.window ?? null, devOrigin)
     vault.onChange(() => window?.replaceView())
     // Also replaces a page that was already locked, so a password typed
     // but not submitted does not survive a lock.

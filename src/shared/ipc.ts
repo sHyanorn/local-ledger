@@ -93,6 +93,7 @@ export const channels = {
   'reports:trend': schemas.trend,
   'export:save': schemas.exportSave,
   'settings:get': z.undefined(),
+  'backup:save': z.strictObject({ password: givenPassword }),
   'settings:update': schemas.settingsUpdate,
 } as const
 
@@ -165,5 +166,8 @@ export interface Results {
   'reports:trend': TrendPoint[]
   'export:save': Outcome<'cancelled' | 'busy' | 'unwritable'>
   'settings:get': Settings
+  'backup:save': Outcome<
+    'wrong-password' | 'damaged' | 'cancelled' | 'unwritable'
+  >
   'settings:update': Settings
 }

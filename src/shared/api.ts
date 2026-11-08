@@ -113,6 +113,13 @@ export interface LedgerApi {
       currency: Currency,
     ): Promise<Results['reports:trend']>
   }
+  readonly backup: {
+    /**
+     * Seals a backup under the master password, which must be the current
+     * one, and asks where to save it.
+     */
+    save(password: string): Promise<Results['backup:save']>
+  }
   readonly settings: {
     get(): Promise<Results['settings:get']>
     /** Stores the given settings and returns them all. */

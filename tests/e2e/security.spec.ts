@@ -161,6 +161,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
       reports: methods('reports'),
       export: methods('export'),
       settings: methods('settings'),
+      backup: methods('backup'),
       unlockReplaced: String(vault.unlock).includes('replaced'),
     }
   })
@@ -175,6 +176,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
       'rules',
       'budgets',
       'reports',
+      'backup',
       'settings',
       'export',
       'transfers',
@@ -207,6 +209,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
     reports: ['month', 'trend'],
     export: ['save'],
     settings: ['get', 'update'],
+    backup: ['save'],
     unlockReplaced: false,
   })
 })
@@ -458,6 +461,7 @@ ledgerTest(
         () => window.ledger.reports.trend(1, '2026-05', 'AUD'),
         () => window.ledger.export.save('2026-05', 'AUD', 'pdf'),
         () => window.ledger.settings.get(),
+        () => window.ledger.backup.save('fake password'),
         () => window.ledger.settings.update({ idleLockMinutes: 1 }),
       ]
       return Promise.all(
@@ -469,7 +473,7 @@ ledgerTest(
         ),
       )
     })
-    expect(results).toHaveLength(33)
+    expect(results).toHaveLength(34)
     for (const result of results) expect(result).toMatch(/Error: locked$/)
   },
 )

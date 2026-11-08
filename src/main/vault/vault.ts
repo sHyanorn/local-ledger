@@ -26,12 +26,19 @@ import {
   writeFileAtomic,
 } from './files'
 import type { Checkpoint } from './files'
-import { DEFAULT_KDF } from './kdf'
+import { writeBackup } from './backup'
+import { open } from './envelope'
+import { DEFAULT_KDF, encodePassword } from './kdf'
 import type { Derive, KdfParams } from './kdf'
 import { createKey, openKey } from './keys'
 import type { NewKey } from './keys'
 import { NewerSchemaError } from './migrations'
-import { parseVaultFile, serializeVaultFile, VAULT_FILE } from './vault-file'
+import {
+  associatedData,
+  parseVaultFile,
+  serializeVaultFile,
+  VAULT_FILE,
+} from './vault-file'
 import type { VaultFile } from './vault-file'
 
 export const VAULT_DIR = 'vault'
@@ -243,6 +250,49 @@ export class Vault {
       } finally {
         oldKey?.fill(0)
         created?.dataKey.fill(0)
+      }
+    })
+  }
+
+  /**
+   * A backup file of the open vault: its database file as it is, with the
+   * data key sealed under the password, which must be the current one.
+   */
+  backup(
+    password: string,
+  ): Promise<
+    | { ok: true; file: Buffer }
+    | { ok: false; reason: 'wrong-password' | 'locked' | 'damaged' }
+  > {
+    return this.#run(async (cancelled) => {
+      if (!this.#db) return { ok: false, reason: 'locked' }
+      const file = this.#readFile()
+      if (!file) return { ok: false, reason: 'damaged' }
+      const sealingKey = await this.derive(
+        encodePassword(password),
+        file.kdf.salt,
+        file.kdf,
+      )
+      let dataKey: Buffer | null = null
+      try {
+        dataKey = open(sealingKey, file.key, associatedData(file))
+        if (!dataKey) return { ok: false, reason: 'wrong-password' }
+        if (cancelled() || !this.#db) return { ok: false, reason: 'locked' }
+        const schema = this.#db.pragma('user_version', {
+          simple: true,
+        }) as number
+        // Operations run one at a time and none is writing, so the file on
+        // disk is the whole database.
+        const database = readFileSync(
+          join(this.dir, databaseName(file.generation)),
+        )
+        return {
+          ok: true,
+          file: writeBackup(database, schema, dataKey, sealingKey, file.kdf),
+        }
+      } finally {
+        sealingKey.fill(0)
+        dataKey?.fill(0)
       }
     })
   }
