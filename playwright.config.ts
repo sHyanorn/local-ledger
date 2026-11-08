@@ -1,7 +1,8 @@
 import { defineConfig } from '@playwright/test'
 
 // Tests launch the compiled, unpackaged app with Electron. The packaged app
-// cannot be driven: Playwright needs --inspect, which the fuses turn off.
+// cannot be driven: the fuses turn off --inspect and the app refuses a remote
+// debugging port, both of which Playwright needs. Its self-test covers it.
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 30_000,

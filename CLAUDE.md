@@ -37,7 +37,7 @@ npm ci && npm run setup:electron   # install scripts are off (.npmrc)
 npm run dev
 npm test
 npm run test:e2e     # on Linux: as a non-root user, under xvfb-run
-npm run test:native  # encrypted database under Electron
+npm run test:native  # self-test of the built app (D012)
 npm run lint && npm run typecheck && npm run format:check
 npm run build        # build installers
 npm run build:dir && npm run test:package   # unpacked build and its checks
