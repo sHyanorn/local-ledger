@@ -94,3 +94,32 @@
 - Decision: the window hosts its page in a `WebContentsView`. On every unlock, lock and committed password change the main process loads the page in a new view and closes the old one, whose renderer process then exits, so no renderer process that held a typed password or decrypted data outlives the change. A change that fails keeps its page to report the failure and clears its fields; the typed passwords stay in that process until the next lock. A lock replaces the page even when the vault is already locked, so a password typed but not submitted does not survive it. Closing the window closes its view too, since a `BaseWindow` leaves its views running. Locking closes the database at once and cancels vault operations still deriving a key. The vault locks after 5 minutes of system idle time, when the operating system locks the screen or suspends, on Cmd/Ctrl+L, and when the window closes
 - Rationale: clearing a store cannot wipe what JavaScript strings and the DOM held; ending the process can. Two views of the same origin get separate processes; the e2e suite asserts that the old process has exited
 - Later: the idle limit becomes a setting in M5
+
+## D017 Data IPC
+- Date: 2026-11-08
+- Decision: accounts, categories and transactions each have list, create, update and delete channels; transactions also have paged listing and totals. Every payload is checked in the main process against a schema in `src/shared/schemas.ts`: names up to 100 characters, descriptions 500, notes 2,000, searches 200; amounts are integers within ±10¹¹ units; dates must exist on the calendar; at most 500 rows a page. Text is trimmed before it is stored. An update replaces the whole record
+- Results: expected refusals are outcomes with a reason (`duplicate`, `in-use`, `not-found`, `too-deep`, `currency-in-use`); anything else reaches the page only as the code `forbidden`, `invalid-argument`, `locked` or `failed`. A call while the vault is locked fails with `locked`
+- The page imports `src/shared/ledger.ts`, which holds the constants and types and no zod: zod probes for `new Function`, which the CSP reports as a violation
+- Repositories in `src/main/ledger` prepare their statements per call and keep nothing between calls, so no decrypted row stays in the main process once a reply is sent
+
+## D018 Transaction list and search
+- Date: 2026-11-08
+- Decision: the list is newest first and loads 200 rows at a time, continuing from the last row shown (`(date, id) < (?, ?)`), so a deep page costs what the first does. Search matches the description and notes with `LIKE`, with `%`, `_` and `\` escaped; letters match without regard to case for ASCII only. Rows outside the view skip layout (`content-visibility: auto`), and a row's category shows as text until clicked, since a select per row put about 66,000 options in the page at 2,200 rows
+- Measured with 20,000 seeded transactions, encrypted (2.1 GHz Xeon): first page 0.2 ms, page 91 0.2 ms, a search 0.6 ms, a search with no match 3.3 ms, totals of everything 4.2 ms. In the app under Xvfb with software rendering: a search shows 61 ms after the typing pause; scrolling through 2,200 loaded rows, frames take 24 ms at the median and 48 ms at the 95th percentile, against 17 ms for an idle frame there
+- Alternatives: FTS5 (compiled in, and its index would be encrypted like every page) and a virtualized list (`@tanstack/react-virtual`); neither is needed at these numbers. Revisit if a search passes 50 ms or scrolling stutters on real hardware
+
+## D019 Seed data and demo vault
+- Date: 2026-11-08
+- Decision: `scripts/seed` generates a ledger from a seeded random generator (mulberry32), so a seed and an end date always give the same data. Every merchant and name is invented. The default is about 1,500 transactions over 18 months in four accounts, one of them in yuan: salary, rent and bills on schedules, day-to-day spending by weight, one trip, refunds, and transfers that appear in both accounts (card repayments, savings), which M3 needs for transfer detection
+- `npm run seed` bundles the script with Vite and writes a vault to `.demo/user-data`, git-ignored, with a fixed fake password it prints; it refuses to touch an existing vault and never writes to the app's user data directory. `npm run demo` starts the app on it. Tests call the same generator, with a fast key derivation
+- The package check fails when `app.asar` holds anything beyond the main, preload and renderer builds, `package.json` and runtime dependencies
+
+## D020 Money and currencies
+- Date: 2026-11-08
+- Decision: amounts stay integer cents (D003) end to end: text becomes cents and cents become text by string arithmetic, and formatting hands `Intl.NumberFormat` a decimal string, never a float. Currencies are limited to those with two decimal places (AUD, CAD, CNY, EUR, GBP, HKD, NZD, SGD, USD). Each account has one currency; totals and balances are given per currency and never added across currencies. Formatting uses `en-AU`
+- Later: conversion between currencies (Nice to have)
+
+## D021 Accounts and categories
+- Date: 2026-11-08
+- Decision: an account's opening balance is a field of the account, not a transaction, so reports will not count it as income; the balance is the opening balance plus every transaction. Names are unique without regard to case. An account can be deleted only without transactions, and its currency changes only while it has none. Categories nest two levels: a category with subcategories stays at the top. Deleting a category deletes its subcategories too; their transactions become uncategorized and their budgets go with them, and the confirmation says how many transactions it affects
+- Later: archiving accounts (Nice to have); rules that point to a deleted category (M3)

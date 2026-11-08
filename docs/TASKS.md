@@ -17,16 +17,18 @@
 - [x] Keep keys in Buffers and zero them after use; state in `docs/SECURITY_DESIGN.md` what cannot be wiped (the master password arrives over IPC as a string)
 
 ## M2 Data core
-- [ ] Typed IPC API with zod validation
-- [ ] CRUD for accounts and categories
-- [ ] Transaction list, search, filtering and editing; extend the lock test to check that no fake transaction text survives a lock
-- [ ] `npm run seed` fake data generator
+- [x] Typed IPC API with zod validation
+- [x] CRUD for accounts and categories
+- [x] Transaction list, search, filtering and editing; extend the lock test to check that no fake transaction text survives a lock
+- [x] `npm run seed` fake data generator
 
 ## M3 Import and categorization
 - [ ] CSV parsing and generic column-mapping wizard
 - [ ] Templates for the four Australian banks (tested with hand-made sample files)
 - [ ] Import preview and duplicate detection
 - [ ] Rule engine and "create a rule after a manual change" prompt
+- [ ] Deleting a category that rules point to: say how many, and what happens to them
+- [ ] Transfers: when both accounts' CSVs are imported, one transfer appears twice (out of one, into the other); detect the pair and keep it out of M4's income and spending
 
 ## M4 Budgets and reports
 - [ ] Budget setup and overspending alerts
@@ -42,4 +44,5 @@
 - [ ] English README, screenshots and GIFs; publish the first release
 
 ## Nice to have
+- [ ] Archive an account: hide it from lists while keeping its transactions
 - [ ] Recovery key: a random key, shown once at setup, that also seals the data key (D013 leaves room for it)

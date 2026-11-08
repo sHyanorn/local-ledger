@@ -50,7 +50,8 @@ What the app does:
 
 - The data key, the sealing key, the encoded password and the raw key literal live in buffers the app owns and fills with zeros after use, also when an operation fails or is cancelled. While unlocked, the only copy of the data key is inside SQLite.
 - Argon2id runs in a worker thread that ends after each derivation, releasing its 64 MiB.
-- On unlock, lock and a password change that commits, the renderer process that showed the previous page ends. A change that fails keeps its page so it can say so, and clears its fields; the typed passwords stay in that process as strings until the next lock ends it.
+- On unlock, lock and a password change that commits, the renderer process that showed the previous page ends.
+- The data handlers keep nothing between calls. A test shows a transaction, locks, and checks that its text is gone from the pages and no longer reachable in the main process heap (a heap snapshot, which collects garbage first). A change that fails keeps its page so it can say so, and clears its fields; the typed passwords stay in that process as strings until the next lock ends it.
 
 What it cannot do, and does not claim:
 
@@ -64,7 +65,7 @@ What it cannot do, and does not claim:
 
 - Renderer: `contextIsolation`, `sandbox` (checked at the OS level in tests), no Node.js integration, no webview, spellcheck off. The page is served from `app://local-ledger` with a strict CSP on every response.
 - New windows, navigation, redirects and permission requests are refused; the session cancels every request outside the app. Tests read a Chromium net log and fail on any network request.
-- IPC: one handler per channel; each checks that the sender is the app's own page and validates its payload with zod. A failure reaches the page as a code only; the main process logs the channel and an error code, never a message or the payload.
+- IPC: one handler per channel; each checks that the sender is the app's own page and validates its payload with zod (D017). The data channels need the vault unlocked. A failure reaches the page as a code only; the main process logs the channel and an error code, never a message or the payload.
 - The app refuses to start with any switch that weakens the Chromium sandbox and, when packaged, with a remote debugging port.
 - Fuses: no `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` or `--inspect`; the app loads only from an integrity-checked `app.asar`; `file://` gets no extra privileges. The native SQLite binary sits in `app.asar.unpacked`, outside the integrity check.
 - Releases are unsigned (D006); the release workflow (M5) publishes checksums and build provenance attestations to verify downloads with.

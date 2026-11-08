@@ -20,7 +20,7 @@ tests/
   unit/       Vitest
   e2e/        Playwright for Electron
   native/     Encrypted database under Electron, checks of the packaged app
-scripts/      Repository checks run by npm scripts
+scripts/      Repository checks and the seed data generator, run by npm scripts
 ```
 
 ## Working practices
@@ -41,7 +41,8 @@ npm run test:native  # self-test of the built app (D012)
 npm run lint && npm run typecheck && npm run format:check
 npm run build        # build installers
 npm run build:dir && npm run test:package   # unpacked build and its checks
-npm run seed         # generate fake demo data
+npm run seed         # write a demo vault of fake data to .demo/user-data
+npm run demo         # start the app on the demo vault
 ```
 
 ## Mandatory Electron security rules

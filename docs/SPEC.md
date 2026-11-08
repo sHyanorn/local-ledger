@@ -72,7 +72,7 @@ Encryption scheme:
 ## 5. Data model
 
 ```
-accounts(id, name, type, currency, created_at)
+accounts(id, name, type, currency, opening_balance_cents, created_at)
 transactions(id, account_id, date, amount_cents, description, category_id,
              import_batch_id, hash, notes, created_at)
 categories(id, name, parent_id, color, icon)
