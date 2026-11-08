@@ -6,16 +6,18 @@ import {
   shortMonth,
 } from '../../shared/chart-format'
 import { budgetState } from '../../shared/budgets'
-import { chartMarkup, groupedBars, horizontalBars } from '../../shared/charts'
+import {
+  chartMarkup,
+  escapeHtml,
+  groupedBars,
+  horizontalBars,
+} from '../../shared/charts'
 import { formatAmount } from '../../shared/money'
 import { formatMonth } from '../../shared/months'
 import type { Statement } from './statement'
 
 /** The page's title, which becomes the PDF's: fixed, so it holds no data. */
 export const PDF_TITLE = 'Local Ledger Statement'
-
-const escape = (text: string) =>
-  text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`)
 
 const DATE = new Intl.DateTimeFormat('en-AU', {
   day: 'numeric',
@@ -29,7 +31,7 @@ const STATE = { none: '', under: '', close: 'Close', over: 'Over' } as const
 
 export function statementPage(statement: Statement): string {
   const { report, currency, month } = statement
-  const money = (cents: number) => escape(formatAmount(cents, currency))
+  const money = (cents: number) => escapeHtml(formatAmount(cents, currency))
   const name = (id: number | null) =>
     id === null ? 'Uncategorized' : (statement.names.get(id) ?? '')
   const spending = report.categories.filter((entry) => entry.netCents < 0)
@@ -74,7 +76,7 @@ export function statementPage(statement: Statement): string {
           .map((budget) => {
             const total = budget.budgetCents ?? 0
             const state = budgetState(budget)
-            return `<tr><td>${escape(budget.name)}</td><td class="number">${money(total)}</td><td class="number">${money(budget.spentCents)}</td><td class="number${state === 'over' ? ' over' : ''}">${money(total - budget.spentCents)}</td><td>${STATE[state]}</td></tr>`
+            return `<tr><td>${escapeHtml(budget.name)}</td><td class="number">${money(total)}</td><td class="number">${money(budget.spentCents)}</td><td class="number${state === 'over' ? ' over' : ''}">${money(total - budget.spentCents)}</td><td>${STATE[state]}</td></tr>`
           })
           .join('')}</tbody></table></section>`
 
@@ -86,7 +88,7 @@ export function statementPage(statement: Statement): string {
 <tbody>${statement.rows
           .map(
             (row) =>
-              `<tr><td class="date">${escape(day(row.date))}</td><td>${escape(row.account)}</td><td>${escape(row.description)}${row.notes ? `<span class="note">${escape(row.notes)}</span>` : ''}</td><td>${escape(row.category)}</td><td class="number">${money(row.amountCents)}</td></tr>`,
+              `<tr><td class="date">${escapeHtml(day(row.date))}</td><td>${escapeHtml(row.account)}</td><td>${escapeHtml(row.description)}${row.notes ? `<span class="note">${escapeHtml(row.notes)}</span>` : ''}</td><td>${escapeHtml(row.category)}</td><td class="number">${money(row.amountCents)}</td></tr>`,
           )
           .join('')}</tbody></table>`
 
@@ -94,7 +96,7 @@ export function statementPage(statement: Statement): string {
 <html lang="en"><head><meta charset="utf-8"><title>${PDF_TITLE}</title>
 <link rel="stylesheet" href="report.css"></head>
 <body>
-<header><h1>${escape(formatMonth(month))}</h1><span class="muted">${currency}</span></header>
+<header><h1>${escapeHtml(formatMonth(month))}</h1><span class="muted">${currency}</span></header>
 ${totals}
 <section><h2>Income and Spending</h2>${months}
 <p class="legend"><span class="key income"></span>Income<span class="key spending"></span>Spending</p></section>

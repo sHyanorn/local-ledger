@@ -58,14 +58,21 @@ const round = (value: number) => Math.round(value * 10) / 10
 
 const PAD = { top: 12, right: 12, bottom: 28, left: 64 }
 
-function valueAxis(
-  ticks: number[],
-  y: (value: number) => number,
-  left: number,
-  right: number,
+/** A vertical scale over the values and zero, with its grid lines and ticks. */
+function valueScale(
+  values: number[],
+  width: number,
+  height: number,
   format: Format,
-): Shape[] {
-  return ticks.flatMap((tick): Shape[] => [
+): { y: (value: number) => number; axis: Shape[] } {
+  const ticks = niceTicks(Math.min(0, ...values), Math.max(0, ...values))
+  const y = scale(
+    [ticks[0] ?? 0, ticks.at(-1) ?? 1],
+    [height - PAD.bottom, PAD.top],
+  )
+  const left = PAD.left
+  const right = width - PAD.right
+  const axis = ticks.flatMap((tick): Shape[] => [
     {
       tag: 'line',
       className: tick === 0 ? 'axis zero' : 'grid',
@@ -78,6 +85,7 @@ function valueAxis(
       text: format(tick),
     },
   ])
+  return { y, axis }
 }
 
 /**
@@ -99,19 +107,14 @@ export function groupedBars({
   width?: number
   height?: number
 }): Chart {
-  const values = groups.flatMap((group) => group.values)
-  const ticks = niceTicks(Math.min(0, ...values), Math.max(0, ...values))
-  const bottom = height - PAD.bottom
-  const y = scale([ticks[0] ?? 0, ticks.at(-1) ?? 1], [bottom, PAD.top])
-  const band = (width - PAD.left - PAD.right) / Math.max(1, groups.length)
-  const bar = (band * 0.7) / Math.max(1, series.length)
-  const shapes: Shape[] = valueAxis(
-    ticks,
-    y,
-    PAD.left,
-    width - PAD.right,
+  const { y, axis: shapes } = valueScale(
+    groups.flatMap((group) => group.values),
+    width,
+    height,
     format,
   )
+  const band = (width - PAD.left - PAD.right) / Math.max(1, groups.length)
+  const bar = (band * 0.7) / Math.max(1, series.length)
   groups.forEach((group, index) => {
     const start = PAD.left + index * band + band * 0.15
     group.values.forEach((value, n) => {
@@ -217,10 +220,12 @@ export function trendLine({
   width?: number
   height?: number
 }): Chart {
-  const values = points.map((point) => point.value)
-  const ticks = niceTicks(Math.min(0, ...values), Math.max(0, ...values))
-  const bottom = height - PAD.bottom
-  const y = scale([ticks[0] ?? 0, ticks.at(-1) ?? 1], [bottom, PAD.top])
+  const { y, axis: shapes } = valueScale(
+    points.map((point) => point.value),
+    width,
+    height,
+    format,
+  )
   const step = (width - PAD.left - PAD.right) / Math.max(1, points.length - 1)
   const x = (index: number) =>
     round(
@@ -228,13 +233,6 @@ export function trendLine({
         ? (PAD.left + width - PAD.right) / 2
         : PAD.left + index * step,
     )
-  const shapes: Shape[] = valueAxis(
-    ticks,
-    y,
-    PAD.left,
-    width - PAD.right,
-    format,
-  )
   if (points.length > 0) {
     shapes.push({
       tag: 'path',
@@ -274,7 +272,8 @@ export function trendLine({
   return { width, height, label, shapes }
 }
 
-const escape = (text: string) =>
+/** Text safe inside HTML or SVG markup, attribute values included. */
+export const escapeHtml = (text: string) =>
   text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`)
 
 /** camelCase SVG attribute names as written in markup. */
@@ -287,13 +286,16 @@ export function chartMarkup(chart: Chart): string {
     .map((shape) => {
       const attrs = Object.entries(shape.attrs)
         .map(
-          ([name, value]) => ` ${attribute(name)}="${escape(String(value))}"`,
+          ([name, value]) =>
+            ` ${attribute(name)}="${escapeHtml(String(value))}"`,
         )
         .join('')
-      const title = shape.title ? `<title>${escape(shape.title)}</title>` : ''
-      const text = shape.text ? escape(shape.text) : ''
-      return `<${shape.tag} class="${escape(shape.className)}"${attrs}>${title}${text}</${shape.tag}>`
+      const title = shape.title
+        ? `<title>${escapeHtml(shape.title)}</title>`
+        : ''
+      const text = shape.text ? escapeHtml(shape.text) : ''
+      return `<${shape.tag} class="${escapeHtml(shape.className)}"${attrs}>${title}${text}</${shape.tag}>`
     })
     .join('')
-  return `<svg class="chart" viewBox="0 0 ${chart.width} ${chart.height}" role="img" aria-label="${escape(chart.label)}">${body}</svg>`
+  return `<svg class="chart" viewBox="0 0 ${chart.width} ${chart.height}" role="img" aria-label="${escapeHtml(chart.label)}">${body}</svg>`
 }
