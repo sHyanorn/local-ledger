@@ -1,8 +1,13 @@
 import { create } from 'zustand'
-import type { VaultState } from '../../shared/ipc'
+import type { Results, VaultState } from '../../shared/ipc'
+import { PASSWORD_MAX, passwordLength } from '../../shared/password'
 
-type Notice =
-  'wrong-password' | 'newer' | 'damaged' | 'exists' | 'no-vault' | null
+type Reason<C extends 'vault:create' | 'vault:unlock'> = Extract<
+  Results[C],
+  { ok: false }
+>['reason']
+/** A refusal from the main process, or 'failed' when the call itself failed. */
+type Notice = Reason<'vault:create'> | Reason<'vault:unlock'> | 'failed' | null
 
 interface VaultStore {
   state: VaultState | 'loading'
@@ -25,18 +30,30 @@ export const useVault = create<VaultStore>((set) => ({
   load: async () => set({ state: await window.ledger.vault.status() }),
   create: async (password) => {
     set({ busy: true, notice: null })
-    const result = await window.ledger.vault.create(password)
-    set({ busy: false, notice: result.ok ? null : result.reason })
+    try {
+      const result = await window.ledger.vault.create(password)
+      set({ busy: false, notice: result.ok ? null : result.reason })
+    } catch {
+      set({ busy: false, notice: 'failed' })
+    }
   },
   unlock: async (password) => {
+    // No password that long was ever accepted.
+    if (passwordLength(password) > PASSWORD_MAX) {
+      return set({ notice: 'wrong-password' })
+    }
     set({ busy: true, notice: null })
-    const result = await window.ledger.vault.unlock(password)
-    if (result.ok) return
-    set({
-      busy: false,
-      notice: result.reason,
-      ...(result.reason === 'damaged' ? { state: 'damaged' as const } : {}),
-    })
+    try {
+      const result = await window.ledger.vault.unlock(password)
+      if (result.ok) return
+      set({
+        busy: false,
+        notice: result.reason,
+        ...(result.reason === 'damaged' ? { state: 'damaged' as const } : {}),
+      })
+    } catch {
+      set({ busy: false, notice: 'failed' })
+    }
   },
   lock: () => window.ledger.vault.lock(),
 }))

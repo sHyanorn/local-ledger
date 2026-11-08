@@ -37,7 +37,7 @@ beforeEach(async () => {
   })()
 })
 afterEach(async () => {
-  await vault.lock()
+  vault.lock()
   rmSync(root, { recursive: true, force: true })
 })
 
@@ -53,7 +53,7 @@ function plaintextIn(file: string): string[] {
 
 describe('on disk', () => {
   it('the database file holds no fake data in clear', async () => {
-    await vault.lock()
+    vault.lock()
     for (const name of readdirSync(vault.dir)) {
       expect(plaintextIn(join(vault.dir, name)), name).toEqual([])
     }

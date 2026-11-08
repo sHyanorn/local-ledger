@@ -93,11 +93,13 @@ test.describe('unlock and lock', () => {
       await page.getByRole('button', { name: 'Unlock' }).click()
       await expect(page.getByRole('alert')).toHaveText('Wrong password.')
 
+      const lockedPid = await rendererPid(again)
       await page.getByLabel('Master password').fill(PASSWORD)
       const home = await replacedBy(again, () =>
         page.getByRole('button', { name: 'Unlock' }).click(),
       )
       await expect(home.getByRole('button', { name: 'Lock' })).toBeVisible()
+      await expectExited(lockedPid)
     } finally {
       await again.close()
     }
@@ -119,6 +121,55 @@ test.describe('unlock and lock', () => {
     )
   })
 
+  test('closing the window ends its page process and locks the vault', async ({
+    app,
+  }) => {
+    const unlockedPid = await rendererPid(app)
+    await app.evaluate(({ app, BaseWindow }) => {
+      // As on macOS, where the app keeps running without a window.
+      app.removeAllListeners('window-all-closed')
+      BaseWindow.getAllWindows()[0]?.close()
+    })
+    await expectExited(unlockedPid)
+    const reopened = await replacedBy(app, () =>
+      app.evaluate(({ app }) => {
+        app.emit('activate')
+      }),
+    )
+    expect(await reopened.evaluate(() => window.ledger.vault.status())).toBe(
+      'locked',
+    )
+  })
+
+  test('a lock while an unlock derives its key keeps the vault locked', async ({
+    app,
+  }) => {
+    const home = app.windows().at(-1)
+    if (!home) throw new Error('no page')
+    const locked = await replacedBy(app, () =>
+      home.getByRole('button', { name: 'Lock' }).click(),
+    )
+    await locked.getByLabel('Master password').fill(PASSWORD)
+    const unlockingPid = await rendererPid(app)
+    const replaced = replacedBy(app, async () => {
+      await locked.getByRole('button', { name: 'Unlock' }).click()
+      // The key derivation takes a few hundred milliseconds.
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      await app.evaluate(({ powerMonitor }) => {
+        powerMonitor.emit('lock-screen')
+      })
+    })
+    // The page that took the password is replaced by a locked one.
+    const relocked = await replaced
+    await expectExited(unlockingPid)
+    await expect(relocked.getByLabel('Master password')).toBeVisible()
+    expect(await relocked.evaluate(() => window.ledger.vault.status())).toBe(
+      'locked',
+    )
+  })
+
+  // Menu accelerators are not delivered under Xvfb, so this clicks the item;
+  // a unit test checks its accelerator.
   test('the Lock menu item locks', async ({ app }) => {
     const locked = await replacedBy(app, () =>
       app.evaluate(({ Menu }) =>

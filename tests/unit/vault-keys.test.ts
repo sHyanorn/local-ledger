@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { createDecipheriv } from 'node:crypto'
+import { describe, expect, it, vi } from 'vitest'
 import { open, seal } from '../../src/main/vault/envelope'
 import {
   argon2,
@@ -109,6 +110,35 @@ describe('envelope', () => {
     expect(
       open(key, { ...sealed, sealed: sealed.sealed.subarray(0, 16) }, aad),
     ).toBeNull()
+  })
+
+  it('wipes what it decrypted when the tag does not verify', () => {
+    // GCM decrypts before it checks the tag, so with the right key and an
+    // altered tag the body holds the secret.
+    const sealed = seal(key, secret, aad)
+    const tag = sealed.sealed.length - 1
+    const altered = Buffer.from(sealed.sealed)
+    altered[tag] = (altered[tag] ?? 0) ^ 1
+    const decipher = Object.getPrototypeOf(
+      createDecipheriv('aes-256-gcm', key, sealed.nonce),
+    ) as { update: (data: Buffer) => Buffer }
+    const original = decipher.update
+    const bodies: Buffer[] = []
+    const spy = vi.spyOn(decipher, 'update').mockImplementation(function (
+      this: unknown,
+      data: Buffer,
+    ) {
+      const body = original.call(this, data)
+      bodies.push(body)
+      return body
+    })
+    try {
+      expect(open(key, { ...sealed, sealed: altered }, aad)).toBeNull()
+    } finally {
+      spy.mockRestore()
+    }
+    expect(bodies).toHaveLength(1)
+    expect(bodies[0]).toEqual(Buffer.alloc(secret.length))
   })
 })
 

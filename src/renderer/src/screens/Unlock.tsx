@@ -5,6 +5,7 @@ import { useVault } from '../store'
 const MESSAGES: Record<string, string> = {
   'wrong-password': 'Wrong password.',
   newer: 'This vault needs a newer version of Local Ledger.',
+  failed: 'The vault could not be opened. Try again.',
 }
 
 export function Unlock() {

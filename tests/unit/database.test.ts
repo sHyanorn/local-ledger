@@ -1,12 +1,21 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import {
+  closeSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+  writeSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Database from 'better-sqlite3-multiple-ciphers'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
+  DamagedError,
   openDatabase,
   rawKeyLiteral,
-  WrongKeyError,
 } from '../../src/main/vault/database'
 import type { Db } from '../../src/main/vault/database'
 import { migrations, NewerSchemaError } from '../../src/main/vault/migrations'
@@ -56,7 +65,7 @@ describe('openDatabase', () => {
   it('refuses a wrong key, and no key', () => {
     track(openDatabase(file, KEY, { create: true })).close()
     expect(() => openDatabase(file, Buffer.alloc(32, 0xac))).toThrow(
-      WrongKeyError,
+      DamagedError,
     )
     const plain = track(new Database(file))
     expect(() => plain.pragma('user_version')).toThrow()
@@ -66,10 +75,37 @@ describe('openDatabase', () => {
     expect(() => openDatabase(file, KEY)).toThrow()
   })
 
+  it('refuses an empty file, which decrypts under any key, and writes nothing', () => {
+    writeFileSync(file, '')
+    expect(() => openDatabase(file, KEY)).toThrow(DamagedError)
+    expect(statSync(file).size).toBe(0)
+  })
+
+  it('refuses a database with a corrupted page past the first', () => {
+    const db = track(openDatabase(file, KEY, { create: true }))
+    db.prepare(
+      "INSERT INTO accounts (name, type, currency) VALUES ('Fake', 'bank', 'AUD')",
+    ).run()
+    const insert = db.prepare(
+      "INSERT INTO transactions (account_id, date, amount_cents, description) VALUES (1, '2026-01-31', ?, 'Fake purchase')",
+    )
+    db.transaction(() => {
+      for (let cents = 0; cents < 2000; cents++) insert.run(cents)
+    })()
+    db.close()
+    const page = 4096
+    expect(statSync(file).size).toBeGreaterThan(10 * page)
+    const fd = openSync(file, 'r+')
+    writeSync(fd, Buffer.alloc(32, 0x5a), 0, 32, 5 * page + 200)
+    closeSync(fd)
+    expect(() => openDatabase(file, KEY)).toThrow(DamagedError)
+  })
+
   it('sets the connection up for one durable file', () => {
     const db = track(openDatabase(file, KEY, { create: true }))
     expect(db.pragma('journal_mode', { simple: true })).toBe('delete')
     expect(db.pragma('synchronous', { simple: true })).toBe(2)
+    expect(db.pragma('fullfsync', { simple: true })).toBe(1)
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1)
     expect(db.pragma('temp_store', { simple: true })).toBe(2)
     expect(db.pragma('cipher', { simple: true })).toBe('sqlcipher')

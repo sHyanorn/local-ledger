@@ -6,9 +6,10 @@ import { migrate } from './migrations'
 
 export type Db = Database.Database
 
-export class WrongKeyError extends Error {
+/** The file does not decrypt with the key, holds no ledger, or fails quick_check. */
+export class DamagedError extends Error {
   constructor() {
-    super('the database does not open with this key')
+    super('the database does not open with this key or is damaged')
   }
 }
 
@@ -53,8 +54,25 @@ export function changeKey(db: Db, key: Uint8Array): void {
 }
 
 /**
+ * An existing ledger: the first read decrypts page 1 and so checks the key,
+ * migrations have run at least once, and every page reads back. An empty
+ * file decrypts under any key, so the second check matters.
+ */
+function isLedger(db: Db): boolean {
+  try {
+    return (
+      db.pragma('user_version', { simple: true }) !== 0 &&
+      db.pragma('quick_check', { simple: true }) === 'ok'
+    )
+  } catch {
+    return false
+  }
+}
+
+/**
  * Opens (or with `create`, creates) the database under the key and brings
- * its schema up to date. Throws WrongKeyError when the key does not fit.
+ * its schema up to date. Throws DamagedError, before anything is written,
+ * when an existing file is not a whole ledger under this key.
  */
 export function openDatabase(
   file: string,
@@ -65,15 +83,12 @@ export function openDatabase(
   try {
     selectCipher(db)
     applyKey(db, key)
-    try {
-      // The first read decrypts page 1 and so checks the key.
-      db.pragma('schema_version', { simple: true })
-    } catch {
-      throw new WrongKeyError()
-    }
+    if (!create && !isLedger(db)) throw new DamagedError()
     // One file, so a copy of it is the whole database.
     db.pragma('journal_mode = DELETE')
     db.pragma('synchronous = FULL')
+    // macOS: flush the drive cache too, as Node's fsync does there.
+    db.pragma('fullfsync = ON')
     db.pragma('foreign_keys = ON')
     // Sorts and temporary tables stay in memory, never in plaintext files.
     db.pragma('temp_store = MEMORY')

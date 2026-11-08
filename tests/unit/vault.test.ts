@@ -10,6 +10,7 @@ import {
   writeFileSync,
   writeSync,
   closeSync,
+  truncateSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -20,7 +21,7 @@ import type { KdfParams } from '../../src/main/vault/kdf'
 import { openKey } from '../../src/main/vault/keys'
 import { migrations } from '../../src/main/vault/migrations'
 import { parseVaultFile } from '../../src/main/vault/vault-file'
-import { LockedError, Vault } from '../../src/main/vault/vault'
+import { BusyError, LockedError, Vault } from '../../src/main/vault/vault'
 import type { VaultState } from '../../src/shared/ipc'
 
 const FAST: KdfParams = {
@@ -37,7 +38,7 @@ beforeEach(() => {
   vault = new Vault(root, { derive: deriveHere, kdf: FAST })
 })
 afterEach(async () => {
-  await vault.lock()
+  vault.lock()
   rmSync(root, { recursive: true, force: true })
 })
 
@@ -65,7 +66,7 @@ describe('create', () => {
 
   it('does not replace an existing vault', async () => {
     await vault.create(PASSWORD)
-    await vault.lock()
+    vault.lock()
     expect(await vault.create('another fake passphrase')).toEqual({
       ok: false,
       reason: 'exists',
@@ -87,12 +88,20 @@ describe('create', () => {
     expect(await vault.create(PASSWORD)).toEqual({ ok: true })
     expect(readdirSync(root)).toEqual(['vault'])
   })
+
+  it('is cancelled by a lock while it derives the key, and leaves nothing', async () => {
+    const creating = vault.create(PASSWORD)
+    vault.lock()
+    expect(await creating).toEqual({ ok: false, reason: 'locked' })
+    expect(vault.state).toBe('new')
+    expect(readdirSync(root)).toEqual([])
+  })
 })
 
 describe('unlock and lock', () => {
   beforeEach(async () => {
     await vault.create(PASSWORD)
-    await vault.lock()
+    vault.lock()
   })
 
   it('locks by closing the database', async () => {
@@ -114,24 +123,46 @@ describe('unlock and lock', () => {
     const seen: VaultState[] = []
     vault.onChange((state) => seen.push(state))
     await vault.unlock(PASSWORD)
-    await vault.lock()
+    vault.lock()
     expect(seen).toEqual(['unlocked', 'locked'])
   })
 
-  it('runs operations in call order', async () => {
-    const order: string[] = []
-    await Promise.all([
-      vault.unlock(PASSWORD).then(() => order.push('unlock')),
-      vault.lock().then(() => order.push('lock')),
-    ])
-    expect(order).toEqual(['unlock', 'lock'])
+  it('cancels an unlock that is still deriving its key, and replaces the page', async () => {
+    const seen: VaultState[] = []
+    vault.onChange((state) => seen.push(state))
+    const unlocking = vault.unlock(PASSWORD)
+    vault.lock()
+    expect(await unlocking).toEqual({ ok: false, reason: 'locked' })
     expect(vault.state).toBe('locked')
+    expect(seen).toEqual(['locked'])
+    expect(await vault.unlock(PASSWORD)).toEqual({ ok: true })
+  })
+
+  it('does nothing on a lock with nothing open or waiting', () => {
+    const seen: VaultState[] = []
+    vault.onChange((state) => seen.push(state))
+    vault.lock()
+    expect(seen).toEqual([])
+  })
+
+  it('refuses more than a few waiting operations', async () => {
+    const results = await Promise.allSettled(
+      Array.from({ length: 5 }, () => vault.unlock('not the fake passphrase')),
+    )
+    expect(results.map((result) => result.status)).toEqual([
+      'fulfilled',
+      'fulfilled',
+      'fulfilled',
+      'fulfilled',
+      'rejected',
+    ])
+    expect(results[4]).toMatchObject({ reason: expect.any(BusyError) })
   })
 
   it('reports a database from a newer app', async () => {
     await vault.unlock(PASSWORD)
     vault.database().pragma(`user_version = ${migrations.length + 1}`)
-    await vault.lock()
+    vault.lock()
     expect(await vault.unlock(PASSWORD)).toEqual({ ok: false, reason: 'newer' })
   })
 })
@@ -139,7 +170,7 @@ describe('unlock and lock', () => {
 describe('a damaged vault', () => {
   beforeEach(async () => {
     await vault.create(PASSWORD)
-    await vault.lock()
+    vault.lock()
   })
 
   it('is reported when vault.json is missing or invalid, and nothing is deleted', async () => {
@@ -177,12 +208,47 @@ describe('a damaged vault', () => {
     })
     expect(vault.state).toBe('locked')
   })
+
+  it('is reported when a page past the first fails quick_check, and nothing is deleted', async () => {
+    await vault.unlock(PASSWORD)
+    const db = vault.database()
+    db.prepare(
+      "INSERT INTO accounts (name, type, currency) VALUES ('Fake Bank', 'bank', 'AUD')",
+    ).run()
+    const insert = db.prepare(
+      "INSERT INTO transactions (account_id, date, amount_cents, description) VALUES (1, '2026-01-31', ?, 'Fake purchase')",
+    )
+    db.transaction(() => {
+      for (let cents = 0; cents < 2000; cents++) insert.run(cents)
+    })()
+    vault.lock()
+    writeFileSync(join(vault.dir, 'ledger-2.db'), 'leftover')
+    const fd = openSync(join(vault.dir, 'ledger-1.db'), 'r+')
+    writeSync(fd, Buffer.alloc(32, 0x5a), 0, 32, 5 * 4096 + 200)
+    closeSync(fd)
+    expect(await vault.unlock(PASSWORD)).toEqual({
+      ok: false,
+      reason: 'damaged',
+    })
+    expect(files()).toEqual(['ledger-1.db', 'ledger-2.db', 'vault.json'])
+  })
+
+  it('is reported when the database is an empty file, and nothing is deleted or written', async () => {
+    truncateSync(join(vault.dir, 'ledger-1.db'), 0)
+    writeFileSync(join(vault.dir, 'ledger-2.db'), 'leftover')
+    expect(await vault.unlock(PASSWORD)).toEqual({
+      ok: false,
+      reason: 'damaged',
+    })
+    expect(files()).toEqual(['ledger-1.db', 'ledger-2.db', 'vault.json'])
+    expect(statSync(join(vault.dir, 'ledger-1.db')).size).toBe(0)
+  })
 })
 
 describe('leftovers', () => {
   beforeEach(async () => {
     await vault.create(PASSWORD)
-    await vault.lock()
+    vault.lock()
     for (const name of [
       'ledger-2.db',
       'ledger-2.db.tmp',
@@ -203,12 +269,25 @@ describe('leftovers', () => {
     await vault.unlock(PASSWORD)
     expect(files()).toEqual(['ledger-1.db', 'notes.txt', 'vault.json'])
   })
+
+  it('that cannot be removed do not fail the unlock', async () => {
+    // A directory stands in for a file another program holds open.
+    mkdirSync(join(vault.dir, 'ledger-3.db'))
+    writeFileSync(join(vault.dir, 'ledger-3.db', 'held'), '')
+    expect(await vault.unlock(PASSWORD)).toEqual({ ok: true })
+    expect(files()).toEqual([
+      'ledger-1.db',
+      'ledger-3.db',
+      'notes.txt',
+      'vault.json',
+    ])
+  })
 })
 
 describe('the data key', () => {
   it('is sealed in vault.json and opens the database as a raw key', async () => {
     await vault.create(PASSWORD)
-    await vault.lock()
+    vault.lock()
     const file = parseVaultFile(
       readFileSync(join(vault.dir, 'vault.json'), 'utf8'),
     )

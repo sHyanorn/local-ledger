@@ -30,13 +30,16 @@ export function syncFile(path: string): void {
 
 /**
  * Replaces a file so that a crash leaves either the old content or the new
- * one: write a temporary file, flush it, rename it over the target.
+ * one: write a temporary file, flush it, rename it over the target, flush
+ * the directory. The rename is the replacement, so nothing after it throws:
+ * returns false when the directory could not be flushed, in which case a
+ * power cut could still bring the old file back.
  */
 export function writeFileAtomic(
   path: string,
   data: string,
   checkpoint: Checkpoint = noCheckpoint,
-): void {
+): boolean {
   const temporary = `${path}.tmp`
   const fd = openSync(temporary, 'w', 0o600)
   try {
@@ -47,5 +50,10 @@ export function writeFileAtomic(
   }
   checkpoint('temporary file written')
   renameSync(temporary, path)
-  syncDirectory(dirname(path))
+  try {
+    syncDirectory(dirname(path))
+    return true
+  } catch {
+    return false
+  }
 }

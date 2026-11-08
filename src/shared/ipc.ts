@@ -41,8 +41,10 @@ export type Outcome<Reason extends string> =
 
 export interface Results {
   'vault:status': VaultState
-  'vault:create': Outcome<'exists'>
-  'vault:unlock': Outcome<'wrong-password' | 'no-vault' | 'damaged' | 'newer'>
+  'vault:create': Outcome<'exists' | 'locked'>
+  'vault:unlock': Outcome<
+    'wrong-password' | 'no-vault' | 'damaged' | 'newer' | 'locked'
+  >
   'vault:lock': void
   'vault:change-password': Outcome<'wrong-password' | 'locked' | 'damaged'>
 }

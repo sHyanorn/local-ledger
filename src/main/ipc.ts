@@ -10,8 +10,9 @@ type Handler<C extends Channel> = (
 
 /**
  * Wraps a handler so it runs only for frames of this app and only on a
- * payload that matches the channel's schema. Errors carry a code and never
- * the payload, which may hold a password.
+ * payload that matches the channel's schema. Only codes reach the page and
+ * the log: never the payload, which may hold a password, nor an error
+ * message, which may hold a path or a query.
  */
 export function guard<C extends Channel>(
   channel: C,
@@ -27,8 +28,20 @@ export function guard<C extends Channel>(
     }
     const parsed = channels[channel].safeParse(payload)
     if (!parsed.success) throw new Error('invalid-argument')
-    return handler(parsed.data as Payload<C>)
+    try {
+      return await handler(parsed.data as Payload<C>)
+    } catch (error) {
+      console.error(`${channel} failed: ${errorCode(error)}`)
+      throw new Error('failed')
+    }
   }
+}
+
+/** A system error code such as EIO, or the error's class name. */
+function errorCode(error: unknown): string {
+  if (!(error instanceof Error)) return 'unknown'
+  const { code } = error as { code?: unknown }
+  return typeof code === 'string' ? code : error.name
 }
 
 export function handle<C extends Channel>(

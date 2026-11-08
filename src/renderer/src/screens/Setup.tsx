@@ -6,11 +6,18 @@ import { useVault } from '../store'
 export function Setup() {
   const create = useVault((store) => store.create)
   const busy = useVault((store) => store.busy)
+  const notice = useVault((store) => store.notice)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
   const problem = newPasswordProblem(password, confirm)
+  const message =
+    submitted && problem
+      ? problem
+      : notice === 'failed'
+        ? 'The vault could not be created. Try again.'
+        : null
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -44,9 +51,9 @@ export function Setup() {
             disabled={busy}
           />
         </label>
-        {submitted && problem && (
+        {message && (
           <p className="error" role="alert">
-            {problem}
+            {message}
           </p>
         )}
         <p className="consequence">

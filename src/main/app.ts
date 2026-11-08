@@ -45,14 +45,12 @@ export function startApp(): void {
       // Closing the window locks the vault; on macOS the app stays running.
       window.window.on('closed', () => {
         window = null
-        void vault.lock()
+        vault.lock()
       })
     }
     open()
     vault.onChange(() => window?.replaceView())
-    const lock = () => {
-      if (vault.unlocked) void vault.lock()
-    }
+    const lock = () => vault.lock()
     setMenu({ lock, packaged: app.isPackaged })
     watchForLock(powerMonitor, lock)
 

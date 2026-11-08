@@ -21,12 +21,15 @@ export async function createKey(
   params: KdfParams = DEFAULT_KDF,
 ): Promise<NewKey> {
   const salt = randomFillSync(Buffer.alloc(SALT_BYTES))
-  const dataKey = randomFillSync(Buffer.alloc(KEY_BYTES))
   const header = { generation, kdf: { ...params, salt } }
   const sealingKey = await derive(encodePassword(password), salt, params)
+  const dataKey = randomFillSync(Buffer.alloc(KEY_BYTES))
   try {
     const key = seal(sealingKey, dataKey, associatedData(header))
     return { file: { ...header, key }, dataKey }
+  } catch (error) {
+    dataKey.fill(0)
+    throw error
   } finally {
     sealingKey.fill(0)
   }

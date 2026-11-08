@@ -108,7 +108,7 @@ async function checkVault(
     'the database holds the schema',
   )
 
-  await vault.lock()
+  vault.lock()
   check(vault.state === 'locked', 'the vault locks')
   const file = join(vault.dir, databaseName(1))
   check(
@@ -124,7 +124,7 @@ async function checkVault(
     'a wrong password fails',
   )
   check((await vault.unlock(PASSWORD)).ok, 'the right password unlocks')
-  await vault.lock()
+  vault.lock()
 }
 
 export async function runSelfTest(

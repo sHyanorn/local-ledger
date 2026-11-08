@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { PASSWORD_MAX, passwordLength } from '../../../shared/password'
 import { newPasswordProblem } from '../password-rules'
 
 export function ChangePassword({ onCancel }: { onCancel: () => void }) {
@@ -16,17 +17,24 @@ export function ChangePassword({ onCancel }: { onCancel: () => void }) {
     event.preventDefault()
     setSubmitted(true)
     if (problem || !current) return
+    // No password that long was ever accepted.
+    if (passwordLength(current) > PASSWORD_MAX)
+      return setRefused('Wrong password.')
     setBusy(true)
     setRefused(null)
-    // On success the main process replaces this page.
-    const result = await window.ledger.vault.changePassword(current, next)
-    setBusy(false)
-    if (!result.ok) {
+    try {
+      // On success the main process replaces this page.
+      const result = await window.ledger.vault.changePassword(current, next)
+      if (result.ok) return
       setRefused(
         result.reason === 'wrong-password'
           ? 'Wrong password.'
           : 'The password could not be changed.',
       )
+    } catch {
+      setRefused('The password could not be changed.')
+    } finally {
+      setBusy(false)
     }
   }
 

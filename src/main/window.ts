@@ -25,6 +25,11 @@ export class AppWindow {
       backgroundColor: background(),
     })
     this.window.on('resize', () => this.#fit())
+    // A BaseWindow leaves its views' pages running when it closes.
+    this.window.on('closed', () => {
+      this.#view?.webContents.close()
+      this.#view = null
+    })
     this.replaceView().once('did-finish-load', () => this.window.show())
   }
 

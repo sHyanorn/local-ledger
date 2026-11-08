@@ -46,6 +46,20 @@ describe('guard', () => {
     ).rejects.toThrow('forbidden')
   })
 
+  it('passes on only a code when the handler fails', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const failure = Object.assign(
+      new Error("EIO: i/o error, open '/home/fake/vault/ledger-2.db'"),
+      { code: 'EIO' },
+    )
+    const listener = guard('vault:unlock', () => Promise.reject(failure))
+    await expect(listener(APP, { password: strong })).rejects.toThrow(
+      /^failed$/,
+    )
+    expect(log).toHaveBeenCalledWith('vault:unlock failed: EIO')
+    log.mockRestore()
+  })
+
   it.each([
     ['a missing field', {}],
     ['an extra field', { password: strong, admin: true }],
