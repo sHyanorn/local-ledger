@@ -425,7 +425,10 @@ button.icon:hover {
   grid-template-columns: 104px minmax(0, 1fr) 210px 120px;
   align-items: center;
   gap: 12px;
-  min-height: 34px;
+  /* A fixed height, so the estimate below is exact on every platform and
+     the list keeps its place when rows load again. */
+  box-sizing: border-box;
+  height: 35px;
   padding: 0 16px;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
   /* Off-screen rows skip layout and paint, so long lists stay fast. */
@@ -438,7 +441,7 @@ button.icon:hover {
 }
 
 .tr.head {
-  min-height: 28px;
+  height: 28px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
