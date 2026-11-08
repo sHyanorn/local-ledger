@@ -273,16 +273,18 @@ describe('applyMapping', () => {
     })
   })
 
-  it('skips the header, and joins description columns', () => {
+  it('skips the header, and takes the first description column with text', () => {
     const result = applyMapping(
       [
-        row(1, 'Date', 'Amount', 'Type', 'Details'),
-        row(2, '02/03/2026', '-1', 'EFTPOS', 'Fake Kiosk'),
+        row(1, 'Date', 'Amount', 'Details', 'Type'),
+        row(2, '02/03/2026', '-1', 'Fake Kiosk', 'EFTPOS'),
+        row(3, '02/03/2026', '-1', ' ', 'EFTPOS'),
       ],
       { ...signed, header: true, description: [2, 3] },
     )
     expect(result.rows.map((parsed) => parsed.description)).toEqual([
-      'EFTPOS Fake Kiosk',
+      'Fake Kiosk',
+      'EFTPOS',
     ])
   })
 

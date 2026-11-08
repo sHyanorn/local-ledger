@@ -43,6 +43,7 @@ npm run build        # build installers
 npm run build:dir && npm run test:package   # unpacked build and its checks
 npm run seed         # write a demo vault of fake data to .demo/user-data
 npm run demo         # start the app on the demo vault
+npm run csv:shape -- <file.csv>   # print a CSV's structure, never its values
 ```
 
 ## Mandatory Electron security rules

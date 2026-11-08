@@ -25,7 +25,8 @@
     "test:native": "npm run compile && electron . --self-test",
     "test:package": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/native/check-package.mjs",
     "seed": "vite build -c scripts/seed/vite.config.mts && node .demo/seed/seed.mjs",
-    "demo": "electron-vite dev -- --user-data-dir=.demo/user-data"
+    "demo": "electron-vite dev -- --user-data-dir=.demo/user-data",
+    "csv:shape": "vite build -c scripts/csv-shape/vite.config.mts && node .demo/csv-shape/csv-shape.mjs"
   },
   "dependencies": {
     "better-sqlite3-multiple-ciphers": "13.0.3",

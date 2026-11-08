@@ -1,0 +1,199 @@
+// The layouts of the four banks' CSV exports, and a guess at any other file.
+// The banks do not publish their layouts; these follow open-source parsers
+// written against real exports (D024). A bank's own category column is never
+// read: the ledger's categories are the user's.
+import type { Row } from './csv'
+import type { Mapping } from './mapping'
+import { dateOrders, parseBankAmount, type DateOrder } from './values'
+
+export const TEMPLATES = ['commbank', 'nab', 'anz', 'westpac'] as const
+export type TemplateId = (typeof TEMPLATES)[number]
+
+export interface Layout {
+  /** The bank whose layout this is, or null for a guess. */
+  template: TemplateId | null
+  mapping: Mapping
+  /** The column naming the bank account, when one file holds several. */
+  accountColumn: number | null
+  /** The date orders every date fits; more than one means the user chooses. */
+  dateOrders: DateOrder[]
+}
+
+const SAMPLE = 50
+
+const isAmount = (cell: string | undefined) =>
+  cell !== undefined && cell.trim() !== '' && parseBankAmount(cell) !== null
+
+const startsWith = (cells: readonly string[], names: readonly string[]) =>
+  names.every((name, index) => cells[index]?.trim().toLowerCase() === name)
+
+const NAB_HEADER = [
+  'date',
+  'amount',
+  'account number',
+  '',
+  'transaction type',
+  'transaction details',
+  'balance',
+  'category',
+  'merchant name',
+]
+const WESTPAC_HEADER = [
+  'bank account',
+  'date',
+  'narrative',
+  'debit amount',
+  'credit amount',
+  'balance',
+  'categories',
+  'serial',
+]
+
+/** Strips empty trailing cells, which some exports add. */
+const width = (cells: readonly string[]) => {
+  let end = cells.length
+  while (end > 0 && cells[end - 1]?.trim() === '') end--
+  return end
+}
+
+function layout(
+  template: TemplateId | null,
+  mapping: Omit<Mapping, 'dateOrder'>,
+  dates: readonly string[],
+  accountColumn: number | null = null,
+): Layout {
+  const orders = dateOrders(dates)
+  return {
+    template,
+    mapping: { ...mapping, dateOrder: orders[0] ?? 'dmy' },
+    accountColumn,
+    dateOrders: orders,
+  }
+}
+
+function bankLayout(rows: readonly Row[]): Layout | null {
+  const first = rows[0]?.cells ?? []
+  const data = (header: boolean) => rows.slice(header ? 1 : 0, SAMPLE + 1)
+  const column = (sample: readonly Row[], index: number) =>
+    sample.map((row) => row.cells[index] ?? '')
+
+  if (startsWith(first, NAB_HEADER)) {
+    // Transaction Details, else Merchant Name, else Transaction Type.
+    return layout(
+      'nab',
+      {
+        header: true,
+        date: 0,
+        description: [5, 8, 4],
+        amount: { kind: 'signed', column: 1, negate: false },
+      },
+      column(data(true), 0),
+    )
+  }
+  if (startsWith(first, WESTPAC_HEADER)) {
+    return layout(
+      'westpac',
+      {
+        header: true,
+        date: 1,
+        description: [2],
+        amount: { kind: 'split', debit: 3, credit: 4 },
+      },
+      column(data(true), 1),
+      0,
+    )
+  }
+
+  const sample = data(false)
+  const dated = sample.every(
+    (row) =>
+      dateOrders([row.cells[0] ?? '']).includes('dmy') &&
+      isAmount(row.cells[1]),
+  )
+  if (!dated) return null
+  const mapping = {
+    header: false,
+    date: 0,
+    description: [2],
+    amount: { kind: 'signed', column: 1, negate: false },
+  } satisfies Omit<Mapping, 'dateOrder'>
+  // CommBank adds a running balance; ANZ has none, and may add five more columns.
+  if (sample.every((row) => width(row.cells) === 4 && isAmount(row.cells[3]))) {
+    return layout('commbank', mapping, column(sample, 0))
+  }
+  if (
+    sample.every(
+      (row) =>
+        (row.cells.length === 3 || row.cells.length === 8) &&
+        !isAmount(row.cells[3]),
+    )
+  ) {
+    return layout('anz', mapping, column(sample, 0))
+  }
+  return null
+}
+
+const OUT = /debit|withdrawal|money out|paid out|spent/i
+const IN = /credit|deposit|money in|paid in|received/i
+
+/** The columns of a layout no template knows, as far as they can be told. */
+function guessLayout(rows: readonly Row[]): Layout | null {
+  const isDate = (cell: string | undefined) =>
+    cell !== undefined && dateOrders([cell]).length > 0
+  const firstCells = rows[0]?.cells ?? []
+  const header = !firstCells.some(isDate) && !firstCells.some(isAmount)
+  const names = header ? firstCells.map((cell) => cell.toLowerCase()) : []
+  const sample = rows.slice(header ? 1 : 0, SAMPLE + 1)
+  if (sample.length === 0) return null
+  const columns = Math.max(...sample.map((row) => row.cells.length))
+  const share = (index: number, test: (cell: string | undefined) => boolean) =>
+    sample.filter((row) => test(row.cells[index])).length / sample.length
+  const indexes = [...Array(columns).keys()]
+
+  const date = indexes.find((index) => share(index, isDate) >= 0.9)
+  if (date === undefined) return null
+
+  const named = (pattern: RegExp) =>
+    indexes.find((index) => index !== date && pattern.test(names[index] ?? ''))
+  const debit = named(OUT)
+  const credit = named(IN)
+  let amount: Mapping['amount'] | undefined
+  if (debit !== undefined && credit !== undefined && debit !== credit) {
+    amount = { kind: 'split', debit, credit }
+  } else {
+    const column = indexes.find(
+      (index) =>
+        index !== date &&
+        !/balance/i.test(names[index] ?? '') &&
+        share(index, isAmount) >= 0.9,
+    )
+    if (column !== undefined) amount = { kind: 'signed', column, negate: false }
+  }
+  if (amount === undefined) return null
+
+  const used = new Set(
+    amount.kind === 'split'
+      ? [date, amount.debit, amount.credit]
+      : [date, amount.column],
+  )
+  const textLength = (index: number) =>
+    sample.reduce((sum, row) => {
+      const cell = row.cells[index] ?? ''
+      return isAmount(cell) || isDate(cell) ? sum : sum + cell.trim().length
+    }, 0)
+  const description = indexes
+    .filter((index) => !used.has(index))
+    .sort((a, b) => textLength(b) - textLength(a))[0]
+  if (description === undefined || textLength(description) === 0) return null
+
+  return layout(
+    null,
+    { header, date, description: [description], amount },
+    sample.map((row) => row.cells[date] ?? ''),
+  )
+}
+
+/** The bank layout the rows are in, else a guess, else null. */
+export function detectLayout(rows: readonly Row[]): Layout | null {
+  return bankLayout(rows) ?? guessLayout(rows)
+}

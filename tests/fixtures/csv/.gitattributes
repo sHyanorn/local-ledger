@@ -1,0 +1,2 @@
+# Keep line endings and byte order marks exactly as written.
+*.csv -text

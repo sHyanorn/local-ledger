@@ -15,7 +15,7 @@ export interface Mapping {
   header: boolean
   date: number
   dateOrder: DateOrder
-  /** Joined with spaces, skipping empty cells. */
+  /** The first of these columns that is not empty. */
   description: number[]
   amount: AmountColumns
 }
@@ -93,8 +93,7 @@ export function applyMapping(
     const description = cleanText(
       mapping.description
         .map((column) => cells[column] ?? '')
-        .filter((cell) => cell.trim() !== '')
-        .join(' '),
+        .find((cell) => cleanText(cell) !== '') ?? '',
     )
     if (description === '') {
       errors.push({ line, problem: 'description', value: '' })
