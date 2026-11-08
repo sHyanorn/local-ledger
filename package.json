@@ -26,7 +26,8 @@
     "test:package": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/native/check-package.mjs"
   },
   "dependencies": {
-    "better-sqlite3-multiple-ciphers": "13.0.3"
+    "better-sqlite3-multiple-ciphers": "13.0.3",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@electron/fuses": "2.1.3",
