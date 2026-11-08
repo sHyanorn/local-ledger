@@ -42,7 +42,7 @@
 - [x] Delimiter detection: a two-line tab-separated file with comma thousands separators was read as comma-separated, and a semicolon file with unquoted semicolons in descriptions split wrongly
 - [x] A home-currency setting for budgets (D028, D032)
 - [x] Encrypted backup and restore (D033, D034)
-- [ ] Release workflow: macOS and Windows installers, checksums and provenance attestation (D006)
+- [x] Release workflow: macOS and Windows installers, checksums and provenance attestation (D006)
 - [x] Playwright end-to-end tests, including the whole flow from setting a password to exporting
 - [x] Complete `docs/SECURITY_DESIGN.md`
 - [ ] English README, screenshots and GIFs; publish the first release
