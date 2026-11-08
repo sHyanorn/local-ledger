@@ -1,8 +1,12 @@
 import { create } from 'zustand'
+import type { ImportFile } from '../../../shared/imports'
 import type { Account, Category } from '../../../shared/ledger'
 
 export type View =
-  { name: 'transactions'; accountId: number | null } | { name: 'settings' }
+  | { name: 'transactions'; accountId: number | null }
+  | { name: 'settings' }
+  /** A file chosen for import, into the account shown when it was chosen. */
+  | { name: 'import'; file: ImportFile; accountId: number | null }
 
 interface LedgerStore {
   accounts: Account[]

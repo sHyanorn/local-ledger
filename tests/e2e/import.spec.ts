@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { ElectronApplication, Page } from '@playwright/test'
 import { DEMO_PASSWORD } from '../../scripts/seed/demo'
@@ -109,5 +110,71 @@ ledgerTest(
       ok: false,
       reason: 'not-found',
     })
+  },
+)
+
+ledgerTest(
+  'imports through the page, then undoes the import from Settings',
+  async ({ app, home }) => {
+    const sidebar = home.getByRole('navigation', { name: 'Ledger' })
+    await chooseFile(app, sample('westpac.csv'))
+    await sidebar.getByRole('button', { name: /^Everyday/ }).click()
+    await home.getByRole('button', { name: 'Import CSV…' }).click()
+    await expect(
+      home.getByRole('heading', { name: 'Import westpac.csv' }),
+    ).toBeVisible()
+
+    // Nothing imports until an account takes some rows.
+    const importButton = home.getByRole('button', { name: /^Import\b/ }).last()
+    await expect(importButton).toBeDisabled()
+    await home
+      .getByRole('group', { name: 'Accounts' })
+      .getByRole('combobox')
+      .first()
+      .selectOption({ label: 'Everyday' })
+    const table = home.getByRole('table', { name: 'Rows to import' })
+    await expect(table.getByRole('row')).toHaveCount(3)
+    await expect(home.getByText('2 new transactions')).toBeVisible()
+
+    // A row left unticked stays out.
+    await table
+      .getByRole('checkbox', { name: 'Import DEPOSIT FAKE EMPLOYER PTY LTD' })
+      .uncheck()
+    await home.getByRole('button', { name: 'Import 1 Transaction' }).click()
+    await expect(home.getByRole('heading', { name: 'Everyday' })).toBeVisible()
+    await home.getByRole('searchbox', { name: 'Search' }).fill('FAKE')
+    const list = home.getByRole('table', { name: 'Transactions' })
+    await expect(
+      list.getByRole('row').filter({ hasText: 'FAKE MARKET STALL SYDNEY AU' }),
+    ).toHaveCount(1)
+    await expect(
+      list.getByRole('row').filter({ hasText: 'DEPOSIT FAKE EMPLOYER' }),
+    ).toHaveCount(0)
+
+    await sidebar.getByRole('button', { name: 'Settings' }).click()
+    await home.getByRole('button', { name: 'Undo…' }).click()
+    const confirm = home.getByRole('alertdialog', { name: 'Undo Import?' })
+    await expect(confirm).toContainText(
+      '1 transaction from “westpac.csv” will be deleted.',
+    )
+    await confirm.getByRole('button', { name: 'Undo Import' }).click()
+    await expect(home.getByRole('heading', { name: 'Imports' })).toHaveCount(0)
+    await sidebar.getByRole('button', { name: /^Everyday/ }).click()
+    await home.getByRole('searchbox', { name: 'Search' }).fill('FAKE')
+    await expect(home.getByText('No matching transactions')).toBeVisible()
+  },
+)
+
+ledgerTest(
+  'says why a file cannot be imported',
+  async ({ app, home }, testInfo) => {
+    const broken = testInfo.outputPath('broken.csv')
+    writeFileSync(broken, '01/05/2026,"-1.00,Fake\n')
+    await chooseFile(app, broken)
+    await home.getByRole('button', { name: 'Import CSV…' }).click()
+    const alert = home.getByRole('alertdialog', { name: 'Can’t Import File' })
+    await expect(alert).toBeVisible()
+    await expect(alert).toContainText('The file could not be read as CSV.')
+    await alert.getByRole('button', { name: 'OK' }).click()
   },
 )

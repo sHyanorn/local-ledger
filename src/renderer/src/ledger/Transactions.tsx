@@ -3,9 +3,11 @@ import { isIsoDate } from '../../../shared/dates'
 import { SEARCH_MAX } from '../../../shared/ledger'
 import type { Transaction, TransactionFilter } from '../../../shared/ledger'
 import { formatAmount } from '../../../shared/money'
+import { Confirm } from '../components/Dialog'
 import { AccountDialog } from './AccountDialog'
 import { CategoryOptions } from './CategoryOptions'
 import { formatDate, periodRange, PERIODS } from './format'
+import { chooseImportFile } from './importing'
 import type { Period } from './format'
 import { count, useLedger } from './store'
 import { TransactionDialog } from './TransactionDialog'
@@ -19,6 +21,8 @@ const DATE_MAX = '2999-12-31'
 export function Transactions({ accountId }: { accountId: number | null }) {
   const accounts = useLedger((store) => store.accounts)
   const refreshLedger = useLedger((store) => store.refresh)
+  const show = useLedger((store) => store.show)
+  const [importProblem, setImportProblem] = useState('')
   const account = accounts.find((candidate) => candidate.id === accountId)
   const [search, setSearch] = useState('')
   const [text, setText] = useState('')
@@ -66,6 +70,17 @@ export function Transactions({ accountId }: { accountId: number | null }) {
     void refreshLedger()
   }
 
+  const startImport = async () => {
+    try {
+      const chosen = await chooseImportFile()
+      if (!chosen) return
+      if ('problem' in chosen) setImportProblem(chosen.problem)
+      else show({ name: 'import', file: chosen.file, accountId })
+    } catch {
+      setImportProblem('The file could not be opened.')
+    }
+  }
+
   const recategorize = async (row: Transaction, value: string) => {
     const categoryId = value === '' ? null : Number(value)
     try {
@@ -99,6 +114,14 @@ export function Transactions({ accountId }: { accountId: number | null }) {
               Edit Account…
             </button>
           )}
+          <button
+            type="button"
+            className="secondary"
+            disabled={accounts.length === 0}
+            onClick={() => void startImport()}
+          >
+            Import CSV…
+          </button>
           <button
             type="button"
             disabled={accounts.length === 0}
@@ -194,6 +217,13 @@ export function Transactions({ accountId }: { accountId: number | null }) {
           {...(accountId === null ? {} : { accountId })}
           onSaved={saved}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {importProblem && (
+        <Confirm
+          title="Can’t Import File"
+          message={importProblem}
+          onCancel={() => setImportProblem('')}
         />
       )}
       {editingAccount && account && (

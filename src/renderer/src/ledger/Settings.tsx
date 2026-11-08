@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Category } from '../../../shared/ledger'
 import { ChangePassword } from '../screens/ChangePassword'
 import { CategoryDialog } from './CategoryDialog'
+import { ImportHistory } from './ImportHistory'
 import { categoryTree, useLedger } from './store'
 
 type Editing = { category?: Category; parentId?: number | null } | null
@@ -63,6 +64,7 @@ export function Settings() {
               ])}
             </ul>
           </section>
+          <ImportHistory />
           <section aria-labelledby="security-heading">
             <h2 id="security-heading">Security</h2>
             <button

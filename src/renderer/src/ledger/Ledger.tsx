@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { ImportView } from './ImportView'
 import { Settings } from './Settings'
 import { Sidebar } from './Sidebar'
 import { useLedger } from './store'
@@ -19,6 +20,12 @@ export function Ledger() {
       <main className="main">
         {view.name === 'settings' ? (
           <Settings />
+        ) : view.name === 'import' ? (
+          <ImportView
+            key={view.file.id}
+            file={view.file}
+            accountId={view.accountId}
+          />
         ) : (
           <Transactions accountId={view.accountId} />
         )}
