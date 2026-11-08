@@ -1,12 +1,23 @@
 // Checks the output of `electron-builder --dir`: the fuses read back as
-// configured, only the target's SQLite binary ships, and the packaged app
-// starts while ignoring the Node and debugger entry points the fuses close.
+// configured, only the target's SQLite binary ships, the packaged app passes
+// its self-test while the Node and debugger entry points it closes are in
+// use, and it refuses a remote debugging port.
 import { execFileSync, spawn } from 'node:child_process'
-import { closeSync, existsSync, openSync, readSync, readdirSync } from 'node:fs'
+import {
+  closeSync,
+  existsSync,
+  mkdtempSync,
+  openSync,
+  readSync,
+  readdirSync,
+  rmSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { FuseState, FuseV1Options, getCurrentFuseWire } from '@electron/fuses'
 import pkg from '../../package.json' with { type: 'json' }
 import config from '../../electron-builder.ts'
+import { networkRequests } from './net-log.mjs'
 
 const RELEASE = 'release'
 const SQLITE = 'node_modules/better-sqlite3-multiple-ciphers'
@@ -134,49 +145,78 @@ function checkFiles(resources) {
 }
 
 /**
- * Starts the app with the closed entry points in use and expects it to keep running.
+ * Runs the packaged app until it exits, or kills it after a minute.
  * @param {string} executable
+ * @param {string[]} args
+ * @param {Record<string, string>} env
+ * @returns {Promise<{ code: number | null, output: string }>}
  */
-async function checkLaunch(executable) {
-  const marker = 'ran-as-node'
-  const child = spawn(
-    executable,
-    ['--inspect=0', '-e', `console.log('${marker}')`],
-    {
-      env: {
-        ...process.env,
-        ELECTRON_RUN_AS_NODE: '1',
-        NODE_OPTIONS: '--require ./missing-module.js',
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  )
+async function run(executable, args, env = {}) {
+  const child = spawn(executable, args, {
+    env: { ...process.env, ...env },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
   let output = ''
   child.stdout.on('data', (data) => (output += data))
   child.stderr.on('data', (data) => (output += data))
-  const exited = new Promise((resolve) =>
-    child.once('exit', (code) => resolve(code)),
-  )
-  const result = await Promise.race([
-    exited,
-    new Promise((resolve) => setTimeout(() => resolve('running'), 10_000)),
-  ])
-  check(
-    result === 'running',
-    `the packaged app keeps running (exit: ${result})`,
-  )
-  check(!output.includes(marker), 'ELECTRON_RUN_AS_NODE is ignored')
-  check(!output.includes('Debugger listening'), '--inspect is ignored')
-  if (result === 'running') {
+  /** @type {Promise<number | null>} */
+  const exited = new Promise((resolve) => child.once('exit', resolve))
+  const timer = setTimeout(() => {
     if (process.platform === 'win32') {
       execFileSync('taskkill', ['/pid', String(child.pid), '/t', '/f'])
     } else {
-      child.kill()
+      child.kill('SIGKILL')
     }
-    await exited
-  } else {
-    console.log(output)
-  }
+  }, 60_000)
+  const code = await exited
+  clearTimeout(timer)
+  console.log(output.trimEnd().replace(/^/gm, '  | '))
+  return { code, output }
+}
+
+/** @param {string} executable */
+async function checkLaunch(executable) {
+  // If a fuse failed, ELECTRON_RUN_AS_NODE would run the -e script, and
+  // --inspect would start a debugger.
+  const marker = 'ran-as-node'
+  const scratch = mkdtempSync(join(tmpdir(), 'ledger-package-'))
+  const netLog = join(scratch, 'net-log.json')
+  const selfTest = await run(
+    executable,
+    [
+      '--inspect=0',
+      '--self-test',
+      `--log-net-log=${netLog}`,
+      `--user-data-dir=${join(scratch, 'profile')}`,
+      '-e',
+      `console.log('${marker}')`,
+    ],
+    { ELECTRON_RUN_AS_NODE: '1' },
+  )
+  const requests = existsSync(netLog) ? networkRequests(netLog) : ['no net log']
+  check(
+    requests.length === 0,
+    `the packaged app makes no network request (${requests.join(', ') || 'none'})`,
+  )
+  rmSync(scratch, { recursive: true, force: true })
+  check(
+    selfTest.code === 0 && selfTest.output.includes('self-test passed'),
+    'the packaged app renders and opens an encrypted database',
+  )
+  check(!selfTest.output.includes(marker), 'ELECTRON_RUN_AS_NODE is ignored')
+  check(!selfTest.output.includes('Debugger listening'), '--inspect is ignored')
+
+  const debugging = await run(executable, [
+    '--remote-debugging-port=0',
+    '--self-test',
+  ])
+  check(
+    debugging.code === 1 &&
+      debugging.output.includes(
+        'Refusing to start with --remote-debugging-port.',
+      ),
+    'the packaged app refuses a remote debugging port',
+  )
 }
 
 /**

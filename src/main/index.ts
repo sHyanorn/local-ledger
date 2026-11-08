@@ -3,11 +3,13 @@ import { app, BrowserWindow } from 'electron'
 import { hardenApp } from './hardening'
 import { registerAppScheme, serveAppScheme } from './protocol'
 import { APP_ORIGIN, refusedSwitches, windowWebPreferences } from './security'
+import { runSelfTest, SELF_TEST_SWITCH } from './self-test'
 
 const devUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL
 const devOrigin = devUrl === undefined ? undefined : new URL(devUrl).origin
+const pageUrl = devUrl ?? `${APP_ORIGIN}/index.html`
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1100,
     height: 720,
@@ -18,7 +20,8 @@ function createWindow(): void {
     ),
   })
   window.once('ready-to-show', () => window.show())
-  void window.loadURL(devUrl ?? `${APP_ORIGIN}/index.html`)
+  void window.loadURL(pageUrl)
+  return window
 }
 
 function start(): void {
@@ -27,7 +30,10 @@ function start(): void {
 
   void app.whenReady().then(() => {
     serveAppScheme(join(__dirname, '../renderer'))
-    createWindow()
+    const window = createWindow()
+    if (app.commandLine.hasSwitch(SELF_TEST_SWITCH)) {
+      void runSelfTest(window, pageUrl)
+    }
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
     })

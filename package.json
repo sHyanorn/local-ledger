@@ -22,7 +22,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:e2e": "npm run compile && playwright test",
-    "test:native": "electron tests/native/smoke.mjs",
+    "test:native": "npm run compile && electron . --self-test",
     "test:package": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/native/check-package.mjs"
   },
   "dependencies": {
