@@ -12,15 +12,24 @@ export { expect } from '@playwright/test'
 export const PASSWORD = 'fake ledger passphrase for tests'
 
 /** Starts the app on a user data directory of its own. */
-export function launch(
+export async function launch(
   userData: string,
   extraArgs: string[] = [],
 ): Promise<ElectronApplication> {
-  return electron.launch({
+  const app = await electron.launch({
     args: [`--user-data-dir=${userData}`, ...extraArgs, '.'],
     // Playwright turns the Chromium sandbox off on Linux unless asked to keep it.
     chromiumSandbox: true,
   })
+  // CI machines get no keyboard or mouse input, so their system idle time
+  // can be past the auto-lock limit, which would lock the vault mid-test.
+  // Once the first page has loaded, and before the first idle check five
+  // seconds in, the system reads as busy; the auto-lock test sets its own.
+  await (await app.firstWindow()).waitForLoadState('load')
+  await app.evaluate(({ powerMonitor }) => {
+    powerMonitor.getSystemIdleTime = () => 0
+  })
+  return app
 }
 
 /** The OS process of the page currently shown by the app. */
