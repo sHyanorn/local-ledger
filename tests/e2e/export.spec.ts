@@ -1,7 +1,8 @@
+import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import type { ElectronApplication } from '@playwright/test'
 import { strFromU8, unzipSync } from 'fflate'
-import { expect, ledgerTest } from './fixtures'
+import { expect, ledgerTest, replacedBy } from './fixtures'
 
 /** The save dialog answers with this path, or as cancelled for null. */
 function saveTo(app: ElectronApplication, path: string | null, lock = false) {
@@ -109,5 +110,57 @@ ledgerTest(
       'Exported',
     )
     expect(readFileSync(path).subarray(0, 5).toString('latin1')).toBe('%PDF-')
+  },
+)
+
+ledgerTest(
+  'after exporting and a lock, the exported text is not reachable in the main process',
+  async ({ app, home }, testInfo) => {
+    const control = `Control ${randomUUID()}`
+    await app.evaluate(
+      (_electron, value) => {
+        Object.assign(globalThis, { residueControl: value })
+      },
+      `${'-'.repeat(4096)}${control}`,
+    )
+    const marker = `Residue ${randomUUID()}`
+    const month = thisMonth()
+    await home.evaluate(
+      async ([marker, month]) => {
+        const accounts = await window.ledger.accounts.list()
+        await window.ledger.transactions.create({
+          accountId: accounts.find((account) => account.currency === 'AUD')!.id,
+          date: `${month}-01`,
+          amountCents: -100,
+          description: marker,
+          categoryId: null,
+          notes: '',
+        })
+      },
+      [marker, month] as const,
+    )
+    for (const format of ['xlsx', 'pdf'] as const) {
+      await saveTo(app, testInfo.outputPath(`residue.${format}`))
+      expect(
+        await home.evaluate(
+          ([month, format]) => window.ledger.export.save(month, 'AUD', format),
+          [month, format] as const,
+        ),
+      ).toEqual({ ok: true })
+    }
+    await replacedBy(app, () =>
+      app.evaluate(({ powerMonitor }) => {
+        powerMonitor.emit('lock-screen')
+      }),
+    )
+    const file = testInfo.outputPath('main.heapsnapshot')
+    await app.evaluate((_electron, path) => {
+      process.getBuiltinModule('v8').writeHeapSnapshot(path)
+    }, file)
+    const snapshot = readFileSync(file, 'utf8')
+    expect(snapshot.includes(control), 'the control is found').toBe(true)
+    expect(snapshot.includes(marker), 'the exported text is reachable').toBe(
+      false,
+    )
   },
 )

@@ -10,6 +10,10 @@ Import CSV exports from any bank: the column wizard maps the date, amount and de
 
 If a bank file is not read correctly, `npm run csv:shape -- <file.csv>` prints a report of its structure (columns, date and amount formats, encoding) that contains none of its data, to attach to an issue.
 
+## Budgets, reports and exports
+
+Set a monthly budget per category and see how much is left; the sidebar counts categories over budget. Reports chart twelve months of income and spending, spending by category, and a category's trend; transfers between your own accounts are left out. A month's statement exports to Excel or PDF. Exported files are not encrypted.
+
 ## Docs
 
 - [Specification](docs/SPEC.md)

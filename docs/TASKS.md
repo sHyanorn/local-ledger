@@ -32,9 +32,9 @@
 - [x] Transfers: when both accounts' CSVs are imported, one transfer appears twice (out of one, into the other); detect the pair and keep it out of M4's income and spending
 
 ## M4 Budgets and reports
-- [ ] Budget setup and overspending alerts
-- [ ] Overview and report charts, reading income and spending from `report_transactions` so paired transfers stay out (D027)
-- [ ] Excel and PDF export, preferring options with few dependencies; text cells written as text, and any CSV export escaping cells that start with `=`, `+`, `-`, `@`, a tab or a line break, full-width forms included (SECURITY_DESIGN)
+- [x] Budget setup and overspending alerts
+- [x] Overview and report charts, reading income and spending from `report_transactions` so paired transfers stay out (D027)
+- [x] Excel and PDF export, preferring options with few dependencies; text cells written as text, and any CSV export escaping cells that start with `=`, `+`, `-`, `@`, a tab or a line break, full-width forms included (SECURITY_DESIGN)
 
 ## M5 Polish and release
 - [ ] Apple-style UI polish, dark mode, keyboard shortcuts; a setting for the auto-lock time; dropping a CSV file on the window to import it
