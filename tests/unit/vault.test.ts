@@ -6,6 +6,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
   writeSync,
   closeSync,
@@ -52,6 +53,15 @@ describe('create', () => {
       migrations.length,
     )
   })
+
+  it.skipIf(process.platform === 'win32')(
+    'keeps the vault directory and vault.json to their owner',
+    async () => {
+      await vault.create(PASSWORD)
+      expect(statSync(vault.dir).mode & 0o777).toBe(0o700)
+      expect(statSync(join(vault.dir, 'vault.json')).mode & 0o777).toBe(0o600)
+    },
+  )
 
   it('does not replace an existing vault', async () => {
     await vault.create(PASSWORD)
