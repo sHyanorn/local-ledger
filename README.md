@@ -20,7 +20,7 @@ The screenshots show made-up data from `npm run seed`.
 - **Categories and rules.** Rules categorize imported rows by their description. Transfers between your own accounts are paired and left out of income and spending.
 - **Budgets and reports.** A monthly budget per category in your home currency, twelve months of income and spending, spending by category, and a category's trend.
 - **Exports.** A month's statement as an Excel workbook or a PDF. **Exported files are not encrypted.**
-- **Backups.** An encrypted `.llbackup` file of the whole vault, which opens only with the master password it was made under. Restoring one keeps the replaced vault beside it.
+- **Backups.** An encrypted `.llbackup` file of the whole vault, which opens only with the master password it was made under. Restoring one keeps the replaced vault beside it, and a vault that no longer opens can be replaced from a backup.
 
 ## Install
 
@@ -42,6 +42,8 @@ Each release lists the SHA-256 of every file in `SHA256SUMS` and carries a build
 sha256sum -c SHA256SUMS --ignore-missing          # macOS: shasum -a 256 -c SHA256SUMS --ignore-missing
 gh attestation verify local-ledger-<version>-mac-arm64.dmg --repo shyanorn/local-ledger
 ```
+
+On Windows, `Get-FileHash .\local-ledger-<version>-windows-x64-setup.exe` in PowerShell prints the SHA-256 to compare with the line in `SHA256SUMS`.
 
 ## Importing bank files
 
