@@ -3,6 +3,7 @@ import { groupedBars, horizontalBars, trendLine } from '../../../shared/charts'
 import type { Currency } from '../../../shared/money'
 import type { ReportData, TrendPoint } from '../../../shared/reports'
 import { ChartView } from '../components/ChartView'
+import { ExportDialog } from './ExportDialog'
 import {
   compactAmount,
   exactAmount,
@@ -26,6 +27,8 @@ export function ReportsView() {
   const [trendCategory, setTrendCategory] = useState<number | null>(null)
   const trendId = trendCategory ?? topLevel[0]?.id ?? null
   const [trend, setTrend] = useState<TrendPoint[] | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [saved, setSaved] = useState<string | null>(null)
 
   useEffect(() => {
     let current = true
@@ -89,6 +92,16 @@ export function ReportsView() {
             onClick={() => setMonth(shiftMonth(month, 1))}
           >
             ›
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => {
+              setSaved(null)
+              setExporting(true)
+            }}
+          >
+            Export…
           </button>
         </div>
       </header>
@@ -167,6 +180,32 @@ export function ReportsView() {
           </div>
         )}
       </div>
+      <div aria-live="polite">
+        {saved && (
+          <div className="suggestion" role="region" aria-label="Notice">
+            <p>{saved}</p>
+            <button
+              type="button"
+              className="icon"
+              aria-label="Dismiss"
+              title="Dismiss"
+              onClick={() => setSaved(null)}
+            >
+              ×
+            </button>
+          </div>
+        )}
+      </div>
+      {exporting && (
+        <ExportDialog
+          month={month}
+          currency={currency}
+          onDone={(done) => {
+            setExporting(false)
+            if (done) setSaved(`Exported ${formatMonth(month)}.`)
+          }}
+        />
+      )}
     </div>
   )
 }

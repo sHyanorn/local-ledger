@@ -89,3 +89,25 @@ ledgerTest(
     expect(existsSync(path)).toBe(false)
   },
 )
+
+ledgerTest(
+  'the export dialog says the file is unencrypted before saving',
+  async ({ app, home }, testInfo) => {
+    const path = testInfo.outputPath('from-dialog.pdf')
+    await saveTo(app, path)
+    await home
+      .getByRole('navigation', { name: 'Ledger' })
+      .getByRole('button', { name: 'Reports' })
+      .click()
+    await home.getByRole('button', { name: 'Export…' }).click()
+    const dialog = home.getByRole('alertdialog', { name: /^Export / })
+    await expect(dialog).toHaveAccessibleDescription(/not encrypted/)
+    await dialog.getByLabel('PDF').check()
+    await dialog.getByRole('button', { name: 'Export…' }).click()
+    await expect(dialog).toBeHidden()
+    await expect(home.getByRole('region', { name: 'Notice' })).toContainText(
+      'Exported',
+    )
+    expect(readFileSync(path).subarray(0, 5).toString('latin1')).toBe('%PDF-')
+  },
+)
