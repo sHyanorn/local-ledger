@@ -13,7 +13,7 @@ import { insertLedger } from './insert'
 const { values } = parseArgs({
   options: {
     dir: { type: 'string', default: '.demo/user-data' },
-    transactions: { type: 'string', default: '3000' },
+    transactions: { type: 'string', default: '1500' },
     seed: { type: 'string', default: '1' },
   },
 })

@@ -52,13 +52,43 @@ describe('generateLedger', () => {
     )
   })
 
-  it('scales to the number of transactions asked for', () => {
-    expect(
-      generateLedger({ end: END, transactions: 3000 }).transactions,
-    ).toHaveLength(3000)
-    expect(
-      generateLedger({ end: END, transactions: 20000 }).transactions,
-    ).toHaveLength(20000)
+  it('scales to about the number of transactions asked for', () => {
+    for (const asked of [1500, 20000]) {
+      const { length } = generateLedger({
+        end: END,
+        transactions: asked,
+      }).transactions
+      expect(Math.abs(length - asked)).toBeLessThanOrEqual(36)
+    }
+  })
+
+  it('keeps balances plausible: cash never negative, the card paid down, savings growing', () => {
+    const ledger = generateLedger({ end: END })
+    const balance = (name: string) => {
+      const account = ledger.accounts.find((a) => a.name === name)
+      if (!account) throw new Error(name)
+      return ledger.transactions
+        .filter((row) => row.account === name)
+        .reduce(
+          (sum, row) => sum + row.amountCents,
+          account.openingBalanceCents,
+        )
+    }
+    expect(balance('Everyday')).toBeGreaterThan(0)
+    expect(balance('Travel Cash')).toBeGreaterThanOrEqual(0)
+    expect(balance('Credit Card')).toBeGreaterThan(-500000)
+    expect(balance('Savings')).toBeGreaterThan(1200000)
+    // Every transfer appears in both accounts.
+    const out = ledger.transactions.filter(
+      (r) => r.description === 'Card Repayment 4417',
+    )
+    const into = ledger.transactions.filter(
+      (r) => r.description === 'Payment Received, Thank You',
+    )
+    expect(out.map((r) => [r.date, -r.amountCents])).toEqual(
+      into.map((r) => [r.date, r.amountCents]),
+    )
+    expect(out.length).toBeGreaterThan(10)
   })
 })
 

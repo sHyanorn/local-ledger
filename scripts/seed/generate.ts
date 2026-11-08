@@ -9,7 +9,7 @@ export interface SeedOptions {
   end?: Date
   /** How far back the transactions go. */
   months?: number
-  /** Roughly how many transactions; recurring ones come first. */
+  /** Roughly how many transactions; scheduled ones come first. */
   transactions?: number
 }
 
@@ -53,7 +53,7 @@ const ACCOUNTS: AccountFields[] = [
     name: 'Travel Cash',
     type: 'cash',
     currency: 'CNY',
-    openingBalanceCents: 200000,
+    openingBalanceCents: 500000,
   },
 ]
 
@@ -68,9 +68,10 @@ const CATEGORIES = [
   { name: 'Travel', children: [] },
 ]
 
-interface Recurring {
+/** Money that comes and goes on a schedule. */
+interface Scheduled {
   account: string
-  category: string
+  category: string | null
   description: string
   cents: number
   /** Days between occurrences; 0 means monthly on `day`. */
@@ -78,7 +79,7 @@ interface Recurring {
   day: number
 }
 
-const RECURRING: Recurring[] = [
+const SCHEDULED: Scheduled[] = [
   {
     account: 'Everyday',
     category: 'Income/Salary',
@@ -135,14 +136,32 @@ const RECURRING: Recurring[] = [
     every: 0,
     day: 28,
   },
+  // A transfer appears in both accounts, uncategorized until M3 handles it.
+  {
+    account: 'Everyday',
+    category: null,
+    description: 'Transfer to Savings',
+    cents: -100000,
+    every: 0,
+    day: 4,
+  },
+  {
+    account: 'Savings',
+    category: null,
+    description: 'Transfer from Everyday',
+    cents: 100000,
+    every: 0,
+    day: 4,
+  },
 ]
 
+/** Day-to-day spending, picked at random by weight. */
 interface Spending {
   account: string
   /** Null for the uncategorized share. */
   category: string | null
   merchants: string[]
-  /** Smallest and largest amount, in cents spent. */
+  /** Smallest and largest amount in cents; negative is money out. */
   range: [number, number]
   weight: number
 }
@@ -152,7 +171,7 @@ const SPENDING: Spending[] = [
     account: 'Everyday',
     category: 'Food/Groceries',
     merchants: ['Greenleaf Market', 'Harbour Fresh Grocer', 'Corner Pantry'],
-    range: [1800, 21000],
+    range: [-11000, -1800],
     weight: 18,
   },
   {
@@ -163,95 +182,104 @@ const SPENDING: Spending[] = [
       'The Copper Kettle',
       'Saltbush Kitchen',
     ],
-    range: [2200, 14500],
+    range: [-9800, -2200],
     weight: 10,
   },
   {
     account: 'Everyday',
     category: 'Food/Coffee',
     merchants: ['Paper Plane Coffee', 'Bluegum Espresso'],
-    range: [450, 1350],
+    range: [-1350, -450],
     weight: 16,
   },
   {
     account: 'Everyday',
     category: 'Transport/Fuel',
     merchants: ['Southern Cross Fuel', 'Ridgeline Petroleum'],
-    range: [4000, 9800],
+    range: [-9800, -4000],
     weight: 5,
   },
   {
     account: 'Everyday',
     category: 'Transport/Public Transport',
     merchants: ['Metro Card Top Up'],
-    range: [1000, 5000],
+    range: [-5000, -1000],
     weight: 6,
   },
   {
     account: 'Credit Card',
     category: 'Transport/Rideshare',
     merchants: ['Hopalong Rides'],
-    range: [1200, 4600],
+    range: [-4600, -1200],
     weight: 4,
   },
   {
     account: 'Credit Card',
     category: 'Shopping/Clothing',
     merchants: ['Wattle Lane Outfitters', 'Tidewater Threads'],
-    range: [3500, 18000],
+    range: [-18000, -3500],
     weight: 3,
   },
   {
     account: 'Credit Card',
     category: 'Shopping/Electronics',
     merchants: ['Circuit Bay Electronics'],
-    range: [2900, 89900],
+    range: [-60000, -2900],
     weight: 1,
   },
   {
     account: 'Everyday',
     category: 'Shopping/Household',
     merchants: ['Homestead Hardware', 'Kookaburra Homewares'],
-    range: [900, 12000],
+    range: [-12000, -900],
     weight: 5,
   },
   {
     account: 'Everyday',
     category: 'Health/Pharmacy',
     merchants: ['Riverside Pharmacy'],
-    range: [800, 6500],
+    range: [-6500, -800],
     weight: 3,
   },
   {
     account: 'Credit Card',
     category: 'Entertainment/Events',
     merchants: ['Starlight Cinema', 'Old Mill Theatre'],
-    range: [1800, 9500],
+    range: [-9500, -1800],
     weight: 2,
   },
   {
-    account: 'Travel Cash',
-    category: 'Travel',
-    merchants: [
-      'Jade Garden Teahouse',
-      'Lakeside Night Market',
-      'Red Lantern Hostel',
-    ],
-    range: [3500, 68000],
-    weight: 2,
+    account: 'Credit Card',
+    category: 'Income/Refunds',
+    merchants: ['Refund Tidewater Threads', 'Refund Circuit Bay Electronics'],
+    range: [1500, 12000],
+    weight: 1,
   },
   {
     account: 'Everyday',
     category: null,
-    merchants: [
-      'Card Payment 4417',
-      'EFTPOS Purchase',
-      'Transfer Reference 2290',
-    ],
-    range: [500, 15000],
+    merchants: ['Card Payment 4417', 'EFTPOS Purchase', 'Direct Debit 2290'],
+    range: [-15000, -500],
     weight: 3,
   },
 ]
+
+/** One trip, spent from the travel cash account over two weeks. */
+const TRIP = {
+  account: 'Travel Cash',
+  category: 'Travel',
+  merchants: [
+    'Jade Garden Teahouse',
+    'Lakeside Night Market',
+    'Red Lantern Hostel',
+    'Old Town Ferry',
+  ],
+  range: [-45000, -2500] as [number, number],
+  count: 16,
+  days: 14,
+  /** How many months before the end the trip starts. */
+  monthsAgo: 5,
+}
 
 const NOTES = ['split with flatmate', 'gift', 'reimbursable', 'deposit paid']
 
@@ -268,32 +296,33 @@ function random(seed: number): () => number {
 }
 
 const DAY_MS = 86_400_000
+// Days are counted as UTC midnights, so no time zone shifts a date.
+const isoDay = (time: number) => new Date(time).toISOString().slice(0, 10)
 
 export function generateLedger({
   seed = 1,
   end = new Date(),
   months = 18,
-  transactions = 3000,
+  transactions = 1500,
 }: SeedOptions = {}): SeedLedger {
   const next = random(seed)
   const pick = <T>(items: readonly T[]): T =>
     items[Math.floor(next() * items.length)] as T
+  const between = ([low, high]: [number, number]) =>
+    low + Math.floor(next() * (high - low + 1))
   const last = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate())
   const first = Date.UTC(end.getFullYear(), end.getMonth() - months + 1, 1)
-  // Days are counted as UTC midnights, so no time zone shifts a date.
-  const day = (time: number) => new Date(time).toISOString().slice(0, 10)
+  const span = Math.floor((last - first) / DAY_MS) + 1
   const rows: SeedTransaction[] = []
+  const add = (
+    row: Omit<SeedTransaction, 'notes'> & { notes?: string },
+  ): void => {
+    rows.push({ notes: '', ...row })
+  }
 
-  for (const item of RECURRING) {
+  for (const item of SCHEDULED) {
     for (let time = first + (item.day - 1) * DAY_MS; time <= last;) {
-      rows.push({
-        account: item.account,
-        date: day(time),
-        amountCents: item.cents,
-        description: item.description,
-        category: item.category,
-        notes: '',
-      })
+      add({ ...item, date: isoDay(time), amountCents: item.cents })
       if (item.every > 0) {
         time += item.every * DAY_MS
       } else {
@@ -303,21 +332,65 @@ export function generateLedger({
     }
   }
 
+  const tripStart = Date.UTC(
+    end.getFullYear(),
+    end.getMonth() - TRIP.monthsAgo,
+    10,
+  )
+  for (let n = 0; n < TRIP.count && tripStart <= last; n++) {
+    add({
+      account: TRIP.account,
+      category: TRIP.category,
+      date: isoDay(tripStart + Math.floor(next() * TRIP.days) * DAY_MS),
+      amountCents: between(TRIP.range),
+      description: pick(TRIP.merchants),
+    })
+  }
+
+  // Leave room for one card repayment a month, added below.
   const total = SPENDING.reduce((sum, item) => sum + item.weight, 0)
-  const span = Math.floor((last - first) / DAY_MS) + 1
-  while (rows.length < transactions) {
+  while (rows.length + months * 2 < transactions) {
     let roll = next() * total
     const item =
       SPENDING.find((candidate) => (roll -= candidate.weight) < 0) ??
       (SPENDING.at(-1) as Spending)
-    const [low, high] = item.range
-    rows.push({
+    add({
       account: item.account,
-      date: day(first + Math.floor(next() * span) * DAY_MS),
-      amountCents: -(low + Math.floor(next() * (high - low + 1))),
-      description: pick(item.merchants),
       category: item.category,
+      date: isoDay(first + Math.floor(next() * span) * DAY_MS),
+      amountCents: between(item.range),
+      description: pick(item.merchants),
       notes: next() < 0.04 ? pick(NOTES) : '',
+    })
+  }
+
+  // The card is paid off on the 15th: last month's spending, from Everyday.
+  const spent = rows.filter((row) => row.account === 'Credit Card')
+  for (let month = 1; month < months; month++) {
+    const firstOf = (offset: number) =>
+      Date.UTC(end.getFullYear(), end.getMonth() - months + 1 + offset, 1)
+    const due = firstOf(month) + 14 * DAY_MS
+    if (due > last) break
+    const from = isoDay(firstOf(month - 1))
+    const until = isoDay(firstOf(month) - DAY_MS)
+    const owed = -spent
+      .filter((row) => row.date >= from && row.date <= until)
+      .reduce((sum, row) => sum + row.amountCents, 0)
+    if (owed <= 0) continue
+    const date = isoDay(due)
+    add({
+      account: 'Everyday',
+      category: null,
+      date,
+      amountCents: -owed,
+      description: 'Card Repayment 4417',
+    })
+    add({
+      account: 'Credit Card',
+      category: null,
+      date,
+      amountCents: owed,
+      description: 'Payment Received, Thank You',
     })
   }
 
