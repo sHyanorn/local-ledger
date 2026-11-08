@@ -1,17 +1,19 @@
-// `--self-test` checks that the window renders and that the bundled SQLCipher
-// module opens an encrypted database, then exits 0 or 1. CI runs it on the
-// packaged app, which no test driver can reach. It works in a temporary user
-// data directory, uses a random throwaway key and prints no key material.
-import { randomBytes } from 'node:crypto'
+// `--self-test` checks that the page renders and that the vault works end to
+// end (key derivation in its worker, the sealed key, the encrypted database
+// through the bundled SQLCipher module), then exits 0 or 1. CI runs it on
+// the packaged app, which no test driver can reach. It works in a temporary
+// user data directory with a throwaway password and prints no key material.
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import Database from 'better-sqlite3-multiple-ciphers'
 import { app } from 'electron'
-import type { BrowserWindow } from 'electron'
+import type { WebContents } from 'electron'
+import { databaseName, Vault } from './vault/vault'
 
 export const SELF_TEST_SWITCH = 'self-test'
 
 const PREFIX = 'local-ledger-self-test-'
+const PASSWORD = 'self-test passphrase, not a secret'
 let userData: string | undefined
 
 /**
@@ -48,89 +50,86 @@ function check(ok: boolean, step: string): void {
   console.log(`ok: ${step}`)
 }
 
-function fails(run: () => unknown): boolean {
-  try {
-    run()
-    return false
-  } catch {
-    return true
-  }
-}
-
-async function checkWindow(window: BrowserWindow, url: string): Promise<void> {
-  const contents = window.webContents
+/** Waits for the current page to load the app and render into #root. */
+async function checkPage(
+  contents: () => WebContents | undefined,
+  url: string,
+  what: string,
+): Promise<void> {
   const deadline = Date.now() + 20_000
   while (Date.now() < deadline) {
-    if (!contents.isLoading() && contents.getURL() === url) {
-      const children: unknown = await contents.executeJavaScript(
+    const page = contents()
+    if (page && !page.isLoading() && page.getURL() === url) {
+      const children: unknown = await page.executeJavaScript(
         "document.getElementById('root')?.childElementCount ?? 0",
       )
       if (typeof children === 'number' && children > 0) {
-        check(true, `the window renders ${url}`)
+        check(true, `the window renders ${what}`)
         return
       }
     }
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
-  check(false, `the window renders ${url}`)
+  check(false, `the window renders ${what}`)
 }
 
-function open(file: string, key: Buffer | null): Database.Database {
-  const db = new Database(file)
-  db.pragma("cipher='sqlcipher'")
-  db.pragma('legacy=4')
-  if (key) db.pragma(`key="x'${key.toString('hex')}'"`)
-  return db
-}
-
-function checkDatabase(): void {
-  const dir = mkdtempSync(join(app.getPath('temp'), 'ledger-self-test-'))
-  const file = join(dir, 'self-test.db')
-  const key = randomBytes(32)
+function plainSqliteFails(file: string): boolean {
+  const db = new Database(file, { readonly: true })
   try {
-    const db = open(file, key)
-    db.exec('CREATE TABLE t (id INTEGER PRIMARY KEY, amount_cents INTEGER)')
-    const insert = db.prepare('INSERT INTO t (amount_cents) VALUES (?)')
-    for (const cents of [1250, -4999, 100000]) insert.run(cents)
-    console.log(
-      `sqlite ${db.prepare('SELECT sqlite_version()').pluck().get()}, ` +
-        `cipher ${db.pragma('cipher', { simple: true })}`,
-    )
-    db.close()
-
-    const header = readFileSync(file).subarray(0, 16).toString('latin1')
-    check(header !== 'SQLite format 3\0', 'the file has no plaintext header')
-
-    const count = 'SELECT count(*) FROM t'
-    for (const [label, wrongKey] of [
-      ['without a key', null],
-      ['with a wrong key', randomBytes(32)],
-    ] as const) {
-      const other = open(file, wrongKey)
-      check(
-        fails(() => other.prepare(count).get()),
-        `the database does not open ${label}`,
-      )
-      other.close()
-    }
-
-    const right = open(file, key)
-    const rows = right
-      .prepare('SELECT amount_cents FROM t ORDER BY id')
-      .pluck()
-      .all()
-    check(
-      JSON.stringify(rows) === '[1250,-4999,100000]',
-      'the right key reads the rows back',
-    )
-    right.close()
+    db.pragma('user_version')
+    return false
+  } catch {
+    return true
   } finally {
-    rmSync(dir, { recursive: true, force: true })
+    db.close()
   }
 }
 
+async function checkVault(
+  vault: Vault,
+  contents: () => WebContents | undefined,
+  url: string,
+): Promise<void> {
+  check(vault.state === 'new', 'a new vault starts empty')
+  await checkPage(contents, url, 'the setup page')
+  const firstPage = contents()
+
+  check((await vault.create(PASSWORD)).ok, 'the vault is created')
+  check(vault.state === 'unlocked', 'a new vault is unlocked')
+  check(contents() !== firstPage, 'unlocking replaces the page')
+  await checkPage(contents, url, 'the unlocked page')
+  const db = vault.database()
+  console.log(
+    `sqlite ${db.prepare('SELECT sqlite_version()').pluck().get()}, ` +
+      `cipher ${db.pragma('cipher', { simple: true })}`,
+  )
+  check(
+    db.prepare('SELECT count(*) FROM accounts').pluck().get() === 0,
+    'the database holds the schema',
+  )
+
+  await vault.lock()
+  check(vault.state === 'locked', 'the vault locks')
+  const file = join(vault.dir, databaseName(1))
+  check(
+    readFileSync(file).subarray(0, 16).toString('latin1') !==
+      'SQLite format 3\0',
+    'the database file has no plaintext header',
+  )
+  check(plainSqliteFails(file), 'the database does not open without the key')
+
+  const wrong = await vault.unlock(`${PASSWORD} but wrong`)
+  check(
+    !wrong.ok && wrong.reason === 'wrong-password',
+    'a wrong password fails',
+  )
+  check((await vault.unlock(PASSWORD)).ok, 'the right password unlocks')
+  await vault.lock()
+}
+
 export async function runSelfTest(
-  window: BrowserWindow,
+  vault: Vault,
+  contents: () => WebContents | undefined,
   url: string,
 ): Promise<void> {
   try {
@@ -138,12 +137,11 @@ export async function runSelfTest(
       `electron ${process.versions.electron}, ${process.platform}-${process.arch}, ` +
         `packaged ${app.isPackaged}`,
     )
-    await checkWindow(window, url)
-    checkDatabase()
     check(
-      app.getPath('userData') === userData,
+      app.getPath('userData') === userData && vault.root === userData,
       'the user data directory is a temporary one',
     )
+    await checkVault(vault, contents, url)
     console.log('self-test passed')
     exit(0)
   } catch (error) {

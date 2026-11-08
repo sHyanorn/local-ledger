@@ -1,48 +1,7 @@
-import { join } from 'node:path'
-import { app, BrowserWindow } from 'electron'
-import { hardenApp } from './hardening'
-import { registerAppScheme, serveAppScheme } from './protocol'
-import { APP_ORIGIN, refusedSwitches, windowWebPreferences } from './security'
-import { isolateUserData, runSelfTest, SELF_TEST_SWITCH } from './self-test'
-
-const devUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL
-const devOrigin = devUrl === undefined ? undefined : new URL(devUrl).origin
-const pageUrl = devUrl ?? `${APP_ORIGIN}/index.html`
-
-function createWindow(): BrowserWindow {
-  const window = new BrowserWindow({
-    width: 1100,
-    height: 720,
-    show: false,
-    webPreferences: windowWebPreferences(
-      join(__dirname, '../preload/index.js'),
-      app.isPackaged,
-    ),
-  })
-  window.once('ready-to-show', () => window.show())
-  void window.loadURL(pageUrl)
-  return window
-}
-
-function start(): void {
-  registerAppScheme()
-  hardenApp(devOrigin)
-
-  void app.whenReady().then(() => {
-    serveAppScheme(join(__dirname, '../renderer'))
-    const window = createWindow()
-    if (app.commandLine.hasSwitch(SELF_TEST_SWITCH)) {
-      void runSelfTest(window, pageUrl)
-    }
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow()
-    })
-  })
-
-  app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit()
-  })
-}
+import { app } from 'electron'
+import { startApp } from './app'
+import { refusedSwitches } from './security'
+import { isolateUserData, SELF_TEST_SWITCH } from './self-test'
 
 const refused = refusedSwitches(
   (name) => app.commandLine.hasSwitch(name),
@@ -53,5 +12,7 @@ if (refused.length > 0) {
   app.exit(1)
 } else {
   if (app.commandLine.hasSwitch(SELF_TEST_SWITCH)) isolateUserData()
-  start()
+  // One process per user data directory, so one process per vault.
+  if (app.requestSingleInstanceLock()) startApp()
+  else app.quit()
 }

@@ -1,13 +1,19 @@
 import { spawnSync } from 'node:child_process'
 import { readFileSync, readlinkSync } from 'node:fs'
-import { _electron } from '@playwright/test'
 import electron from 'electron'
 import type { WebPreferences } from 'electron'
 import pkg from '../../package.json' with { type: 'json' }
 import { CONTENT_SECURITY_POLICY } from '../../src/main/security'
 import switches from '../../src/main/switches.json' with { type: 'json' }
 import { networkRequests } from '../native/net-log.mjs'
-import { expect, test } from './fixtures'
+import {
+  createVault,
+  expect,
+  launch,
+  rendererPid,
+  replacedBy,
+  test,
+} from './fixtures'
 
 const APP_URL = 'app://local-ledger/index.html'
 // Outside Electron, the electron package exports the path of its binary.
@@ -19,25 +25,18 @@ declare global {
   }
 }
 
-// Playwright reads fixture dependencies from the first pattern, so it stays.
-// oxlint-disable-next-line no-empty-pattern
-test('the app makes no network request', async ({}, testInfo) => {
+const SETUP_HEADING = { name: 'Create a master password' }
+
+test('the app makes no network request', async ({ userData }, testInfo) => {
   // A fresh profile, so nothing Chromium cached on an earlier run hides a request.
   const log = testInfo.outputPath('net-log.json')
-  const app = await _electron.launch({
-    args: [
-      `--log-net-log=${log}`,
-      `--user-data-dir=${testInfo.outputPath('profile')}`,
-      '.',
-    ],
-    chromiumSandbox: true,
-  })
+  const app = await launch(userData, [`--log-net-log=${log}`])
   try {
-    const page = await app.firstWindow()
-    await expect(
-      page.getByRole('heading', { name: 'Local Ledger' }),
-    ).toBeVisible()
-    await page.waitForTimeout(2_000)
+    const home = await createVault(app, await app.firstWindow())
+    await replacedBy(app, () =>
+      home.getByRole('button', { name: 'Lock' }).click(),
+    )
+    await new Promise((resolve) => setTimeout(resolve, 2_000))
   } finally {
     await app.close()
   }
@@ -66,9 +65,7 @@ test('loading the app raises no CSP violation or console problem', async ({
     })
   })
   await page.reload()
-  await expect(
-    page.getByRole('heading', { name: 'Local Ledger' }),
-  ).toBeVisible()
+  await expect(page.getByRole('heading', SETUP_HEADING)).toBeVisible()
   expect(await page.evaluate(() => window.violations)).toEqual([])
   expect(problems).toEqual([])
 })
@@ -80,9 +77,7 @@ test('every app response carries the CSP', async ({ page }) => {
     responses.push([response.url(), headers['content-security-policy']])
   })
   await page.reload()
-  await expect(
-    page.getByRole('heading', { name: 'Local Ledger' }),
-  ).toBeVisible()
+  await expect(page.getByRole('heading', SETUP_HEADING)).toBeVisible()
   expect(responses.map(([url]) => url)).toEqual(
     expect.arrayContaining([
       APP_URL,
@@ -141,23 +136,36 @@ test('the renderer has no Node.js', async ({ page }) => {
 test('preload exposes only the ledger API, read-only', async ({ page }) => {
   const api = await page.evaluate(() => {
     const ledger = window.ledger as unknown as Record<string, unknown>
+    const vault = ledger.vault as Record<string, unknown>
     try {
       ledger.version = 'changed'
       ledger.extra = true
       delete ledger.version
+      vault.unlock = () => 'replaced'
     } catch {
       // Writes to a frozen object throw in strict mode code.
     }
-    return { keys: Object.keys(ledger), version: ledger.version }
+    return {
+      keys: Object.keys(ledger),
+      version: ledger.version,
+      vault: Object.keys(vault).sort(),
+      unlockReplaced: String(vault.unlock).includes('replaced'),
+    }
   })
-  expect(api).toEqual({ keys: ['version'], version: pkg.version })
+  expect(api).toEqual({
+    keys: ['version', 'vault'],
+    version: pkg.version,
+    vault: ['create', 'lock', 'status', 'unlock'],
+    unlockReplaced: false,
+  })
 })
 
 test('the window runs isolated and sandboxed', async ({ app }) => {
-  const prefs = await app.evaluate(({ BrowserWindow }) => {
+  const prefs = await app.evaluate(({ webContents }) => {
     // Present at runtime, missing from Electron's typings.
-    const contents = BrowserWindow.getAllWindows()[0]
-      ?.webContents as unknown as
+    const contents = webContents
+      .getAllWebContents()
+      .find((page) => page.getURL().startsWith('app://')) as unknown as
       { getLastWebPreferences(): WebPreferences | null } | undefined
     const prefs = contents?.getLastWebPreferences()
     return {
@@ -179,13 +187,11 @@ test('the window runs isolated and sandboxed', async ({ app }) => {
 
 test('the operating system sandboxes the renderer process', async ({ app }) => {
   if (process.platform === 'linux') {
-    const rendererPid = await app.evaluate(({ BrowserWindow }) =>
-      BrowserWindow.getAllWindows()[0]?.webContents.getOSProcessId(),
-    )
+    const pid = await rendererPid(app)
     const mainPid = app.process().pid
-    const status = readFileSync(`/proc/${rendererPid}/status`, 'utf8')
+    const status = readFileSync(`/proc/${pid}/status`, 'utf8')
     expect(status).toMatch(/^Seccomp:\s+2$/m)
-    expect(readlinkSync(`/proc/${rendererPid}/ns/user`)).not.toBe(
+    expect(readlinkSync(`/proc/${pid}/ns/user`)).not.toBe(
       readlinkSync(`/proc/${mainPid}/ns/user`),
     )
   } else {

@@ -1,8 +1,8 @@
 import { expect, test } from './fixtures'
 
-test('the app opens its main window', async ({ page }) => {
+test('a first launch asks for a master password', async ({ page }) => {
   await expect(page).toHaveTitle('Local Ledger')
   await expect(
-    page.getByRole('heading', { name: 'Local Ledger' }),
+    page.getByRole('heading', { name: 'Create a master password' }),
   ).toBeVisible()
 })

@@ -244,7 +244,7 @@ async function checkLaunch(executable) {
   rmSync(scratch, { recursive: true, force: true })
   check(
     selfTest.code === 0 && selfTest.output.includes('self-test passed'),
-    'the packaged app renders and opens an encrypted database',
+    'the packaged app passes its self-test',
   )
   check(!selfTest.output.includes(marker), 'ELECTRON_RUN_AS_NODE is ignored')
   check(!selfTest.output.includes('Debugger listening'), '--inspect is ignored')

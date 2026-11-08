@@ -1,14 +1,9 @@
 // IPC channels between preload and the main process, with the schema the
 // main process validates each payload against.
 import { z } from 'zod'
+import { PASSWORD_MAX, PASSWORD_MIN, passwordLength } from './password'
 
-/** Master password length, in code points after NFKC normalization. */
-export const PASSWORD_MIN = 15
-export const PASSWORD_MAX = 1024
-
-export function passwordLength(password: string): number {
-  return [...password.normalize('NFKC')].length
-}
+export { PASSWORD_MAX, PASSWORD_MIN, passwordLength } from './password'
 
 // Bounds the work done before normalization; NFKC can lengthen a string.
 const passwordText = z.string().max(PASSWORD_MAX * 4)
@@ -39,7 +34,7 @@ export const channels = {
 export type Channel = keyof typeof channels
 export type Payload<C extends Channel> = z.infer<(typeof channels)[C]>
 
-export type VaultState = 'new' | 'locked' | 'unlocked'
+export type VaultState = 'new' | 'locked' | 'unlocked' | 'damaged'
 
 export type Outcome<Reason extends string> =
   { ok: true } | { ok: false; reason: Reason }
@@ -47,7 +42,7 @@ export type Outcome<Reason extends string> =
 export interface Results {
   'vault:status': VaultState
   'vault:create': Outcome<'exists'>
-  'vault:unlock': Outcome<'wrong-password' | 'no-vault' | 'damaged'>
+  'vault:unlock': Outcome<'wrong-password' | 'no-vault' | 'damaged' | 'newer'>
   'vault:lock': void
   'vault:change-password': Outcome<'wrong-password' | 'locked'>
 }

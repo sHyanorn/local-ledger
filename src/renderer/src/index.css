@@ -5,15 +5,26 @@
     -apple-system,
     'Segoe UI',
     sans-serif;
+  font-size: 13px;
   -webkit-font-smoothing: antialiased;
   --bg: #ffffff;
+  --panel: #f5f5f7;
   --fg: #1d1d1f;
+  --muted: #6e6e73;
+  --line: #d2d2d7;
+  --accent: #007aff;
+  --danger: #d70015;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #1e1e1e;
+    --panel: #2a2a2c;
     --fg: #f5f5f7;
+    --muted: #98989d;
+    --line: #3a3a3c;
+    --accent: #0a84ff;
+    --danger: #ff6961;
   }
 }
 
@@ -29,14 +40,94 @@ body {
   color: var(--fg);
 }
 
-.app {
+h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+button {
+  font: inherit;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 14px;
+  background: var(--accent);
+  color: #fff;
+  cursor: default;
+  transition: opacity 120ms ease;
+}
+
+button:disabled {
+  opacity: 0.5;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+input {
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  outline: none;
+}
+
+input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.gate {
   display: grid;
   place-items: center;
   height: 100%;
 }
 
-.app h1 {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 600;
+.panel {
+  display: grid;
+  gap: 14px;
+  width: 320px;
+  padding: 28px;
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.panel label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.panel button {
+  justify-self: end;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.consequence {
+  color: var(--muted);
+}
+
+.home {
+  height: 100%;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
 }
