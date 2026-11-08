@@ -36,6 +36,26 @@ export function Transactions({ accountId }: { accountId: number | null }) {
   const [custom, setCustom] = useState({ from: '', to: '' })
   const [editing, setEditing] = useState<Editing>(null)
   const [editingAccount, setEditingAccount] = useState(false)
+  const searchField = useRef<HTMLInputElement>(null)
+  // ⌘N and ⌘F from the menu, also when they brought this list up.
+  useEffect(() => {
+    const act = (command: 'new-transaction' | 'find') => {
+      const store = useLedger.getState()
+      store.done()
+      if (command === 'find') {
+        searchField.current?.focus()
+        searchField.current?.select()
+      } else if (store.accounts.length > 0) {
+        setEditing({})
+      }
+    }
+    const waiting = useLedger.getState().request
+    if (waiting) act(waiting.command)
+    return useLedger.subscribe((state, before) => {
+      if (state.request && state.request !== before.request)
+        act(state.request.command)
+    })
+  }, [])
 
   // Searching waits for a pause in typing.
   useEffect(() => {
@@ -151,6 +171,7 @@ export function Transactions({ accountId }: { accountId: number | null }) {
 
       <div className="filters" role="search">
         <input
+          ref={searchField}
           type="search"
           aria-label="Search"
           placeholder="Search"

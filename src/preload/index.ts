@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { isCommand } from '../shared/commands'
 import type { LedgerApi } from '../shared/api'
 import type { Channel, Payload, Results } from '../shared/ipc'
 
@@ -12,6 +13,18 @@ const invoke = <C extends Channel>(
 // contextBridge hands the page a frozen copy of this object.
 const api: LedgerApi = {
   version: __APP_VERSION__,
+  commands: {
+    on: (listener) => {
+      // Only the names of known commands reach the page, never the event.
+      const forward = (_event: unknown, name: unknown) => {
+        if (isCommand(name)) listener(name)
+      }
+      ipcRenderer.on('command', forward)
+      return () => {
+        ipcRenderer.off('command', forward)
+      }
+    },
+  },
   vault: {
     status: () => invoke('vault:status', undefined),
     create: (password) => invoke('vault:create', { password }),

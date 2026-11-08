@@ -195,3 +195,8 @@
 - Date: 2026-11-08
 - Decision: the import preview draws only the rows in view and twenty on each side, with spacers for the rest; every row is 35 px tall (the list's CSS fixes it), so a row's place follows from the scroll position. Rows are memoized and a checkbox changes only its own row. Each row carries `aria-rowindex` and the table `aria-rowcount`. With 50,000 rows the preview went from about 4 s to about 0.2 s, and a checkbox from up to 1 s to about 15 ms (measured in the e2e setup under xvfb)
 - Alternatives: a virtual list library such as react-window (one more dependency for about 60 lines); CSS `content-visibility` alone, as the transaction list uses (it skips layout and paint, not React's work for 50,000 rows)
+
+## D036 Menu commands and shortcuts
+- Date: 2026-11-08
+- Decision: shortcuts are accelerators on app menu items, so they show in the menu and work the same from the keyboard or a click: ⌘1 to ⌘5 for Overview, All Transactions, Budgets, Reports and Transfers, ⌘N for a new transaction, ⌘F for search, ⌘, for Settings and ⌘L to lock (Ctrl on Windows). The main process sends the command's name to the page only while the vault is open; preload passes on only names from a fixed list, never the event. Help → Check for Updates… opens the releases page in the browser (D006)
+- Alternatives: keyboard listeners in the page (shortcuts hidden from the menu, and fired twice where the menu also handles them)

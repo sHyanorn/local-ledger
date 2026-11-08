@@ -150,6 +150,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
     return {
       keys: Object.keys(ledger),
       version: ledger.version,
+      commands: methods('commands'),
       vault: methods('vault'),
       accounts: methods('accounts'),
       categories: methods('categories'),
@@ -169,6 +170,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
   expect(api).toEqual({
     keys: [
       'version',
+      'commands',
       'vault',
       'accounts',
       'categories',
@@ -184,6 +186,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
       'transfers',
     ],
     version: pkg.version,
+    commands: ['on'],
     vault: ['changePassword', 'create', 'lock', 'status', 'unlock'],
     accounts: ['create', 'delete', 'list', 'update'],
     categories: ['create', 'delete', 'list', 'update'],

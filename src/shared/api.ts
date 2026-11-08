@@ -1,6 +1,7 @@
 import type { ImportTarget, Mapping, Encoding } from './imports'
 import type { Results, VaultState } from './ipc'
 import type { RuleFields, RuleMatch } from './rules'
+import type { Command } from './commands'
 import type { ExportFormat } from './export'
 import type { Settings } from './settings'
 import type { Currency } from './money'
@@ -17,6 +18,10 @@ type Updated<T> = T & { id: number }
 /** The API that preload exposes to the renderer as `window.ledger`. */
 export interface LedgerApi {
   readonly version: string
+  readonly commands: {
+    /** Calls back with each menu command; returns a function that stops. */
+    on(listener: (command: Command) => void): () => void
+  }
   readonly vault: {
     status(): Promise<VaultState>
     create(password: string): Promise<Results['vault:create']>

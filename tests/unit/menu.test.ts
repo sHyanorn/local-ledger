@@ -16,13 +16,15 @@ const items = () =>
     ...(Array.isArray(item.submenu) ? item.submenu : []),
   ])
 
+const base = { lock: () => {}, command: () => {}, openReleases: () => {} }
+
 beforeEach(() => {
   built.template = []
 })
 
 it('has a Lock item on Cmd/Ctrl+L', () => {
   const lock = vi.fn()
-  setMenu({ lock, packaged: true })
+  setMenu({ ...base, lock, packaged: true })
   const item = items().find((entry) => entry.id === 'lock')
   expect(item).toMatchObject({ label: 'Lock', accelerator: 'CmdOrCtrl+L' })
   const click = item?.click as (() => void) | undefined
@@ -31,8 +33,44 @@ it('has a Lock item on Cmd/Ctrl+L', () => {
 })
 
 it('offers reload and DevTools only while developing', () => {
-  setMenu({ lock: () => {}, packaged: true })
+  setMenu({ ...base, packaged: true })
   expect(items().some((entry) => entry.role === 'viewMenu')).toBe(false)
-  setMenu({ lock: () => {}, packaged: false })
+  setMenu({ ...base, packaged: false })
   expect(items().some((entry) => entry.role === 'viewMenu')).toBe(true)
+})
+
+it.each([
+  ['overview', 'CmdOrCtrl+1'],
+  ['transactions', 'CmdOrCtrl+2'],
+  ['budgets', 'CmdOrCtrl+3'],
+  ['reports', 'CmdOrCtrl+4'],
+  ['transfers', 'CmdOrCtrl+5'],
+  ['new-transaction', 'CmdOrCtrl+N'],
+  ['find', 'CmdOrCtrl+F'],
+  ['settings', 'CmdOrCtrl+,'],
+])('sends %s on %s', (id, accelerator) => {
+  const command = vi.fn()
+  setMenu({ ...base, command, packaged: true })
+  const item = items().find((entry) => entry.id === id)
+  expect(item?.accelerator).toBe(accelerator)
+  ;(item?.click as () => void)()
+  expect(command).toHaveBeenCalledWith(id)
+})
+
+it('opens the releases page from Check for Updates', () => {
+  const openReleases = vi.fn()
+  setMenu({ ...base, openReleases, packaged: true })
+  ;(
+    items().find((entry) => entry.id === 'check-for-updates')
+      ?.click as () => void
+  )()
+  expect(openReleases).toHaveBeenCalledOnce()
+})
+
+it('gives every accelerator to one item only', () => {
+  setMenu({ ...base, packaged: true })
+  const accelerators = items()
+    .map((entry) => entry.accelerator)
+    .filter(Boolean)
+  expect(new Set(accelerators).size).toBe(accelerators.length)
 })

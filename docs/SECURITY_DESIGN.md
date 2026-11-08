@@ -92,6 +92,7 @@ What it cannot do, and does not claim:
 
 - Renderer: `contextIsolation`, `sandbox` (checked at the OS level in tests), no Node.js integration, no webview, spellcheck off. The page is served from `app://local-ledger` with a strict CSP on every response.
 - New windows, navigation, redirects and permission requests are refused; the session cancels every request outside the app. Tests read a Chromium net log and fail on any network request.
+- The only messages from the main process to the page are menu commands, sent while the vault is open; preload passes on a command's name only if it is on a fixed list.
 - IPC: one handler per channel; each checks that the sender is the app's own page and validates its payload with zod (D017). The data channels need the vault unlocked. A failure reaches the page as a code only; the main process logs the channel and an error code, never a message or the payload.
 - The app refuses to start with any switch that weakens the Chromium sandbox and, when packaged, with a remote debugging port.
 - Fuses: no `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` or `--inspect`; the app loads only from an integrity-checked `app.asar`; `file://` gets no extra privileges. The native SQLite binary sits in `app.asar.unpacked`, outside the integrity check.

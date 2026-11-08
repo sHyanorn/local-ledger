@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { app, powerMonitor } from 'electron'
+import { app, powerMonitor, shell } from 'electron'
 import { IDLE_LIMIT_SECONDS, watchForLock } from './auto-lock'
 import { getSettings } from './ledger/settings'
 import { hardenApp } from './hardening'
@@ -8,7 +8,7 @@ import { handleExport } from './export/handlers'
 import { handleImport } from './import/handlers'
 import { handle } from './ipc'
 import { handleLedger } from './ledger/handlers'
-import { setMenu } from './menu'
+import { RELEASES_URL, setMenu } from './menu'
 import { registerAppScheme, serveAppScheme } from './protocol'
 import { APP_ORIGIN, windowWebPreferences } from './security'
 import { runSelfTest, SELF_TEST_SWITCH } from './self-test'
@@ -64,7 +64,14 @@ export function startApp(): void {
       if (!vault.lock()) window?.replaceView()
     }
     handle('vault:lock', lock, devOrigin)
-    setMenu({ lock, packaged: app.isPackaged })
+    setMenu({
+      lock,
+      command: (name) => {
+        if (vault.unlocked) window?.contents?.send('command', name)
+      },
+      openReleases: () => void shell.openExternal(RELEASES_URL),
+      packaged: app.isPackaged,
+    })
     watchForLock(powerMonitor, lock, {
       // The vault's own setting while it is open; locking again is harmless.
       idleLimit: () => {

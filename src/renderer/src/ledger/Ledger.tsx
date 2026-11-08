@@ -14,10 +14,10 @@ import { TransfersView } from './TransfersView'
 export function Ledger() {
   const view = useLedger((store) => store.view)
   const refresh = useLedger((store) => store.refresh)
-  const budgetNotice = useLedger((store) => store.budgetNotice)
-  const setBudgetNotice = useLedger((store) => store.setBudgetNotice)
   const show = useLedger((store) => store.show)
   const setNotice = useLedger((store) => store.setNotice)
+  const budgetNotice = useLedger((store) => store.budgetNotice)
+  const setBudgetNotice = useLedger((store) => store.setBudgetNotice)
   const [dragging, setDragging] = useState(false)
   // Enter and leave fire for every child; count them to know when it left.
   const depth = useRef(0)
@@ -63,6 +63,33 @@ export function Ledger() {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  const ask = useLedger((store) => store.ask)
+  // The menu's commands and their shortcuts.
+  useEffect(
+    () =>
+      window.ledger.commands.on((command) => {
+        const current = useLedger.getState().view
+        const accountId =
+          current.name === 'transactions' ? current.accountId : null
+        switch (command) {
+          case 'overview':
+          case 'budgets':
+          case 'reports':
+          case 'transfers':
+          case 'settings':
+            return show({ name: command })
+          case 'transactions':
+            return show({ name: 'transactions', accountId: null })
+          case 'new-transaction':
+          case 'find':
+            if (current.name !== 'transactions')
+              show({ name: 'transactions', accountId })
+            return ask(command)
+        }
+      }),
+    [show, ask],
+  )
 
   return (
     <div

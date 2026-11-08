@@ -33,6 +33,10 @@ interface LedgerStore {
   setBudgetNotice(notice: string | null): void
   view: View
   show(view: View): void
+  /** A menu command for the transaction list, waiting for it to act. */
+  request: { command: 'new-transaction' | 'find'; id: number } | null
+  ask(command: 'new-transaction' | 'find'): void
+  done(): void
   /** Reloads accounts and categories after a change. */
   refresh(): Promise<void>
 }
@@ -51,6 +55,12 @@ export const useLedger = create<LedgerStore>((set, get) => ({
   setBudgetNotice: (budgetNotice) => set({ budgetNotice }),
   view: { name: 'overview' },
   show: (view) => set({ view }),
+  request: null,
+  ask: (command) =>
+    set(({ request }) => ({
+      request: { command, id: (request?.id ?? 0) + 1 },
+    })),
+  done: () => set({ request: null }),
   refresh: async () => {
     // Answers can arrive out of order; only the latest request's counts.
     const ticket = ++refreshes
