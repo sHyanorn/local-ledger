@@ -109,7 +109,7 @@ async function checkVault(
   )
 
   vault.lock()
-  check(vault.state === 'locked', 'the vault locks')
+  check(vault.state === 'locked' && !db.open, 'the vault locks')
   const file = join(vault.dir, databaseName(1))
   check(
     readFileSync(file).subarray(0, 16).toString('latin1') !==

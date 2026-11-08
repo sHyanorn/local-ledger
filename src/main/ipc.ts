@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { channels } from '../shared/ipc'
+import { errorCode } from './error-code'
 import type { Channel, Payload, Results } from '../shared/ipc'
 import { isTrustedSender } from './security'
 
@@ -35,13 +36,6 @@ export function guard<C extends Channel>(
       throw new Error('failed')
     }
   }
-}
-
-/** A system error code such as EIO, or the error's class name. */
-function errorCode(error: unknown): string {
-  if (!(error instanceof Error)) return 'unknown'
-  const { code } = error as { code?: unknown }
-  return typeof code === 'string' ? code : error.name
 }
 
 export function handle<C extends Channel>(

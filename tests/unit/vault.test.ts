@@ -14,7 +14,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { openDatabase } from '../../src/main/vault/database'
 import { deriveHere } from '../../src/main/vault/kdf'
 import type { KdfParams } from '../../src/main/vault/kdf'
@@ -33,9 +33,23 @@ const PASSWORD = 'fake ledger passphrase for tests'
 
 let root: string
 let vault: Vault
+/** Runs once, as the next key derivation starts. */
+let duringDerivation: (() => void) | null = null
+let derivations = 0
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'ledger-vault-'))
-  vault = new Vault(root, { derive: deriveHere, kdf: FAST })
+  duringDerivation = null
+  derivations = 0
+  vault = new Vault(root, {
+    derive: (...args) => {
+      derivations++
+      const hook = duringDerivation
+      duringDerivation = null
+      hook?.()
+      return deriveHere(...args)
+    },
+    kdf: FAST,
+  })
 })
 afterEach(async () => {
   vault.lock()
@@ -89,12 +103,35 @@ describe('create', () => {
     expect(readdirSync(root)).toEqual(['vault'])
   })
 
-  it('is cancelled by a lock while it derives the key, and leaves nothing', async () => {
-    const creating = vault.create(PASSWORD)
-    vault.lock()
-    expect(await creating).toEqual({ ok: false, reason: 'locked' })
-    expect(vault.state).toBe('new')
-    expect(readdirSync(root)).toEqual([])
+  it.each([
+    ['waits its turn', () => vault.lock(), 0],
+    ['derives its key', () => (duringDerivation = () => vault.lock()), 1],
+  ])(
+    'is cancelled by a lock while it %s, and leaves nothing',
+    async (_while, setUpLock, derived) => {
+      const creating = vault.create(PASSWORD)
+      setUpLock()
+      expect(await creating).toEqual({ ok: false, reason: 'locked' })
+      expect(derivations).toBe(derived)
+      expect(vault.state).toBe('new')
+      expect(readdirSync(root)).toEqual([])
+    },
+  )
+
+  it('shows a vault that is in place but did not open', async () => {
+    const failing = new Vault(root, {
+      derive: deriveHere,
+      kdf: FAST,
+      checkpoint: (step) => {
+        if (step !== 'vault staged') return
+        const [staging] = readdirSync(root)
+        truncateSync(join(root, staging ?? '', 'ledger-1.db'), 0)
+      },
+    })
+    const seen: VaultState[] = []
+    failing.onChange((state) => seen.push(state))
+    await expect(failing.create(PASSWORD)).rejects.toThrow('did not open')
+    expect(seen).toEqual(['locked'])
   })
 })
 
@@ -105,6 +142,10 @@ describe('unlock and lock', () => {
   })
 
   it('locks by closing the database', async () => {
+    await vault.unlock(PASSWORD)
+    const db = vault.database()
+    expect(vault.lock()).toBe(true)
+    expect(db.open).toBe(false)
     expect(vault.state).toBe('locked')
     expect(() => vault.database()).toThrow(LockedError)
   })
@@ -127,22 +168,51 @@ describe('unlock and lock', () => {
     expect(seen).toEqual(['unlocked', 'locked'])
   })
 
-  it('cancels an unlock that is still deriving its key, and replaces the page', async () => {
-    const seen: VaultState[] = []
-    vault.onChange((state) => seen.push(state))
-    const unlocking = vault.unlock(PASSWORD)
-    vault.lock()
-    expect(await unlocking).toEqual({ ok: false, reason: 'locked' })
-    expect(vault.state).toBe('locked')
-    expect(seen).toEqual(['locked'])
-    expect(await vault.unlock(PASSWORD)).toEqual({ ok: true })
-  })
+  it.each([
+    ['waits its turn', () => vault.lock(), 0],
+    ['derives its key', () => (duringDerivation = () => vault.lock()), 1],
+  ])(
+    'cancels an unlock that %s, and replaces the page',
+    async (_while, setUpLock, derived) => {
+      const seen: VaultState[] = []
+      vault.onChange((state) => seen.push(state))
+      derivations = 0
+      const unlocking = vault.unlock(PASSWORD)
+      setUpLock()
+      expect(await unlocking).toEqual({ ok: false, reason: 'locked' })
+      expect(derivations).toBe(derived)
+      expect(vault.state).toBe('locked')
+      expect(seen).toEqual(['locked'])
+      expect(await vault.unlock(PASSWORD)).toEqual({ ok: true })
+    },
+  )
 
   it('does nothing on a lock with nothing open or waiting', () => {
     const seen: VaultState[] = []
     vault.onChange((state) => seen.push(state))
-    vault.lock()
+    expect(vault.lock()).toBe(false)
     expect(seen).toEqual([])
+  })
+
+  it('replaces a page that asks to unlock an open vault', async () => {
+    await vault.unlock(PASSWORD)
+    const seen: VaultState[] = []
+    vault.onChange((state) => seen.push(state))
+    expect(await vault.unlock('any fake passphrase at all')).toEqual({
+      ok: true,
+    })
+    expect(seen).toEqual(['unlocked'])
+  })
+
+  it('stays unlocked when a listener fails', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vault.onChange(() => {
+      throw new Error('the window is gone')
+    })
+    expect(await vault.unlock(PASSWORD)).toEqual({ ok: true })
+    expect(vault.state).toBe('unlocked')
+    expect(log).toHaveBeenCalledWith('vault listener failed: Error')
+    log.mockRestore()
   })
 
   it('refuses more than a few waiting operations', async () => {

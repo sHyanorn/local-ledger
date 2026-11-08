@@ -10,6 +10,7 @@ export type Db = Database.Database
 export class DamagedError extends Error {
   constructor() {
     super('the database does not open with this key or is damaged')
+    this.name = 'DamagedError'
   }
 }
 

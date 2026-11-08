@@ -19,6 +19,19 @@ export function syncDirectory(dir: string): void {
   }
 }
 
+/**
+ * Flushes a directory after a rename that has already taken effect, so
+ * nothing is undone when the flush fails: returns false instead of throwing.
+ */
+export function flushDirectory(dir: string): boolean {
+  try {
+    syncDirectory(dir)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function syncFile(path: string): void {
   const fd = openSync(path, 'r+')
   try {
@@ -50,10 +63,5 @@ export function writeFileAtomic(
   }
   checkpoint('temporary file written')
   renameSync(temporary, path)
-  try {
-    syncDirectory(dirname(path))
-    return true
-  } catch {
-    return false
-  }
+  return flushDirectory(dirname(path))
 }

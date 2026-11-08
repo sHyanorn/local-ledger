@@ -39,6 +39,17 @@ describe('watchForLock', () => {
     expect(lock).toHaveBeenCalledOnce()
   })
 
+  it('locks once per idle period', () => {
+    power.idle = IDLE_LIMIT_SECONDS
+    vi.advanceTimersByTime(IDLE_POLL_MS * 3)
+    expect(lock).toHaveBeenCalledOnce()
+    power.idle = 0
+    vi.advanceTimersByTime(IDLE_POLL_MS)
+    power.idle = IDLE_LIMIT_SECONDS
+    vi.advanceTimersByTime(IDLE_POLL_MS)
+    expect(lock).toHaveBeenCalledTimes(2)
+  })
+
   it.each(['lock-screen', 'suspend'])(
     'locks when the system emits %s',
     (event) => {

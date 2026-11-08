@@ -167,28 +167,37 @@ describe('changePassword', () => {
     })
   })
 
-  it('is cancelled by a lock while it derives keys; the lock closes the database at once', async () => {
-    let derivations = 0
-    const vault: Vault = new Vault(root, {
-      kdf: FAST,
-      derive: (...args) => {
-        // The first derivation of the change, after the one that created.
-        if (++derivations === 2) {
-          vault.lock()
-          expect(vault.unlocked).toBe(false)
-        }
-        return deriveHere(...args)
-      },
-    })
-    open.push(vault)
-    await vault.create(OLD)
-    expect(await vault.changePassword(OLD, NEW)).toEqual({
-      ok: false,
-      reason: 'locked',
-    })
-    expect(files(vault)).toEqual(['ledger-1.db', 'vault.json'])
-    expect(await vault.unlock(OLD)).toEqual({ ok: true })
-  })
+  // Derivation 1 created the vault; 2 opens the old key, 3 seals the new one.
+  it.each([
+    [2, 'the old key', 2],
+    [3, 'the new key', 3],
+  ])(
+    'is cancelled by a lock during derivation %i (%s); the lock closes the database at once',
+    async (lockAt, _key, derivedInAll) => {
+      let derivations = 0
+      const vault: Vault = new Vault(root, {
+        kdf: FAST,
+        derive: (...args) => {
+          if (++derivations === lockAt) {
+            const db = vault.database()
+            vault.lock()
+            expect(db.open).toBe(false)
+          }
+          return deriveHere(...args)
+        },
+      })
+      open.push(vault)
+      await vault.create(OLD)
+      expect(await vault.changePassword(OLD, NEW)).toEqual({
+        ok: false,
+        reason: 'locked',
+      })
+      // A lock during the first derivation skips the second.
+      expect(derivations).toBe(derivedInAll)
+      expect(files(vault)).toEqual(['ledger-1.db', 'vault.json'])
+      expect(await vault.unlock(OLD)).toEqual({ ok: true })
+    },
+  )
 
   it('never commits a copy that fails integrity_check', async () => {
     const vault = vaultAt(root)
@@ -196,10 +205,14 @@ describe('changePassword', () => {
     vault.lock()
     await corruptIndex(vault)
     expect(await vault.unlock(OLD)).toEqual({ ok: true })
+    const seen: VaultState[] = []
+    vault.onChange((state) => seen.push(state))
     await expect(vault.changePassword(OLD, NEW)).rejects.toThrow(
       'integrity_check',
     )
     expect(vault.state).toBe('unlocked')
+    // The page stays, to say the change failed.
+    expect(seen).toEqual([])
     expect(files(vault)).toEqual(['ledger-1.db', 'vault.json'])
   })
 })
@@ -208,6 +221,7 @@ describe('a failure during changePassword, without a crash', () => {
   it.each(STEPS)(
     'right after "%s" leaves the vault open with the password that works there',
     async (step, works) => {
+      const committed = works === NEW
       let armed = true
       const vault = vaultAt(root, (at) => {
         if (armed && at === step) {
@@ -222,14 +236,21 @@ describe('a failure during changePassword, without a crash', () => {
           "INSERT INTO accounts (name, type, currency) VALUES ('Fake Bank', 'bank', 'AUD')",
         )
         .run()
-      await expect(vault.changePassword(OLD, NEW)).rejects.toThrow('disk error')
+      const seen: VaultState[] = []
+      vault.onChange((state) => seen.push(state))
+      const changing = vault.changePassword(OLD, NEW)
+      // Before the commit the change fails and the page stays to say so;
+      // after it the change stands and the page is replaced.
+      if (committed) expect(await changing).toEqual({ ok: true })
+      else await expect(changing).rejects.toThrow('disk error')
+      expect(seen).toEqual(committed ? ['unlocked'] : [])
       expect(vault.state).toBe('unlocked')
       expect(fakeAccounts(vault)).toEqual(['Fake Bank'])
-      // A committed change keeps the old generation until the next unlock.
+      // After a failure the old generation stays until the next unlock.
       expect(files(vault)).toEqual(
-        works === OLD
-          ? ['ledger-1.db', 'vault.json']
-          : ['ledger-1.db', 'ledger-2.db', 'vault.json'],
+        committed
+          ? ['ledger-1.db', 'ledger-2.db', 'vault.json']
+          : ['ledger-1.db', 'vault.json'],
       )
 
       vault.lock()

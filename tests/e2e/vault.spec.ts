@@ -1,4 +1,10 @@
-import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import {
   createVault,
@@ -163,9 +169,32 @@ test.describe('unlock and lock', () => {
     const relocked = await replaced
     await expectExited(unlockingPid)
     await expect(relocked.getByLabel('Master password')).toBeVisible()
+    // Queued behind the cancelled unlock, so this returns once it has ended.
+    expect(
+      await relocked.evaluate(() =>
+        window.ledger.vault.unlock('not the fake passphrase'),
+      ),
+    ).toEqual({ ok: false, reason: 'wrong-password' })
     expect(await relocked.evaluate(() => window.ledger.vault.status())).toBe(
       'locked',
     )
+  })
+
+  test('a lock clears a password typed but not submitted', async ({ app }) => {
+    const home = app.windows().at(-1)
+    if (!home) throw new Error('no page')
+    const locked = await replacedBy(app, () =>
+      home.getByRole('button', { name: 'Lock' }).click(),
+    )
+    await locked.getByLabel('Master password').fill(PASSWORD)
+    const typedPid = await rendererPid(app)
+    const cleared = await replacedBy(app, () =>
+      app.evaluate(({ powerMonitor }) => {
+        powerMonitor.emit('lock-screen')
+      }),
+    )
+    await expectExited(typedPid)
+    await expect(cleared.getByLabel('Master password')).toHaveValue('')
   })
 
   // Menu accelerators are not delivered under Xvfb, so this clicks the item;
@@ -237,6 +266,44 @@ test.describe('automatic lock', () => {
       'locked',
     )
   })
+})
+
+test('a password change that fails says so, and the old password still works', async ({
+  app,
+  page,
+  userData,
+}) => {
+  // A read-only vault directory makes the copy fail; Windows has no such mode.
+  test.skip(process.platform === 'win32')
+  const NEW = 'a new fake passphrase for tests'
+  const home = await createVault(app, page)
+  await home.getByRole('button', { name: 'Change Password…' }).click()
+  await home.getByLabel('Current password').fill(PASSWORD)
+  await home.getByLabel('New password', { exact: true }).fill(NEW)
+  await home.getByLabel('Confirm new password').fill(NEW)
+  chmodSync(vaultDir(userData), 0o500)
+  try {
+    await home.getByRole('button', { name: 'Change Password' }).click()
+    await expect(home.getByRole('alert')).toHaveText(
+      'The password could not be changed.',
+    )
+  } finally {
+    chmodSync(vaultDir(userData), 0o700)
+  }
+  await home.getByRole('button', { name: 'Cancel' }).click()
+  const locked = await replacedBy(app, () =>
+    home.getByRole('button', { name: 'Lock' }).click(),
+  )
+  expect(
+    await locked.evaluate((next) => window.ledger.vault.unlock(next), NEW),
+  ).toEqual({ ok: false, reason: 'wrong-password' })
+  await locked.getByLabel('Master password').fill(PASSWORD)
+  const unlocked = await replacedBy(app, () =>
+    locked.getByRole('button', { name: 'Unlock' }).click(),
+  )
+  expect(await unlocked.evaluate(() => window.ledger.vault.status())).toBe(
+    'unlocked',
+  )
 })
 
 test('changing the password re-keys the vault in a new page process', async ({

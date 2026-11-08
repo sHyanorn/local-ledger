@@ -48,10 +48,12 @@ const OLD = 'old fake ledger passphrase'
 const NEW = 'new fake ledger passphrase'
 let root: string
 let failDerivation = 0
+let duringDerivation: (() => void) | null = null
 
-/** Sealing keys, and a way to fail the nth derivation. */
+/** Sealing keys, a way to fail the nth derivation, and a hook into one. */
 const derive: Derive = async (...args) => {
   if (--failDerivation === 0) throw new Error('worker ran out of memory')
+  duringDerivation?.()
   const key = await deriveHere(...args)
   seen.keys.push(key)
   return key
@@ -66,6 +68,7 @@ const expectAllWiped = (count: number) => {
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'ledger-wipe-'))
   failDerivation = 0
+  duringDerivation = null
   // The raw key literals handed to SQLite.
   for (const method of ['key', 'rekey'] as const) {
     const original = Database.prototype[method]
@@ -140,9 +143,9 @@ it('after an unlock that a lock cancelled', async () => {
   await vault.create(OLD)
   vault.lock()
   seen.keys = []
-  const unlocking = vault.unlock(OLD)
-  vault.lock()
-  expect(await unlocking).toEqual({ ok: false, reason: 'locked' })
+  duringDerivation = () => vault.lock()
+  expect(await vault.unlock(OLD)).toEqual({ ok: false, reason: 'locked' })
+  // The sealing key and the data key it opened.
   expectAllWiped(2)
 })
 

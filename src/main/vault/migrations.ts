@@ -73,6 +73,7 @@ export const migrations: readonly Migration[] = [
 export class NewerSchemaError extends Error {
   constructor(version: number) {
     super(`the database has schema version ${version}, newer than this app`)
+    this.name = 'NewerSchemaError'
   }
 }
 

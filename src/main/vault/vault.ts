@@ -14,9 +14,16 @@ import {
 } from 'node:fs'
 import { join } from 'node:path'
 import type { Outcome, VaultState } from '../../shared/ipc'
+import { errorCode } from '../error-code'
 import { changeKey, DamagedError, openDatabase } from './database'
 import type { Db } from './database'
-import { noCheckpoint, syncDirectory, syncFile, writeFileAtomic } from './files'
+import {
+  flushDirectory,
+  noCheckpoint,
+  syncDirectory,
+  syncFile,
+  writeFileAtomic,
+} from './files'
 import type { Checkpoint } from './files'
 import { DEFAULT_KDF } from './kdf'
 import type { Derive, KdfParams } from './kdf'
@@ -38,18 +45,26 @@ export const databaseName = (generation: number) => `ledger-${generation}.db`
 export class LockedError extends Error {
   constructor() {
     super('the vault is locked')
+    this.name = 'LockedError'
   }
 }
 
 export class BusyError extends Error {
   constructor() {
     super('too many vault operations are waiting')
+    this.name = 'BusyError'
   }
 }
 
 type Listener = (state: VaultState) => void
 /** True once a lock has come after the operation was called. */
 type Cancelled = () => boolean
+interface OpenOptions {
+  /** Remove other generations and temporary files. */
+  removeLeftovers?: boolean
+  /** Tell listeners, which replaces the page. */
+  emit?: boolean
+}
 
 export interface VaultOptions {
   /** The key derivation; the app runs it in a worker. */
@@ -114,6 +129,7 @@ export class Vault {
    */
   create(password: string): Promise<Outcome<'exists' | 'locked'>> {
     return this.#run(async (cancelled) => {
+      if (cancelled()) return { ok: false, reason: 'locked' }
       if (existsSync(this.dir)) return { ok: false, reason: 'exists' }
       const { file, dataKey } = await createKey(
         password,
@@ -134,10 +150,16 @@ export class Vault {
           throw new Error('the new vault could not be flushed')
         this.checkpoint('vault staged')
         renameSync(staging, this.dir)
-        syncDirectory(this.root)
-        const opened = this.#openWithKey(file, dataKey)
-        if (!opened.ok)
-          throw new Error(`the new vault did not open: ${opened.reason}`)
+        // The vault is in place: nothing after this undoes it, and the page
+        // shows it either way.
+        try {
+          flushDirectory(this.root)
+          const opened = this.#openWithKey(file, dataKey)
+          if (!opened.ok)
+            throw new Error(`the new vault did not open: ${opened.reason}`)
+        } finally {
+          if (!this.#db) this.#emit()
+        }
         return { ok: true }
       } finally {
         dataKey.fill(0)
@@ -151,7 +173,12 @@ export class Vault {
     Outcome<'wrong-password' | 'no-vault' | 'damaged' | 'newer' | 'locked'>
   > {
     return this.#run(async (cancelled) => {
-      if (this.#db) return { ok: true }
+      if (cancelled()) return { ok: false, reason: 'locked' }
+      if (this.#db) {
+        // A page that still asks is out of date; replace it.
+        this.#emit()
+        return { ok: true }
+      }
       const state = this.state
       if (state === 'new') return { ok: false, reason: 'no-vault' }
       const file = this.#readFile()
@@ -169,15 +196,20 @@ export class Vault {
 
   /**
    * Closes the database now, without waiting for queued operations, and
-   * cancels those already called: each stops at its next step.
+   * cancels those already called: each stops at its next step. Returns
+   * whether anything was open or waiting, in which case listeners were told.
    */
-  lock(): void {
+  lock(): boolean {
     this.#locks++
     const db = this.#db
-    if (!db && this.#pending === 0) return
-    this.#db = null
-    db?.close()
-    this.#emit()
+    if (!db && this.#pending === 0) return false
+    try {
+      db?.close()
+    } finally {
+      this.#db = null
+      this.#emit()
+    }
+    return true
   }
 
   /**
@@ -197,6 +229,7 @@ export class Vault {
       try {
         oldKey = await openKey(file, current, this.derive)
         if (!oldKey) return { ok: false, reason: 'wrong-password' }
+        if (cancelled()) return { ok: false, reason: 'locked' }
         created = await createKey(
           next,
           file.generation + 1,
@@ -261,47 +294,61 @@ export class Vault {
       renameSync(temporary, nextPath)
       syncDirectory(this.dir)
       this.checkpoint('renamed')
-      const flushed = writeFileAtomic(
+      writeFileAtomic(
         join(this.dir, VAULT_FILE),
         serializeVaultFile(created.file),
         this.checkpoint,
       )
       this.checkpoint('committed')
-      // Until the directory is flushed, a power cut could bring the old
-      // vault.json back, so its generation stays until the next unlock.
-      const opened = this.#openWithKey(created.file, created.dataKey, flushed)
+      // Other generations go only once a directory flush shows that
+      // vault.json names this one.
+      const opened = this.#openWithKey(created.file, created.dataKey)
       return opened.ok ? opened : { ok: false, reason: 'damaged' }
     } catch (error) {
-      this.#reopenAfterFailure(file, oldKey, created)
-      throw error
+      return this.#afterFailure(error, file, oldKey, created)
     } finally {
       if (!this.#db) this.#emit()
     }
   }
 
   /**
-   * After a failed change, without a crash: reopens the generation that
-   * vault.json on disk names, so whether the change committed is read from
-   * the disk. Deletes nothing itself; when the change did not commit, that
-   * open removes the new generation as a leftover. Stays locked if neither
-   * opens.
+   * A step of a change failed without a crash. vault.json on disk tells
+   * whether the change committed, and the generation it names is reopened;
+   * nothing is deleted here. Before the commit, the old generation reopens
+   * without replacing the page, which then reports the failure. After it,
+   * the change stands.
    */
-  #reopenAfterFailure(file: VaultFile, oldKey: Buffer, created: NewKey): void {
-    if (this.#db) return
+  #afterFailure(
+    error: unknown,
+    file: VaultFile,
+    oldKey: Buffer,
+    created: NewKey,
+  ): Outcome<'damaged'> {
+    const named = this.#readFile()?.generation
+    if (named === created.file.generation) {
+      console.error(
+        `password change committed, then failed: ${errorCode(error)}`,
+      )
+      this.#tryOpen(created.file, created.dataKey, { removeLeftovers: false })
+      return { ok: true }
+    }
+    if (named === file.generation) this.#tryOpen(file, oldKey, { emit: false })
+    throw error
+  }
+
+  /** Opens the generation, staying locked if it does not open. */
+  #tryOpen(file: VaultFile, dataKey: Uint8Array, options: OpenOptions): void {
     try {
-      const named = this.#readFile()?.generation
-      if (named === file.generation) this.#openWithKey(file, oldKey)
-      else if (named === created.file.generation)
-        this.#openWithKey(created.file, created.dataKey, false)
+      this.#openWithKey(file, dataKey, options)
     } catch {
-      // Stays locked; the caller reports the original failure.
+      // Stays locked.
     }
   }
 
   #openWithKey(
     file: VaultFile,
     dataKey: Uint8Array,
-    removeLeftovers = true,
+    { removeLeftovers = true, emit = true }: OpenOptions = {},
   ): Outcome<'damaged' | 'newer'> {
     let db: Db
     try {
@@ -314,7 +361,7 @@ export class Vault {
     }
     this.#db = db
     if (removeLeftovers) this.#removeLeftovers(file.generation)
-    this.#emit()
+    if (emit) this.#emit()
     return { ok: true }
   }
 
@@ -328,7 +375,9 @@ export class Vault {
 
   /**
    * Removes what an interrupted change left behind, once the current
-   * generation has opened and passed quick_check.
+   * generation has opened and passed quick_check, and only after a
+   * directory flush shows that vault.json names it on disk. Never throws:
+   * whatever stays is tried again at the next unlock.
    */
   #removeLeftovers(current: number): void {
     const keep = new Set([
@@ -336,12 +385,19 @@ export class Vault {
       databaseName(current),
       `${databaseName(current)}-journal`,
     ])
-    for (const name of readdirSync(this.dir)) {
+    let names: string[]
+    try {
+      syncDirectory(this.dir)
+      names = readdirSync(this.dir)
+    } catch {
+      return
+    }
+    for (const name of names) {
       if (!LEFTOVER.test(name) || keep.has(name)) continue
       try {
         rmSync(join(this.dir, name), { force: true })
       } catch {
-        // Held open by another program; the next unlock tries again.
+        // Held open by another program.
       }
     }
   }
@@ -356,8 +412,15 @@ export class Vault {
     }
   }
 
+  /** A listener that fails does not undo a change that has happened. */
   #emit(): void {
     const state = this.state
-    for (const listener of this.#listeners) listener(state)
+    for (const listener of this.#listeners) {
+      try {
+        listener(state)
+      } catch (error) {
+        console.error(`vault listener failed: ${errorCode(error)}`)
+      }
+    }
   }
 }

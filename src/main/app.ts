@@ -28,7 +28,13 @@ export function startApp(): void {
     handle('vault:status', () => vault.state, devOrigin)
     handle('vault:create', ({ password }) => vault.create(password), devOrigin)
     handle('vault:unlock', ({ password }) => vault.unlock(password), devOrigin)
-    handle('vault:lock', () => vault.lock(), devOrigin)
+    handle(
+      'vault:lock',
+      () => {
+        vault.lock()
+      },
+      devOrigin,
+    )
     handle(
       'vault:change-password',
       ({ current, next }) => vault.changePassword(current, next),
@@ -50,7 +56,11 @@ export function startApp(): void {
     }
     open()
     vault.onChange(() => window?.replaceView())
-    const lock = () => vault.lock()
+    // Also replaces a page that was already locked, so a password typed
+    // but not submitted does not survive a lock.
+    const lock = () => {
+      if (!vault.lock()) window?.replaceView()
+    }
     setMenu({ lock, packaged: app.isPackaged })
     watchForLock(powerMonitor, lock)
 

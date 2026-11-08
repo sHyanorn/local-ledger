@@ -7,17 +7,20 @@ export const IDLE_POLL_MS = 5_000
 type Power = Pick<PowerMonitor, 'getSystemIdleTime' | 'on' | 'off'>
 
 /**
- * Calls lock once the system has been idle for the limit, and whenever the
- * operating system locks the screen or goes to sleep. Returns a function
- * that stops watching.
+ * Calls lock once each time the system has been idle for the limit, and
+ * whenever the operating system locks the screen or goes to sleep. Returns
+ * a function that stops watching.
  */
 export function watchForLock(
   power: Power,
   lock: () => void,
   { idleLimit = IDLE_LIMIT_SECONDS, pollMs = IDLE_POLL_MS } = {},
 ): () => void {
+  let idle = false
   const timer = setInterval(() => {
-    if (power.getSystemIdleTime() >= idleLimit) lock()
+    const now = power.getSystemIdleTime() >= idleLimit
+    if (now && !idle) lock()
+    idle = now
   }, pollMs)
   power.on('lock-screen', lock)
   power.on('suspend', lock)
