@@ -23,6 +23,7 @@
     "test": "vitest run",
     "test:e2e": "npm run compile && playwright test",
     "test:native": "npm run compile && electron . --self-test",
+    "screenshots": "npm run compile && playwright test -c playwright.screens.config.ts",
     "test:package": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/native/check-package.mjs",
     "seed": "vite build -c scripts/seed/vite.config.mts && node .demo/seed/seed.mjs",
     "demo": "electron-vite dev -- --user-data-dir=.demo/user-data",
