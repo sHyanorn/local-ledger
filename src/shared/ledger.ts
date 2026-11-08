@@ -37,6 +37,8 @@ export interface Account extends AccountFields {
 export interface Category extends CategoryFields {
   id: number
   transactionCount: number
+  /** Rules that give this category. */
+  ruleCount: number
 }
 
 export interface Transaction extends TransactionFields {

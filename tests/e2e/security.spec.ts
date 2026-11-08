@@ -155,6 +155,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
       categories: methods('categories'),
       transactions: methods('transactions'),
       imports: methods('imports'),
+      rules: methods('rules'),
       unlockReplaced: String(vault.unlock).includes('replaced'),
     }
   })
@@ -166,6 +167,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
       'categories',
       'transactions',
       'imports',
+      'rules',
     ],
     version: pkg.version,
     vault: ['changePassword', 'create', 'lock', 'status', 'unlock'],
@@ -180,6 +182,16 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
       'update',
     ],
     imports: ['batches', 'commit', 'discard', 'open', 'preview', 'undo'],
+    rules: [
+      'create',
+      'decline',
+      'delete',
+      'list',
+      'move',
+      'reach',
+      'suggest',
+      'update',
+    ],
     unlockReplaced: false,
   })
 })
@@ -372,7 +384,8 @@ ledgerTest(
   'every data channel refuses while the vault is locked',
   async ({ page }) => {
     const results = await page.evaluate(async () => {
-      const { accounts, categories, transactions, imports } = window.ledger
+      const { accounts, categories, transactions, imports, rules } =
+        window.ledger
       const request = {
         id: crypto.randomUUID(),
         encoding: 'utf-8' as const,
@@ -405,6 +418,18 @@ ledgerTest(
         () => imports.commit(request, [0]),
         () => imports.batches(),
         () => imports.undo(1),
+        () => rules.list(),
+        () =>
+          rules.create({
+            pattern: 'Fake',
+            match: 'contains',
+            categoryId: 1,
+            apply: false,
+          }),
+        () => rules.move(1, 1),
+        () => rules.reach({ pattern: 'Fake', match: 'is' }),
+        () => rules.suggest(1),
+        () => rules.decline('Fake'),
       ]
       return Promise.all(
         calls.map((call) =>
@@ -415,7 +440,7 @@ ledgerTest(
         ),
       )
     })
-    expect(results).toHaveLength(13)
+    expect(results).toHaveLength(19)
     for (const result of results) expect(result).toMatch(/Error: locked$/)
   },
 )

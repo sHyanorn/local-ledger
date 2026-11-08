@@ -14,6 +14,7 @@ import type {
   ImportFile,
   ImportPreview,
 } from './imports'
+import type { Rule, RuleReach, RuleSuggestion } from './rules'
 import type {
   Account,
   Category,
@@ -68,6 +69,14 @@ export const channels = {
   'import:discard': schemas.importDiscard,
   'import:batches': z.undefined(),
   'import:undo': schemas.id,
+  'rules:list': z.undefined(),
+  'rules:create': schemas.ruleCreate,
+  'rules:update': schemas.ruleUpdate,
+  'rules:delete': schemas.id,
+  'rules:move': schemas.ruleMove,
+  'rules:reach': schemas.ruleReach,
+  'rules:suggest': schemas.id,
+  'rules:decline': schemas.ruleDismiss,
 } as const
 
 export type Channel = keyof typeof channels
@@ -117,4 +126,14 @@ export interface Results {
   'import:batches': ImportBatch[]
   'import:undo':
     { ok: true; count: number } | { ok: false; reason: 'not-found' }
+  'rules:list': Rule[]
+  'rules:create':
+    | { ok: true; id: number; applied: number }
+    | { ok: false; reason: 'not-found' }
+  'rules:update': Outcome<'not-found'>
+  'rules:delete': Outcome<'not-found'>
+  'rules:move': Outcome<'not-found'>
+  'rules:reach': RuleReach
+  'rules:suggest': RuleSuggestion | null
+  'rules:decline': void
 }

@@ -15,6 +15,16 @@ import {
   updateCategory,
 } from './categories'
 import {
+  createRule,
+  declineSuggestion,
+  deleteRule,
+  listRules,
+  moveRule,
+  ruleReach,
+  suggestRule,
+  updateRule,
+} from './rules'
+import {
   createTransaction,
   deleteTransaction,
   pageTransactions,
@@ -65,6 +75,22 @@ export function handleLedger(vault: Vault, devOrigin?: string): void {
   handle(
     'transactions:delete',
     ({ id }) => deleteTransaction(db(), id),
+    devOrigin,
+  )
+  handle('rules:list', () => listRules(db()), devOrigin)
+  handle('rules:create', (fields) => createRule(db(), fields), devOrigin)
+  handle('rules:update', (fields) => updateRule(db(), fields), devOrigin)
+  handle('rules:delete', ({ id }) => deleteRule(db(), id), devOrigin)
+  handle(
+    'rules:move',
+    ({ id, offset }) => moveRule(db(), id, offset),
+    devOrigin,
+  )
+  handle('rules:reach', (rule) => ruleReach(db(), rule), devOrigin)
+  handle('rules:suggest', ({ id }) => suggestRule(db(), id), devOrigin)
+  handle(
+    'rules:decline',
+    ({ pattern }) => declineSuggestion(db(), pattern),
     devOrigin,
   )
 }

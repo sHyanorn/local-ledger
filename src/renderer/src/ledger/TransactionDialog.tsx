@@ -26,7 +26,8 @@ export function TransactionDialog({
   transaction?: Transaction
   /** The account a new transaction starts in. */
   accountId?: number
-  onSaved: () => void
+  /** Given the transaction's id when the user set its category here. */
+  onSaved: (categorized?: number) => void
   onClose: () => void
 }) {
   const accounts = useLedger((store) => store.accounts)
@@ -68,16 +69,25 @@ export function TransactionDialog({
         categoryId,
         notes,
       }
-      const result = transaction
-        ? await window.ledger.transactions.update({
-            id: transaction.id,
-            ...fields,
-          })
-        : await window.ledger.transactions.create(fields)
-      if (!result.ok) {
-        return setProblem('The account or category no longer exists.')
+      let id = transaction?.id
+      if (transaction) {
+        const result = await window.ledger.transactions.update({
+          id: transaction.id,
+          ...fields,
+        })
+        if (!result.ok) {
+          return setProblem('The account or category no longer exists.')
+        }
+      } else {
+        const result = await window.ledger.transactions.create(fields)
+        if (!result.ok) {
+          return setProblem('The account or category no longer exists.')
+        }
+        id = result.id
       }
-      onSaved()
+      const categorized =
+        categoryId !== null && categoryId !== (transaction?.categoryId ?? null)
+      onSaved(categorized ? id : undefined)
       onClose()
     } catch {
       setProblem('The transaction could not be saved.')

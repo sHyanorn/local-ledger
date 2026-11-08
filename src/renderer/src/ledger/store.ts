@@ -52,6 +52,17 @@ export function categoryTree(
     }))
 }
 
+/** "Food › Coffee" for a subcategory, "Food" for a top-level category. */
+export function categoryName(
+  categories: Category[],
+  id: number | null,
+): string | null {
+  const category = categories.find((option) => option.id === id)
+  if (!category) return null
+  const parent = categories.find((option) => option.id === category.parentId)
+  return parent ? `${parent.name} › ${category.name}` : category.name
+}
+
 /** "1 transaction", "1,204 transactions". */
 export function count(n: number, noun: string, plural = `${noun}s`): string {
   return `${n.toLocaleString('en-AU')} ${n === 1 ? noun : plural}`

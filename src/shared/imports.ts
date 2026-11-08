@@ -87,6 +87,8 @@ export interface PreviewRow {
   description: string
   status: RowStatus
   match: ExistingMatch | null
+  /** The category the first matching rule gives, if any. */
+  categoryId: number | null
 }
 
 export interface ImportPreview {

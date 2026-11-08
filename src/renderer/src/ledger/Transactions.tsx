@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { isIsoDate } from '../../../shared/dates'
 import { SEARCH_MAX } from '../../../shared/ledger'
 import type { Transaction, TransactionFilter } from '../../../shared/ledger'
+import type { RuleSuggestion } from '../../../shared/rules'
 import { formatAmount } from '../../../shared/money'
 import { Confirm } from '../components/Dialog'
 import { AccountDialog } from './AccountDialog'
@@ -9,7 +10,8 @@ import { CategoryOptions } from './CategoryOptions'
 import { formatDate, periodRange, PERIODS } from './format'
 import { chooseImportFile } from './importing'
 import type { Period } from './format'
-import { count, useLedger } from './store'
+import { RuleSuggestionBar } from './RuleSuggestionBar'
+import { categoryName, count, useLedger } from './store'
 import { TransactionDialog } from './TransactionDialog'
 import { useTransactions } from './useTransactions'
 
@@ -23,6 +25,7 @@ export function Transactions({ accountId }: { accountId: number | null }) {
   const refreshLedger = useLedger((store) => store.refresh)
   const show = useLedger((store) => store.show)
   const [importProblem, setImportProblem] = useState('')
+  const [suggestion, setSuggestion] = useState<RuleSuggestion | null>(null)
   const account = accounts.find((candidate) => candidate.id === accountId)
   const [search, setSearch] = useState('')
   const [text, setText] = useState('')
@@ -70,6 +73,13 @@ export function Transactions({ accountId }: { accountId: number | null }) {
     void refreshLedger()
   }
 
+  /** After the user sets a category, a rule may be worth offering. */
+  const suggestFor = (id: number) => {
+    window.ledger.rules
+      .suggest(id)
+      .then(setSuggestion, () => setSuggestion(null))
+  }
+
   const startImport = async () => {
     try {
       const chosen = await chooseImportFile()
@@ -94,6 +104,7 @@ export function Transactions({ accountId }: { accountId: number | null }) {
       } else {
         void list.refresh()
       }
+      if (result.ok && categoryId !== null) suggestFor(row.id)
       void refreshLedger()
     } catch {
       void list.refresh()
@@ -215,8 +226,21 @@ export function Transactions({ accountId }: { accountId: number | null }) {
         <TransactionDialog
           {...editing}
           {...(accountId === null ? {} : { accountId })}
-          onSaved={saved}
+          onSaved={(categorized) => {
+            saved()
+            if (categorized !== undefined) suggestFor(categorized)
+          }}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {suggestion && (
+        <RuleSuggestionBar
+          key={`${suggestion.pattern}:${suggestion.categoryId}`}
+          suggestion={suggestion}
+          onDone={(changed) => {
+            setSuggestion(null)
+            if (changed) saved()
+          }}
         />
       )}
       {importProblem && (
@@ -403,18 +427,13 @@ function CategoryCell({
   }
 
   if (!picking) {
-    const category = categories.find((option) => option.id === row.categoryId)
-    const parent = categories.find((option) => option.id === category?.parentId)
-    const name = category
-      ? parent
-        ? `${parent.name} › ${category.name}`
-        : category.name
-      : 'Uncategorized'
+    const known = categoryName(categories, row.categoryId)
+    const name = known ?? 'Uncategorized'
     return (
       <button
         ref={button}
         type="button"
-        className={`inline${category ? '' : ' muted'}`}
+        className={`inline${known ? '' : ' muted'}`}
         aria-label={`Category of ${row.description}: ${name}`}
         onClick={() => setPicking(true)}
       >

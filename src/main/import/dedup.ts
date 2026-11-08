@@ -12,6 +12,7 @@
 // so two alike rows against one transaction leave one of them new.
 import { createHash } from 'node:crypto'
 import type { ExistingMatch, RowStatus } from '../../shared/imports'
+import { matchKey } from '../ledger/match-key'
 import type { Db } from '../vault/database'
 
 /** Days apart that a reworded or hand-entered transaction may be. */
@@ -31,9 +32,6 @@ export interface Classified {
   match: ExistingMatch | null
 }
 
-const compareKey = (description: string) =>
-  description.toLowerCase().replace(/\s+/g, ' ').trim()
-
 /** Fingerprints in file order; identical rows are counted, not merged. */
 export function fingerprints(rows: readonly IncomingRow[]): string[] {
   const seen = new Map<string, number>()
@@ -42,13 +40,13 @@ export function fingerprints(rows: readonly IncomingRow[]): string[] {
       row.accountId,
       row.date,
       row.cents,
-      compareKey(row.description),
+      matchKey(row.description),
     ].join('\u001f')
     const occurrence = (seen.get(key) ?? 0) + 1
     seen.set(key, occurrence)
     return createHash('sha256')
       .update(
-        `${row.date}\u001f${row.cents}\u001f${compareKey(row.description)}\u001f${occurrence}`,
+        `${row.date}\u001f${row.cents}\u001f${matchKey(row.description)}\u001f${occurrence}`,
       )
       .digest('hex')
   })

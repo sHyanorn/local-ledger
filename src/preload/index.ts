@@ -55,6 +55,16 @@ const api: LedgerApi = {
     batches: () => invoke('import:batches', undefined),
     undo: (batchId) => invoke('import:undo', { id: batchId }),
   },
+  rules: {
+    list: () => invoke('rules:list', undefined),
+    create: (fields) => invoke('rules:create', fields),
+    update: (fields) => invoke('rules:update', fields),
+    delete: (id) => invoke('rules:delete', { id }),
+    move: (id, offset) => invoke('rules:move', { id, offset }),
+    reach: (rule) => invoke('rules:reach', rule),
+    suggest: (transactionId) => invoke('rules:suggest', { id: transactionId }),
+    decline: (pattern) => invoke('rules:decline', { pattern }),
+  },
 }
 
 contextBridge.exposeInMainWorld('ledger', api)

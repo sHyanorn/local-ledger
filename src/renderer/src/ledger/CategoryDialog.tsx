@@ -85,10 +85,16 @@ export function CategoryDialog({
       children.length > 0
         ? `“${category.name}” and its ${count(children.length, 'subcategory', 'subcategories')}`
         : `“${category.name}”`
-    const effect =
-      affected > 0
-        ? ` ${count(affected, 'transaction')} will become uncategorized.`
-        : ''
+    const rules =
+      category.ruleCount +
+      children.reduce((sum, child) => sum + child.ruleCount, 0)
+    const effect = [
+      affected > 0 &&
+        ` ${count(affected, 'transaction')} will become uncategorized.`,
+      rules > 0 && ` ${count(rules, 'rule')} for it will be deleted.`,
+    ]
+      .filter(Boolean)
+      .join('')
     return (
       <Confirm
         title="Delete category?"

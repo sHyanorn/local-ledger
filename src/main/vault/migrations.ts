@@ -95,6 +95,13 @@ export const migrations: readonly Migration[] = [
         mapping TEXT NOT NULL
       ) STRICT;
     `),
+
+  // 4: rules run in priority order; suggestions the user declined stay declined.
+  (db) =>
+    db.exec(`
+      CREATE INDEX rules_priority ON rules (priority, id);
+      CREATE TABLE rule_dismissals (key TEXT PRIMARY KEY) STRICT;
+    `),
 ]
 
 export class NewerSchemaError extends Error {

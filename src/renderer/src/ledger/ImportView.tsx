@@ -19,7 +19,7 @@ import {
   rowProblem,
   TEMPLATE_NAMES,
 } from './importing'
-import { count, useLedger } from './store'
+import { categoryName, count, useLedger } from './store'
 
 /** Columns to start from when nothing about the file could be told. */
 function fallbackMapping(columns: number): Mapping {
@@ -41,6 +41,7 @@ export function ImportView({
   accountId: number | null
 }) {
   const accounts = useLedger((store) => store.accounts)
+  const categories = useLedger((store) => store.categories)
   const show = useLedger((store) => store.show)
   const refresh = useLedger((store) => store.refresh)
   const [encoding, setEncoding] = useState<Encoding>(file.encoding)
@@ -277,6 +278,7 @@ export function ImportView({
             </span>
             <span role="columnheader">Date</span>
             <span role="columnheader">Description</span>
+            <span role="columnheader">Category</span>
             {file.groups && <span role="columnheader">Account</span>}
             <span role="columnheader" className="amount">
               Amount
@@ -305,6 +307,13 @@ export function ImportView({
                   </span>
                   <span role="cell" title={row.description}>
                     {row.description}
+                  </span>
+                  <span
+                    role="cell"
+                    className={row.categoryId === null ? 'muted' : undefined}
+                  >
+                    {categoryName(categories, row.categoryId) ??
+                      'Uncategorized'}
                   </span>
                   {file.groups && (
                     <span role="cell" className="muted">

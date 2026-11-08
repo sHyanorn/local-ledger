@@ -2,6 +2,7 @@
 import { z } from 'zod'
 import { isIsoDate } from './dates'
 import { DATE_ORDERS, ENCODINGS, MAX_COLUMNS } from './imports'
+import { PATTERN_MAX, RULE_MATCHES } from './rules'
 import {
   ACCOUNT_TYPES,
   DESCRIPTION_MAX,
@@ -100,6 +101,12 @@ const importRequest = z.strictObject({
   targets: z.array(importTarget).min(1).max(50),
 })
 
+export const ruleFields = z.strictObject({
+  pattern: text(PATTERN_MAX, 1),
+  match: z.enum(RULE_MATCHES),
+  categoryId: id,
+})
+
 export const schemas = {
   id: z.strictObject({ id }),
   accountUpdate: accountFields.extend({ id }),
@@ -112,6 +119,19 @@ export const schemas = {
     selected: z.array(z.number().int().min(0).max(50_000)).max(50_000),
   }),
   importDiscard: z.strictObject({ id: z.uuid() }),
+  ruleCreate: ruleFields.extend({
+    /** Also categorize the uncategorized transactions it matches first. */
+    apply: z.boolean(),
+  }),
+  ruleUpdate: ruleFields.extend({ id }),
+  ruleMove: z.strictObject({
+    id,
+    offset: z.union([z.literal(-1), z.literal(1)]),
+  }),
+  ruleReach: ruleFields
+    .omit({ categoryId: true })
+    .extend({ id: id.optional() }),
+  ruleDismiss: z.strictObject({ pattern: text(DESCRIPTION_MAX, 1) }),
   transactionPage: z.strictObject({
     filter: transactionFilter,
     after: transactionCursor.optional(),
@@ -127,3 +147,4 @@ export type TransactionCursor = z.infer<typeof transactionCursor>
 export type AmountColumns = z.infer<typeof amountColumns>
 export type Mapping = z.infer<typeof mapping>
 export type ImportTarget = z.infer<typeof importTarget>
+export type RuleFields = z.infer<typeof ruleFields>

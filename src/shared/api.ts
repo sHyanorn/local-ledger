@@ -1,5 +1,6 @@
 import type { ImportTarget, Mapping, Encoding } from './imports'
 import type { Results, VaultState } from './ipc'
+import type { RuleFields, RuleMatch } from './rules'
 import type {
   AccountFields,
   CategoryFields,
@@ -68,6 +69,26 @@ export interface LedgerApi {
     batches(): Promise<Results['import:batches']>
     /** Removes an import's transactions, edited or not. */
     undo(batchId: number): Promise<Results['import:undo']>
+  }
+  readonly rules: {
+    list(): Promise<Results['rules:list']>
+    /** With `apply`, also categorizes the uncategorized transactions it matches first. */
+    create(
+      fields: RuleFields & { apply: boolean },
+    ): Promise<Results['rules:create']>
+    update(fields: Updated<RuleFields>): Promise<Results['rules:update']>
+    delete(id: number): Promise<Results['rules:delete']>
+    /** One place earlier (-1) or later (1). */
+    move(id: number, offset: -1 | 1): Promise<Results['rules:move']>
+    reach(rule: {
+      pattern: string
+      match: RuleMatch
+      id?: number
+    }): Promise<Results['rules:reach']>
+    /** A rule to offer after the user set this transaction's category. */
+    suggest(transactionId: number): Promise<Results['rules:suggest']>
+    /** Stops suggesting rules for this payee. */
+    decline(pattern: string): Promise<void>
   }
 }
 

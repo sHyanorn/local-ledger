@@ -207,7 +207,13 @@ describe('categories', () => {
     transaction({ accountId, categoryId: food })
     transaction({ accountId, categoryId: food })
     expect(listCategories(db)).toEqual([
-      { id: food, name: 'Fake Food', parentId: null, transactionCount: 2 },
+      {
+        id: food,
+        name: 'Fake Food',
+        parentId: null,
+        transactionCount: 2,
+        ruleCount: 0,
+      },
     ])
   })
 

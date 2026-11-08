@@ -14,6 +14,7 @@ import {
   type PreviewRow,
 } from '../../shared/imports'
 import { mapping as mappingSchema } from '../../shared/schemas'
+import { firstRule, listRules } from '../ledger/rules'
 import type { Db } from '../vault/database'
 import { FileError, readTable, type Table } from './csv'
 import { classify, type IncomingRow } from './dedup'
@@ -198,6 +199,7 @@ export class ImportSession {
       })
     })
     const classified = classify(db, incoming)
+    const rules = listRules(db)
     return {
       ok: true,
       pending,
@@ -212,6 +214,7 @@ export class ImportSession {
           description: row.description,
           status: classified[position]?.status ?? 'new',
           match: classified[position]?.match ?? null,
+          categoryId: firstRule(rules, row.description)?.categoryId ?? null,
         })),
         errors: errors.filter((error) => accountOf(error.line) !== null),
       },
@@ -249,8 +252,9 @@ export class ImportSession {
       )
       const insert = db.prepare(
         `INSERT OR IGNORE INTO transactions
-           (account_id, date, amount_cents, description, import_batch_id, hash)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+           (account_id, date, amount_cents, description, category_id,
+            import_batch_id, hash)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       let count = 0
       for (const { row, fingerprint } of chosen) {
@@ -259,6 +263,7 @@ export class ImportSession {
           row.date,
           row.amountCents,
           row.description,
+          row.categoryId,
           batchId,
           fingerprint,
         ).changes

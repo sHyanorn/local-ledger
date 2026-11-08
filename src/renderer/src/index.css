@@ -631,7 +631,7 @@ select.inline:focus {
   min-width: 0;
 }
 
-.column-form .check {
+.form .check {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -661,11 +661,14 @@ select.inline:focus {
 }
 
 .tr.preview {
-  grid-template-columns: 20px 104px minmax(0, 1fr) 120px minmax(0, 0.7fr);
+  grid-template-columns: 20px 104px minmax(0, 1fr) 160px 120px minmax(0, 0.7fr);
 }
 
 .tr.preview.with-account {
-  grid-template-columns: 20px 104px minmax(0, 1fr) 140px 120px minmax(0, 0.7fr);
+  grid-template-columns: 20px 104px minmax(0, 1fr) 160px 120px 120px minmax(
+      0,
+      0.7fr
+    );
 }
 
 .tr.preview input[type='checkbox'] {
@@ -701,4 +704,31 @@ select.inline:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Rules */
+
+.list-row.rule {
+  gap: 4px;
+  padding: 0 8px 0 0;
+}
+
+.list-row.rule .list-item {
+  flex: 1;
+  min-width: 0;
+  gap: 12px;
+}
+
+.suggestion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.suggestion p {
+  flex: 1;
+  min-width: 0;
 }

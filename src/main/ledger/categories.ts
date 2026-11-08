@@ -8,7 +8,9 @@ import { isDuplicate } from './errors'
 export function listCategories(db: Db): Category[] {
   return db
     .prepare(
-      `SELECT c.id, c.name, c.parent_id AS parentId, count(t.id) AS transactionCount
+      `SELECT c.id, c.name, c.parent_id AS parentId,
+         count(t.id) AS transactionCount,
+         (SELECT count(*) FROM rules r WHERE r.category_id = c.id) AS ruleCount
        FROM categories c LEFT JOIN transactions t ON t.category_id = c.id
        GROUP BY c.id
        ORDER BY c.name COLLATE NOCASE`,
