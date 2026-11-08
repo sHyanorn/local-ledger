@@ -84,15 +84,23 @@ export function usualWidth(widths: readonly number[]): {
   return { width, share: widths.length === 0 ? 0 : count / widths.length }
 }
 
+/** Row widths without trailing empty cells, which a trailing delimiter adds. */
+const width = (cells: readonly string[]) => {
+  let end = cells.length
+  while (end > 0 && cells[end - 1] === '') end--
+  return end
+}
+
 /**
  * The delimiter that splits most of the first lines into the same number
- * of columns, the most columns among those. A bank export has one per
- * field on every line; a comma inside an amount or a description splits
- * only some lines, so it does not win on a short file.
+ * of columns. A bank export has one per field on every line; a comma inside
+ * an amount or a description splits only some lines. Among those that
+ * qualify, one that also splits the first line (often a header) into that
+ * number wins, then the one with more columns, then the more consistent.
  */
 function detectDelimiter(text: string): string {
   let best: string = DELIMITERS[0]
-  let bestColumns = 1
+  let bestScore: [number, number, number] = [0, 1, 0]
   for (const delimiter of DELIMITERS) {
     let rows: Row[]
     try {
@@ -100,10 +108,18 @@ function detectDelimiter(text: string): string {
     } catch {
       continue
     }
-    const { width, share } = usualWidth(rows.map((row) => row.cells.length))
-    if (share > 0.5 && width > bestColumns) {
+    const usual = usualWidth(rows.map((row) => width(row.cells)))
+    if (usual.share <= 0.5 || usual.width < 2) continue
+    const firstFits = width(rows[0]?.cells ?? []) === usual.width ? 1 : 0
+    const score: [number, number, number] = [
+      firstFits,
+      usual.width,
+      usual.share,
+    ]
+    const better = score.findIndex((value, n) => value !== bestScore[n])
+    if (better !== -1 && score[better]! > bestScore[better]!) {
       best = delimiter
-      bestColumns = width
+      bestScore = score
     }
   }
   return best
@@ -138,10 +154,11 @@ export function joinOverflow(
   column: number | undefined,
 ): Row[] {
   if (delimiter === ',' || column === undefined) return [...rows]
-  const { width } = usualWidth(rows.map((row) => row.cells.length))
+  const usual = usualWidth(rows.map((row) => width(row.cells))).width
   return rows.map((row) => {
-    const extra = row.cells.length - width
-    if (extra <= 0 || column >= width) return row
+    // A trailing delimiter adds an empty cell, not a split description.
+    const extra = width(row.cells) - usual
+    if (extra <= 0 || column >= usual) return row
     const cells = [
       ...row.cells.slice(0, column),
       row.cells

@@ -595,10 +595,18 @@ function PreviewRows({
     }
   }, [])
 
-  const first = Math.max(0, Math.floor(view.top / ROW_HEIGHT) - OVERSCAN)
+  // A scroll position from a longer list, before the browser clamps it,
+  // must still draw the rows that are there.
   const last = Math.min(
     rows.length,
     Math.ceil((view.top + view.height) / ROW_HEIGHT) + OVERSCAN,
+  )
+  const first = Math.max(
+    0,
+    Math.min(
+      Math.floor(view.top / ROW_HEIGHT) - OVERSCAN,
+      last - Math.ceil(view.height / ROW_HEIGHT) - OVERSCAN,
+    ),
   )
 
   return (

@@ -155,6 +155,28 @@ describe('readTable', () => {
     ])
   })
 
+  it('prefers semicolons when commas only split decimals and some descriptions', () => {
+    const lines = ['Datum;Beschreibung;Betrag;Saldo']
+    for (let i = 1; i <= 12; i++) {
+      const description =
+        i % 4 === 0 ? `Fake Laden ${i}` : `Fake Kaffee, Kuchen ${i}`
+      lines.push(
+        `${String(i).padStart(2, '0')}.02.2026;${description};-4,50;1234,${String(i).padStart(2, '0')}`,
+      )
+    }
+    expect(readTable(bytes(lines.join('\n'))).delimiter).toBe(';')
+  })
+
+  it('prefers tabs when most balances hold thousands commas', () => {
+    const lines = ['Date\tDescription\tAmount\tBalance']
+    for (let i = 1; i <= 12; i++) {
+      lines.push(
+        `${String(i).padStart(2, '0')}/03/2026\tFake Shop ${i}\t-4.50\t1,234,${String(100 + i)}.00`,
+      )
+    }
+    expect(readTable(bytes(lines.join('\n'))).delimiter).toBe('\t')
+  })
+
   it('reports the encoding it read', () => {
     expect(readTable(utf16('a,b\n', true)).encoding).toBe('utf-16le')
   })
@@ -406,6 +428,14 @@ describe('joinOverflow', () => {
     expect(joinOverflow(rows, '\t', 1)[2]?.cells[1]).toBe(
       'Fake Cafe with a semicolon',
     )
+  })
+
+  it('leaves a row whose only extra cell is an empty trailing one', () => {
+    const trailing = [
+      ...rows.slice(0, 3),
+      row(5, '04/02/2026', 'Fake Pub', '-1,00', ''),
+    ]
+    expect(joinOverflow(trailing, ';', 1)[3]).toEqual(trailing[3])
   })
 
   it('leaves comma files, rows of the usual width, and a description past it alone', () => {
