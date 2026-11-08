@@ -390,6 +390,33 @@ describe('ImportSession', () => {
     expect(rows()).toMatchObject([{ description: 'Fake C' }])
   })
 
+  it('imports a semicolon file whose descriptions hold unquoted semicolons', () => {
+    const everyday = account()
+    const session = new ImportSession()
+    const file = opened(
+      session,
+      bytes(
+        'Date;Description;Amount\n01/05/2026;Fake Shop;-1.00\n02/05/2026;Fake Cafe; Table 4;-2.50\n03/05/2026;Fake Bar;-3.00\n',
+      ),
+    )
+    const mapping: Mapping = {
+      header: true,
+      date: 0,
+      dateOrder: 'dmy',
+      description: [1],
+      amount: { kind: 'signed', column: 2, negate: false },
+    }
+    previewAndCommit(session, {
+      ...request(file, everyday, mapping),
+      selected: [0, 1, 2],
+    })
+    expect(rows()).toMatchObject([
+      { description: 'Fake Shop', cents: -100 },
+      { description: 'Fake Cafe; Table 4', cents: -250 },
+      { description: 'Fake Bar', cents: -300 },
+    ])
+  })
+
   it('refuses a commit whose settings changed since the preview', () => {
     const everyday = account()
     const savings = account('Fake Savings')

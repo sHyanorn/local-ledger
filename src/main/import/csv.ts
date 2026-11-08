@@ -68,13 +68,29 @@ function parseRows(text: string, options: Options): Row[] {
   }
 }
 
-const median = (values: number[]) =>
-  values.toSorted((a, b) => a - b)[Math.floor(values.length / 2)] ?? 0
+/** The most common row width, the wider on a tie, and the share of rows with it. */
+export function usualWidth(widths: readonly number[]): {
+  width: number
+  share: number
+} {
+  const counts = new Map<number, number>()
+  for (const width of widths) counts.set(width, (counts.get(width) ?? 0) + 1)
+  let width = 0
+  let count = 0
+  for (const [each, n] of counts) {
+    if (n > count || (n === count && each > width)) {
+      width = each
+      count = n
+    }
+  }
+  return { width, share: widths.length === 0 ? 0 : count / widths.length }
+}
 
 /**
- * The delimiter that splits the first lines into the most columns. A bank
- * export has one per field, so a description's commas or semicolons, which
- * are quoted or rare, do not outvote it.
+ * The delimiter that splits most of the first lines into the same number
+ * of columns, the most columns among those. A bank export has one per
+ * field on every line; a comma inside an amount or a description splits
+ * only some lines, so it does not win on a short file.
  */
 function detectDelimiter(text: string): string {
   let best: string = DELIMITERS[0]
@@ -86,10 +102,10 @@ function detectDelimiter(text: string): string {
     } catch {
       continue
     }
-    const columns = median(rows.map((row) => row.cells.length))
-    if (columns > bestColumns) {
+    const { width, share } = usualWidth(rows.map((row) => row.cells.length))
+    if (share > 0.5 && width > bestColumns) {
       best = delimiter
-      bestColumns = columns
+      bestColumns = width
     }
   }
   return best
@@ -108,4 +124,33 @@ export function readTable(bytes: Uint8Array, encoding?: Encoding): Table {
     throw new FileError('too-many-columns')
   }
   return { encoding: decoded.encoding, delimiter, rows }
+}
+
+/**
+ * Rows longer than usual, in a semicolon- or tab-separated file, with the
+ * extra cells joined back into the given column: a description holding the
+ * delimiter without quotes splits there, and the cells after it shift. A
+ * comma-separated file is left alone, since there a longer row is more
+ * often an amount with an unquoted thousands separator, which joining
+ * would turn into a wrong amount.
+ */
+export function joinOverflow(
+  rows: readonly Row[],
+  delimiter: string,
+  column: number | undefined,
+): Row[] {
+  if (delimiter === ',' || column === undefined) return [...rows]
+  const { width } = usualWidth(rows.map((row) => row.cells.length))
+  return rows.map((row) => {
+    const extra = row.cells.length - width
+    if (extra <= 0 || column >= width) return row
+    const cells = [
+      ...row.cells.slice(0, column),
+      row.cells
+        .slice(column, column + extra + 1)
+        .join(delimiter === ';' ? '; ' : ' '),
+      ...row.cells.slice(column + extra + 1),
+    ]
+    return { line: row.line, cells }
+  })
 }

@@ -17,7 +17,7 @@ import { mapping as mappingSchema } from '../../shared/schemas'
 import { firstRule, listRules } from '../ledger/rules'
 import { pairTransfers } from '../ledger/transfers'
 import type { Db } from '../vault/database'
-import { FileError, readTable, type Table } from './csv'
+import { FileError, joinOverflow, readTable, type Table } from './csv'
 import { classify, type IncomingRow } from './dedup'
 import { applyMapping, cleanText } from './mapping'
 import { detectLayout, type Layout } from './templates'
@@ -187,17 +187,20 @@ export class ImportSession {
       return { ok: false, reason: 'not-found' }
     }
 
-    const column = pending.layout?.accountColumn ?? null
-    const cellsByLine = new Map(
-      pending.table.rows.map((row) => [row.line, row.cells]),
+    const table = joinOverflow(
+      pending.table.rows,
+      pending.table.delimiter,
+      request.mapping.description[0],
     )
+    const column = pending.layout?.accountColumn ?? null
+    const cellsByLine = new Map(table.map((row) => [row.line, row.cells]))
     const accountOf = (line: number) => {
       const key =
         column === null ? '' : cleanText(cellsByLine.get(line)?.[column] ?? '')
       return targets.get(key) ?? null
     }
 
-    const { rows, errors } = applyMapping(pending.table.rows, request.mapping)
+    const { rows, errors } = applyMapping(table, request.mapping)
     const incoming: (IncomingRow & { line: number })[] = []
     rows.forEach((row, index) => {
       const accountId = accountOf(row.line)

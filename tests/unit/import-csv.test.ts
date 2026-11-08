@@ -5,6 +5,7 @@ import {
   MAX_FILE_BYTES,
   MAX_RECORD,
   MAX_ROWS,
+  joinOverflow,
   readTable,
 } from '../../src/main/import/csv'
 import { decode } from '../../src/main/import/decode'
@@ -138,6 +139,20 @@ describe('readTable', () => {
   it('keeps commas when a description holds a semicolon', () => {
     const table = readTable(bytes('01/02/2026,-5.00,Fake; Shop\n'))
     expect(table.delimiter).toBe(',')
+  })
+
+  it('reads a short tab-separated file whose amounts have thousands commas', () => {
+    const table = readTable(
+      bytes(
+        'Date\tAmount\tDescription\n01/02/2026\t-1,234,567.00\tFake, Shop\n',
+      ),
+    )
+    expect(table.delimiter).toBe('\t')
+    expect(table.rows[1]?.cells).toEqual([
+      '01/02/2026',
+      '-1,234,567.00',
+      'Fake, Shop',
+    ])
   })
 
   it('reports the encoding it read', () => {
@@ -372,5 +387,31 @@ describe('applyMapping', () => {
       { line: 6, problem: 'description-too-long', value: `${'x'.repeat(40)}…` },
       { line: 7, problem: 'amount', value: '' },
     ])
+  })
+})
+
+describe('joinOverflow', () => {
+  const row = (line: number, ...cells: string[]) => ({ line, cells })
+  const rows = [
+    row(1, 'Date', 'Description', 'Amount'),
+    row(2, '01/02/2026', 'Fake Shop', '-5,00'),
+    row(3, '02/02/2026', 'Fake Cafe', 'with a semicolon', '-3,00'),
+    row(4, '03/02/2026', 'Fake Bar', '-2,00'),
+  ]
+
+  it('joins a semicolon-split description back together', () => {
+    expect(joinOverflow(rows, ';', 1)[2]).toEqual(
+      row(3, '02/02/2026', 'Fake Cafe; with a semicolon', '-3,00'),
+    )
+    expect(joinOverflow(rows, '\t', 1)[2]?.cells[1]).toBe(
+      'Fake Cafe with a semicolon',
+    )
+  })
+
+  it('leaves comma files, rows of the usual width, and a description past it alone', () => {
+    expect(joinOverflow(rows, ',', 1)).toEqual(rows)
+    expect(joinOverflow(rows, ';', 1)[1]).toBe(rows[1])
+    expect(joinOverflow(rows, ';', 3)).toEqual(rows)
+    expect(joinOverflow(rows, ';', undefined)).toEqual(rows)
   })
 })
