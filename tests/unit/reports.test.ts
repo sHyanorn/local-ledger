@@ -4,11 +4,8 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createAccount } from '../../src/main/ledger/accounts'
 import { createCategory } from '../../src/main/ledger/categories'
-import {
-  categoryTrend,
-  reportData,
-  shiftMonth,
-} from '../../src/main/ledger/reports'
+import { categoryTrend, reportData } from '../../src/main/ledger/reports'
+import { shiftMonth } from '../../src/shared/months'
 import { createTransaction } from '../../src/main/ledger/transactions'
 import { pairTransfers } from '../../src/main/ledger/transfers'
 import { openDatabase, type Db } from '../../src/main/vault/database'

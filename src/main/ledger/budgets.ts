@@ -5,19 +5,12 @@
 import { HOME_CURRENCY, type MonthBudgets } from '../../shared/budgets'
 import type { Outcome } from '../../shared/ipc'
 import type { Currency } from '../../shared/money'
+import { shiftMonth } from '../../shared/months'
 import type { Db } from '../vault/database'
 import { isMissingReference } from './errors'
 
-/** The first day of the month after this one, as YYYY-MM-DD. */
-function nextMonth(month: string): string {
-  const [year = 0, number = 0] = month.split('-').map(Number)
-  return number === 12
-    ? `${year + 1}-01-01`
-    : `${year}-${String(number + 1).padStart(2, '0')}-01`
-}
-
 export function monthBudgets(db: Db, month: string): MonthBudgets {
-  const range = [`${month}-01`, nextMonth(month)]
+  const range = [`${month}-01`, `${shiftMonth(month, 1)}-01`]
   const categories = db
     .prepare('SELECT id, parent_id AS parentId FROM categories')
     .all() as { id: number; parentId: number | null }[]

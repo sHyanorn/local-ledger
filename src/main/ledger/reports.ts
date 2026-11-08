@@ -1,6 +1,7 @@
 // Monthly figures for reports, from report_transactions in one currency.
 // See shared/reports.ts for how income and spending are told apart.
 import type { Currency } from '../../shared/money'
+import { shiftMonth } from '../../shared/months'
 import type {
   MonthReport,
   MonthTotals,
@@ -10,13 +11,6 @@ import type {
 import type { Db } from '../vault/database'
 
 const MONTHS = 12
-
-/** The month `offset` months from this one, YYYY-MM. */
-export function shiftMonth(month: string, offset: number): string {
-  const [year = 0, number = 1] = month.split('-').map(Number)
-  const total = year * 12 + (number - 1) + offset
-  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`
-}
 
 /** Each month's top-level category nets, for months from `first` to `last`. */
 function nets(

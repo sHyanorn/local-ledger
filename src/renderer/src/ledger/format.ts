@@ -46,19 +46,4 @@ export function monthOf(today = new Date()): string {
   return isoDate(today).slice(0, 7)
 }
 
-/** The month `offset` months from this one. */
-export function shiftMonth(month: string, offset: number): string {
-  const [year = 0, number = 1] = month.split('-').map(Number)
-  return monthOf(new Date(year, number - 1 + offset, 1))
-}
-
-const MONTH = new Intl.DateTimeFormat('en-AU', {
-  month: 'long',
-  year: 'numeric',
-  timeZone: 'UTC',
-})
-
-/** "November 2026" from "2026-11". */
-export function formatMonth(month: string): string {
-  return MONTH.format(new Date(`${month}-01T00:00:00Z`))
-}
+export { formatMonth, shiftMonth } from '../../../shared/months'
