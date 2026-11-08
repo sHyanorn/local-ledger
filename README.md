@@ -4,6 +4,12 @@ A local-first, fully encrypted personal finance desktop app. Import bank CSVs, a
 
 > Status: in development. See [docs/TASKS.md](docs/TASKS.md).
 
+## Importing bank files
+
+Import CSV exports from any bank: the column wizard maps the date, amount and description. CommBank, NAB, ANZ and Westpac files are recognised without it. Their layouts come from open-source parsers and their published sample files, since the banks do not document them, and have not been checked against real exports; a file the app does not recognise opens in the column wizard.
+
+If a bank file is not read correctly, `npm run csv:shape -- <file.csv>` prints a report of its structure (columns, date and amount formats, encoding) that contains none of its data, to attach to an issue.
+
 ## Docs
 
 - [Specification](docs/SPEC.md)

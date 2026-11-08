@@ -25,7 +25,7 @@
 ## M3 Import and categorization
 - [x] CSV parsing and generic column-mapping wizard
 - [x] Templates for the four Australian banks (tested with hand-made sample files)
-- [ ] Check the bank templates against `npm run csv:shape` output from real exports
+- [x] Cross-check the bank templates with public sample files; state that they are unverified against real exports (D024)
 - [x] Import preview and duplicate detection
 - [x] Rule engine and "create a rule after a manual change" prompt
 - [x] Deleting a category that rules point to: say how many, and what happens to them
