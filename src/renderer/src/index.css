@@ -671,6 +671,10 @@ select.inline:focus {
     );
 }
 
+.table[aria-busy='true'] .rows {
+  opacity: 0.5;
+}
+
 .tr.preview input[type='checkbox'] {
   margin: 0;
 }

@@ -84,6 +84,16 @@ const categoryOf = (id: number) =>
     edited: number
   }
 
+/** Commits as the page does: after previewing the same request. */
+const previewAndCommit = (
+  session: ImportSession,
+  request: Parameters<ImportSession['commit']>[1],
+) => {
+  const { selected: _selected, ...shown } = request
+  session.preview(db, shown)
+  return session.commit(db, request)
+}
+
 describe('matching', () => {
   it.each([
     ['contains', 'fake cafe', 'fake cafe newtown', true],
@@ -234,7 +244,7 @@ describe('applying', () => {
     expect(
       preview.ok && preview.preview.rows.map((row) => row.categoryId),
     ).toEqual([coffee, null])
-    session.commit(db, { ...request, selected: [0, 1] })
+    previewAndCommit(session, { ...request, selected: [0, 1] })
     expect(
       db
         .prepare(

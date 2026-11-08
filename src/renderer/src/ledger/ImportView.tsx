@@ -54,7 +54,11 @@ export function ImportView({
       ? file.groups.map((group) => ({ key: group.key, accountId: null }))
       : [{ key: '', accountId }],
   )
-  const [answer, setPreview] = useState<ImportPreview | null>(null)
+  // The preview shown, and the settings it was made with.
+  const [answer, setAnswer] = useState<{
+    request: ImportRequest
+    preview: ImportPreview
+  } | null>(null)
   const [problem, setProblem] = useState('')
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [importing, setImporting] = useState(false)
@@ -65,7 +69,10 @@ export function ImportView({
   )
   const anyTarget = targets.some((target) => target.accountId !== null)
   // With every account skipped there is nothing to show.
-  const preview = anyTarget ? answer : null
+  const preview = anyTarget ? (answer?.preview ?? null) : null
+  // Rows are chosen by their place in a preview; until the preview for the
+  // current settings arrives, the selection belongs to other rows.
+  const current = anyTarget && answer?.request === request
 
   // Each change reads the file again; an older answer that arrives late is dropped.
   const generation = useRef(0)
@@ -76,7 +83,8 @@ export function ImportView({
       (result) => {
         if (current !== generation.current) return
         if (!result.ok) {
-          setPreview(null)
+          setAnswer(null)
+          setSelected(new Set())
           setProblem(
             result.reason === 'not-found'
               ? 'The file is no longer open. Choose it again.'
@@ -85,7 +93,7 @@ export function ImportView({
           return
         }
         setProblem('')
-        setPreview(result.preview)
+        setAnswer({ request, preview: result.preview })
         setSelected(
           new Set(
             result.preview.rows
@@ -128,7 +136,9 @@ export function ImportView({
             ? 'No rows are selected.'
             : result.reason === 'not-found'
               ? 'The file is no longer open. Choose it again.'
-              : FILE_PROBLEMS[result.reason],
+              : result.reason === 'changed'
+                ? 'The rows changed. Check them and import again.'
+                : FILE_PROBLEMS[result.reason],
         )
         return
       }
@@ -164,7 +174,7 @@ export function ImportView({
           </button>
           <button
             type="button"
-            disabled={importing || selected.size === 0}
+            disabled={importing || !current || selected.size === 0}
             onClick={() => void commit()}
           >
             {selected.size > 0
@@ -256,7 +266,12 @@ export function ImportView({
       )}
 
       {preview && (
-        <div className="table" role="table" aria-label="Rows to import">
+        <div
+          className="table"
+          role="table"
+          aria-label="Rows to import"
+          aria-busy={!current}
+        >
           <div
             className={`tr head preview${file.groups ? ' with-account' : ''}`}
             role="row"

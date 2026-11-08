@@ -82,6 +82,16 @@ const reported = () =>
     }[]
   ).map((row) => row.id)
 
+/** Commits as the page does: after previewing the same request. */
+const previewAndCommit = (
+  session: ImportSession,
+  request: Parameters<ImportSession['commit']>[1],
+) => {
+  const { selected: _selected, ...shown } = request
+  session.preview(db, shown)
+  return session.commit(db, request)
+}
+
 describe('pairing', () => {
   it('pairs opposite amounts in two accounts up to four days apart', () => {
     const out = add(everyday, '2026-05-01', -100000)
@@ -250,7 +260,7 @@ describe('imports and transfers', () => {
       ),
     )
     if (!opened.ok) throw new Error(opened.reason)
-    const committed = session.commit(db, {
+    const committed = previewAndCommit(session, {
       id: opened.file.id,
       encoding: opened.file.encoding,
       mapping: opened.file.mapping!,

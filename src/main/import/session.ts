@@ -37,7 +37,17 @@ interface Pending {
   bytes: Uint8Array
   table: Table
   layout: Layout | null
+  /** The request last previewed: rows are chosen by index within it. */
+  previewed: string | null
 }
+
+/** The settings that decide which row has which index, and its status. */
+const requestKey = (request: ImportRequest) =>
+  JSON.stringify([
+    request.encoding,
+    mappingSchema.parse(request.mapping),
+    request.targets.map((target) => [target.key, target.accountId]),
+  ])
 
 /** The first row as a key for the columns the user chose for its file. */
 const signatureOf = (table: Table) =>
@@ -105,7 +115,7 @@ export class ImportSession {
     }
     const layout = detectLayout(table.rows)
     const id = randomUUID()
-    this.#pending = { id, fileName, bytes, table, layout }
+    this.#pending = { id, fileName, bytes, table, layout, previewed: null }
     const mapping = rememberedMapping(db, table) ?? layout?.mapping ?? null
     return {
       ok: true,
@@ -140,7 +150,9 @@ export class ImportSession {
     request: ImportRequest,
   ): { ok: true; preview: ImportPreview } | Failure<FileProblem | 'not-found'> {
     const built = this.#build(db, request)
-    return built.ok ? { ok: true, preview: built.preview } : built
+    if (!built.ok) return built
+    built.pending.previewed = requestKey(request)
+    return { ok: true, preview: built.preview }
   }
 
   #build(
@@ -231,7 +243,16 @@ export class ImportSession {
     request: ImportRequest & { selected: number[] },
   ):
     | { ok: true; id: number; count: number; paired: number }
-    | Failure<FileProblem | 'not-found' | 'nothing'> {
+    | Failure<FileProblem | 'not-found' | 'nothing' | 'changed'> {
+    // The indexes name rows of the preview the user saw; settings changed
+    // since would give them to other rows.
+    const waiting = this.#pending
+    if (
+      waiting?.id === request.id &&
+      waiting.previewed !== requestKey(request)
+    ) {
+      return { ok: false, reason: 'changed' }
+    }
     const built = this.#build(db, request)
     if (!built.ok) return built
     const { pending, preview, prints } = built

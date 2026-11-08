@@ -127,7 +127,7 @@ export interface Results {
     | { ok: false; reason: FileProblem | 'not-found' }
   'import:commit':
     | { ok: true; id: number; count: number; paired: number }
-    | { ok: false; reason: FileProblem | 'not-found' | 'nothing' }
+    | { ok: false; reason: FileProblem | 'not-found' | 'nothing' | 'changed' }
   'import:discard': void
   'import:batches': ImportBatch[]
   'import:undo':
