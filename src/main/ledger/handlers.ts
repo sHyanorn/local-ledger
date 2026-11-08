@@ -25,6 +25,7 @@ import {
   updateRule,
 } from './rules'
 import {
+  countPossibleTransfers,
   linkTransfer,
   possibleTransfers,
   rejectTransfer,
@@ -96,6 +97,7 @@ export function handleLedger(vault: Vault, devOrigin?: string): void {
   handle('rules:reach', (rule) => ruleReach(db(), rule), devOrigin)
   handle('rules:suggest', ({ id }) => suggestRule(db(), id), devOrigin)
   handle('transfers:possible', () => possibleTransfers(db()), devOrigin)
+  handle('transfers:count', () => countPossibleTransfers(db()), devOrigin)
   handle('transfers:choices', ({ id }) => transferChoices(db(), id), devOrigin)
   handle(
     'transfers:link',

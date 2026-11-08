@@ -295,7 +295,7 @@ export class ImportSession {
         batchId,
       )
       rememberMapping(db, pending, request.mapping)
-      return { id: batchId, count, paired: pairTransfers(db) }
+      return { id: batchId, count, paired: pairTransfers(db, batchId) }
     })()
     this.clear()
     return { ok: true, ...imported }

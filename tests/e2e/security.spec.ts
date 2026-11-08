@@ -194,7 +194,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
       'suggest',
       'update',
     ],
-    transfers: ['choices', 'link', 'possible', 'reject', 'unlink'],
+    transfers: ['choices', 'count', 'link', 'possible', 'reject', 'unlink'],
     unlockReplaced: false,
   })
 })
@@ -434,6 +434,7 @@ ledgerTest(
         () => rules.suggest(1),
         () => rules.decline('Fake'),
         () => transfers.possible(),
+        () => transfers.count(),
         () => transfers.choices(1),
         () => transfers.link(1, 2),
         () => transfers.unlink(1),
@@ -448,7 +449,7 @@ ledgerTest(
         ),
       )
     })
-    expect(results).toHaveLength(24)
+    expect(results).toHaveLength(25)
     for (const result of results) expect(result).toMatch(/Error: locked$/)
   },
 )

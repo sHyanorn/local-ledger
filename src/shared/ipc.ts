@@ -79,6 +79,7 @@ export const channels = {
   'rules:suggest': schemas.id,
   'rules:decline': schemas.ruleDismiss,
   'transfers:possible': z.undefined(),
+  'transfers:count': z.undefined(),
   'transfers:choices': schemas.id,
   'transfers:link': schemas.transferLink,
   'transfers:unlink': schemas.id,
@@ -143,6 +144,7 @@ export interface Results {
   'rules:suggest': RuleSuggestion | null
   'rules:decline': void
   'transfers:possible': PossibleTransfer[]
+  'transfers:count': number
   'transfers:choices': TransferSide[]
   'transfers:link': Outcome<'not-found' | 'not-a-pair'>
   'transfers:unlink': Outcome<'not-found'>

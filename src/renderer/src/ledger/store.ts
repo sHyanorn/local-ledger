@@ -15,6 +15,9 @@ interface LedgerStore {
   categories: Category[]
   /** Possible transfers waiting for the user. */
   transfersToReview: number
+  /** A message about the last import, shown over the list until dismissed. */
+  notice: string | null
+  setNotice(notice: string | null): void
   view: View
   show(view: View): void
   /** Reloads accounts and categories after a change. */
@@ -25,13 +28,15 @@ export const useLedger = create<LedgerStore>((set, get) => ({
   accounts: [],
   categories: [],
   transfersToReview: 0,
+  notice: null,
+  setNotice: (notice) => set({ notice }),
   view: { name: 'transactions', accountId: null },
   show: (view) => set({ view }),
   refresh: async () => {
-    const [accounts, categories, possible] = await Promise.all([
+    const [accounts, categories, transfersToReview] = await Promise.all([
       window.ledger.accounts.list(),
       window.ledger.categories.list(),
-      window.ledger.transfers.possible(),
+      window.ledger.transfers.count(),
     ])
     const { view } = get()
     const gone =
@@ -41,7 +46,7 @@ export const useLedger = create<LedgerStore>((set, get) => ({
     set({
       accounts,
       categories,
-      transfersToReview: possible.length,
+      transfersToReview,
       ...(gone ? { view: { name: 'transactions', accountId: null } } : {}),
     })
   },

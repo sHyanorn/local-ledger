@@ -74,7 +74,7 @@ const links = () =>
     .prepare(
       'SELECT out_id AS outId, in_id AS inId, status FROM transfer_links ORDER BY out_id, in_id',
     )
-    .all()
+    .all() as { outId: number; inId: number; status: string }[]
 const reported = () =>
   (
     db.prepare('SELECT id FROM report_transactions ORDER BY id').all() as {
@@ -121,9 +121,35 @@ describe('pairing', () => {
     expect(possibleTransfers(db)).toEqual([])
   })
 
+  it('pairs recurring equal transfers on the day each happens', () => {
+    const days = ['2026-05-01', '2026-05-02', '2026-05-03', '2026-05-04']
+    const pairs = days.map((date) => [
+      add(everyday, date, -500),
+      add(savings, date, 500),
+    ])
+    expect(pairTransfers(db)).toBe(4)
+    expect(links().map((link) => [link.outId, link.inId])).toEqual(pairs)
+  })
+
+  it('waits when only the money in has another candidate', () => {
+    add(everyday, '2026-05-01', -5000)
+    add(everyday, '2026-05-02', -5000, 'Fake Other Out')
+    add(savings, '2026-05-03', 5000)
+    expect(pairTransfers(db)).toBe(0)
+  })
+
+  it('looks four days before as well as after', () => {
+    add(everyday, '2026-05-05', -5000)
+    add(savings, '2026-05-01', 5000)
+    expect(pairTransfers(db)).toBe(1)
+    add(everyday, '2026-05-15', -7000)
+    add(savings, '2026-05-10', 7000)
+    expect(pairTransfers(db)).toBe(0)
+  })
+
   it('waits for the user when either side has another candidate', () => {
     const out = add(everyday, '2026-05-01', -5000)
-    const first = add(savings, '2026-05-01', 5000)
+    const first = add(savings, '2026-05-02', 5000)
     const second = add(savings, '2026-05-03', 5000)
     expect(pairTransfers(db)).toBe(0)
     expect(
@@ -187,6 +213,9 @@ describe('pairing', () => {
     })
     expect(linkTransfer(db, out, late)).toEqual({ ok: true })
     expect(transferChoices(db, out)).toEqual([])
+    // A side already paired is not offered to another transaction.
+    const another = add(everyday, '2026-03-01', -5000)
+    expect(transferChoices(db, another)).toEqual([])
     const again = add(savings, '2026-01-02', 5000)
     expect(linkTransfer(db, out, again)).toEqual({
       ok: false,
@@ -271,6 +300,33 @@ describe('imports and transfers', () => {
     expect(listBatches(db)).toMatchObject([{ count: 2, edited: 0, paired: 1 }])
     expect(undoBatch(db, 1)).toEqual({ ok: true, count: 2 })
     expect(links()).toEqual([])
+  })
+})
+
+describe('pairing after an import', () => {
+  it('pairs only around the imported rows', () => {
+    // Older rows that could pair are left to the user.
+    add(everyday, '2026-04-01', -2500, 'Fake Old Purchase')
+    add(savings, '2026-04-02', 2500, 'Fake Old Refund')
+    add(everyday, '2026-05-27', -125000, 'Fake To Savings')
+    const session = new ImportSession()
+    const opened = session.open(
+      db,
+      'savings.csv',
+      new TextEncoder().encode('27/05/2026,+1250.00,Fake From Everyday,1\n'),
+    )
+    if (!opened.ok) throw new Error(opened.reason)
+    const result = previewAndCommit(session, {
+      id: opened.file.id,
+      encoding: opened.file.encoding,
+      mapping: opened.file.mapping!,
+      targets: [{ key: '', accountId: savings }],
+      selected: [0],
+    })
+    expect(result).toMatchObject({ ok: true, paired: 1 })
+    expect(possibleTransfers(db).map((pair) => pair.out.description)).toEqual([
+      'Fake Old Purchase',
+    ])
   })
 })
 

@@ -93,6 +93,7 @@ export interface LedgerApi {
   readonly transfers: {
     /** Pairs that may be one transfer but have other candidates. */
     possible(): Promise<Results['transfers:possible']>
+    count(): Promise<Results['transfers:count']>
     /** Transactions this one could be paired with by hand. */
     choices(transactionId: number): Promise<Results['transfers:choices']>
     link(

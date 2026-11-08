@@ -44,6 +44,7 @@ export function ImportView({
   const categories = useLedger((store) => store.categories)
   const show = useLedger((store) => store.show)
   const refresh = useLedger((store) => store.refresh)
+  const setNotice = useLedger((store) => store.setNotice)
   const [encoding, setEncoding] = useState<Encoding>(file.encoding)
   const [mapping, setMapping] = useState<Mapping>(
     file.mapping ?? fallbackMapping(file.columns),
@@ -146,6 +147,14 @@ export function ImportView({
         return
       }
       await refresh()
+      setNotice(
+        [
+          `Imported ${count(result.count, 'transaction')}.`,
+          result.paired > 0 && `${count(result.paired, 'transfer')} paired.`,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      )
       const single = targets.filter((target) => target.accountId !== null)
       show({
         name: 'transactions',

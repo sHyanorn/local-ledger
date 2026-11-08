@@ -26,6 +26,8 @@ export function Transactions({ accountId }: { accountId: number | null }) {
   const show = useLedger((store) => store.show)
   const [importProblem, setImportProblem] = useState('')
   const [suggestion, setSuggestion] = useState<RuleSuggestion | null>(null)
+  const notice = useLedger((store) => store.notice)
+  const setNotice = useLedger((store) => store.setNotice)
   const account = accounts.find((candidate) => candidate.id === accountId)
   const [search, setSearch] = useState('')
   const [text, setText] = useState('')
@@ -233,16 +235,32 @@ export function Transactions({ accountId }: { accountId: number | null }) {
           onClose={() => setEditing(null)}
         />
       )}
-      {suggestion && (
-        <RuleSuggestionBar
-          key={`${suggestion.pattern}:${suggestion.categoryId}`}
-          suggestion={suggestion}
-          onDone={(changed) => {
-            setSuggestion(null)
-            if (changed) saved()
-          }}
-        />
-      )}
+      <div aria-live="polite">
+        {notice && (
+          <div className="suggestion" role="region" aria-label="Import result">
+            <p>{notice}</p>
+            <button
+              type="button"
+              className="icon"
+              aria-label="Dismiss"
+              title="Dismiss"
+              onClick={() => setNotice(null)}
+            >
+              ×
+            </button>
+          </div>
+        )}
+        {suggestion && (
+          <RuleSuggestionBar
+            key={`${suggestion.pattern}:${suggestion.categoryId}`}
+            suggestion={suggestion}
+            onDone={(changed) => {
+              setSuggestion(null)
+              if (changed) saved()
+            }}
+          />
+        )}
+      </div>
       {importProblem && (
         <Confirm
           title="Can’t Import File"

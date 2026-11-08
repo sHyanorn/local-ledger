@@ -19,12 +19,17 @@ import type { Db } from '../vault/database'
 interface Candidate {
   outId: number
   inId: number
+  days: number
+  outBatch: number | null
+  inBatch: number | null
 }
 
 function candidates(db: Db): Candidate[] {
   return db
     .prepare(
-      `SELECT o.id AS outId, i.id AS inId
+      `SELECT o.id AS outId, i.id AS inId,
+         abs(julianday(i.date) - julianday(o.date)) AS days,
+         o.import_batch_id AS outBatch, i.import_batch_id AS inBatch
        FROM transactions o
        JOIN accounts ao ON ao.id = o.account_id
        JOIN transactions i
@@ -44,16 +49,28 @@ function candidates(db: Db): Candidate[] {
     .all() as Candidate[]
 }
 
-/** Candidates each side of which has no other. */
+/**
+ * Candidates each side of which has no other; or, for transfers that recur
+ * with the same amount, no other dated the same day.
+ */
 function unique(all: readonly Candidate[]): Candidate[] {
-  const outs = new Map<number, number>()
-  const ins = new Map<number, number>()
-  for (const { outId, inId } of all) {
-    outs.set(outId, (outs.get(outId) ?? 0) + 1)
-    ins.set(inId, (ins.get(inId) ?? 0) + 1)
+  const tally = (pairs: readonly Candidate[], side: 'outId' | 'inId') => {
+    const counts = new Map<number, number>()
+    for (const pair of pairs)
+      counts.set(pair[side], (counts.get(pair[side]) ?? 0) + 1)
+    return counts
   }
+  const outs = tally(all, 'outId')
+  const ins = tally(all, 'inId')
+  const sameDay = all.filter((pair) => pair.days === 0)
+  const sameDayOuts = tally(sameDay, 'outId')
+  const sameDayIns = tally(sameDay, 'inId')
   return all.filter(
-    (pair) => outs.get(pair.outId) === 1 && ins.get(pair.inId) === 1,
+    (pair) =>
+      (outs.get(pair.outId) === 1 && ins.get(pair.inId) === 1) ||
+      (pair.days === 0 &&
+        sameDayOuts.get(pair.outId) === 1 &&
+        sameDayIns.get(pair.inId) === 1),
   )
 }
 
@@ -66,13 +83,27 @@ const confirm = (db: Db, outId: number, inId: number) =>
     )
     .run(outId, inId)
 
-/** Pairs every transfer whose two sides have no other candidate; returns how many. */
-export function pairTransfers(db: Db): number {
+/**
+ * Pairs the transfers that have one candidate (see `unique`); with a batch,
+ * only those with a side in it, so an import never pairs older rows alone.
+ * Returns how many.
+ */
+export function pairTransfers(db: Db, batchId?: number): number {
   return db.transaction(() => {
-    const sure = unique(candidates(db))
+    const sure = unique(candidates(db)).filter(
+      (pair) =>
+        batchId === undefined ||
+        pair.outBatch === batchId ||
+        pair.inBatch === batchId,
+    )
     for (const pair of sure) confirm(db, pair.outId, pair.inId)
     return sure.length
   })()
+}
+
+/** How many pairs wait for the user, for the sidebar. */
+export function countPossibleTransfers(db: Db): number {
+  return candidates(db).length
 }
 
 const SIDE = `id, account_id AS accountId, date, amount_cents AS amountCents,

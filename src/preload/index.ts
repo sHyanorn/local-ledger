@@ -67,6 +67,7 @@ const api: LedgerApi = {
   },
   transfers: {
     possible: () => invoke('transfers:possible', undefined),
+    count: () => invoke('transfers:count', undefined),
     choices: (transactionId) =>
       invoke('transfers:choices', { id: transactionId }),
     link: (transactionId, otherId) =>
