@@ -131,6 +131,22 @@ export const migrations: readonly Migration[] = [
         SELECT * FROM transactions
         WHERE id NOT IN (SELECT id FROM transfer_members);
     `),
+
+  // 6: a budget holds from its month until a later row for the category;
+  // a row without an amount ends the budget from that month.
+  (db) =>
+    db.exec(`
+      CREATE TABLE budgets_new (
+        id INTEGER PRIMARY KEY,
+        category_id INTEGER NOT NULL REFERENCES categories (id) ON DELETE CASCADE,
+        month TEXT NOT NULL CHECK (month ${ISO_MONTH}),
+        amount_cents INTEGER CHECK (amount_cents >= 0),
+        UNIQUE (category_id, month)
+      ) STRICT;
+      INSERT INTO budgets_new SELECT id, category_id, month, amount_cents FROM budgets;
+      DROP TABLE budgets;
+      ALTER TABLE budgets_new RENAME TO budgets;
+    `),
 ]
 
 export class NewerSchemaError extends Error {

@@ -16,6 +16,7 @@ import type {
 } from './imports'
 import type { Rule, RuleReach, RuleSuggestion } from './rules'
 import type { PossibleTransfer, TransferSide } from './transfers'
+import type { MonthBudgets } from './budgets'
 import type {
   Account,
   Category,
@@ -84,6 +85,8 @@ export const channels = {
   'transfers:link': schemas.transferLink,
   'transfers:unlink': schemas.id,
   'transfers:reject': schemas.transferReject,
+  'budgets:month': schemas.budgetMonth,
+  'budgets:set': schemas.budgetSet,
 } as const
 
 export type Channel = keyof typeof channels
@@ -149,4 +152,6 @@ export interface Results {
   'transfers:link': Outcome<'not-found' | 'not-a-pair'>
   'transfers:unlink': Outcome<'not-found'>
   'transfers:reject': Outcome<'not-found'>
+  'budgets:month': MonthBudgets
+  'budgets:set': Outcome<'not-found'>
 }

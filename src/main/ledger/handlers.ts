@@ -8,6 +8,7 @@ import {
   listAccounts,
   updateAccount,
 } from './accounts'
+import { monthBudgets, setBudget } from './budgets'
 import {
   createCategory,
   deleteCategory,
@@ -96,6 +97,8 @@ export function handleLedger(vault: Vault, devOrigin?: string): void {
   )
   handle('rules:reach', (rule) => ruleReach(db(), rule), devOrigin)
   handle('rules:suggest', ({ id }) => suggestRule(db(), id), devOrigin)
+  handle('budgets:month', ({ month }) => monthBudgets(db(), month), devOrigin)
+  handle('budgets:set', (budget) => setBudget(db(), budget), devOrigin)
   handle('transfers:possible', () => possibleTransfers(db()), devOrigin)
   handle('transfers:count', () => countPossibleTransfers(db()), devOrigin)
   handle('transfers:choices', ({ id }) => transferChoices(db(), id), devOrigin)

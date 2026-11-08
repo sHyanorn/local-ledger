@@ -1,0 +1,110 @@
+// Monthly budgets per category, measured against spending in the home
+// currency. Spending reads report_transactions, so paired transfers never
+// count; refunds reduce it, and it is never below zero. A category's
+// spending includes its subcategories', and each can have its own budget.
+import { HOME_CURRENCY, type MonthBudgets } from '../../shared/budgets'
+import type { Outcome } from '../../shared/ipc'
+import type { Currency } from '../../shared/money'
+import type { Db } from '../vault/database'
+import { isMissingReference } from './errors'
+
+/** The first day of the month after this one, as YYYY-MM-DD. */
+function nextMonth(month: string): string {
+  const [year = 0, number = 0] = month.split('-').map(Number)
+  return number === 12
+    ? `${year + 1}-01-01`
+    : `${year}-${String(number + 1).padStart(2, '0')}-01`
+}
+
+export function monthBudgets(db: Db, month: string): MonthBudgets {
+  const range = [`${month}-01`, nextMonth(month)]
+  const categories = db
+    .prepare('SELECT id, parent_id AS parentId FROM categories')
+    .all() as { id: number; parentId: number | null }[]
+  const net = new Map(
+    (
+      db
+        .prepare(
+          `SELECT t.category_id AS id, sum(t.amount_cents) AS cents
+           FROM report_transactions t JOIN accounts a ON a.id = t.account_id
+           WHERE a.currency = ? AND t.date >= ? AND t.date < ?
+             AND t.category_id IS NOT NULL
+           GROUP BY t.category_id`,
+        )
+        .all(HOME_CURRENCY, ...range) as { id: number; cents: number }[]
+    ).map((row) => [row.id, row.cents]),
+  )
+  // A category's own transactions and its subcategories'.
+  const total = new Map<number, number>()
+  for (const category of categories) {
+    const own = net.get(category.id) ?? 0
+    total.set(category.id, (total.get(category.id) ?? 0) + own)
+    if (category.parentId !== null) {
+      total.set(category.parentId, (total.get(category.parentId) ?? 0) + own)
+    }
+  }
+  const budgets = new Map(
+    (
+      db
+        .prepare(
+          `SELECT b.category_id AS id, b.amount_cents AS cents
+           FROM budgets b
+           WHERE b.month = (SELECT max(month) FROM budgets
+                            WHERE category_id = b.category_id AND month <= ?)`,
+        )
+        .all(month) as { id: number; cents: number | null }[]
+    ).map((row) => [row.id, row.cents]),
+  )
+  const uncategorized = db
+    .prepare(
+      `SELECT ifnull(sum(t.amount_cents), 0)
+       FROM report_transactions t JOIN accounts a ON a.id = t.account_id
+       WHERE a.currency = ? AND t.date >= ? AND t.date < ?
+         AND t.category_id IS NULL`,
+    )
+    .pluck()
+    .get(HOME_CURRENCY, ...range) as number
+  const others = db
+    .prepare(
+      `SELECT a.currency, -sum(t.amount_cents) AS spentCents
+       FROM report_transactions t JOIN accounts a ON a.id = t.account_id
+       WHERE a.currency <> ? AND t.date >= ? AND t.date < ?
+         AND t.amount_cents < 0
+       GROUP BY a.currency ORDER BY a.currency`,
+    )
+    .all(HOME_CURRENCY, ...range) as {
+    currency: Currency
+    spentCents: number
+  }[]
+  return {
+    month,
+    categories: categories.map((category) => ({
+      categoryId: category.id,
+      budgetCents: budgets.get(category.id) ?? null,
+      spentCents: Math.max(0, -(total.get(category.id) ?? 0)),
+    })),
+    uncategorizedCents: Math.max(0, -uncategorized),
+    otherCurrencies: others,
+  }
+}
+
+/** Sets the budget from this month on; null ends it from this month. */
+export function setBudget(
+  db: Db,
+  {
+    categoryId,
+    month,
+    amountCents,
+  }: { categoryId: number; month: string; amountCents: number | null },
+): Outcome<'not-found'> {
+  try {
+    db.prepare(
+      `INSERT INTO budgets (category_id, month, amount_cents) VALUES (?, ?, ?)
+       ON CONFLICT (category_id, month) DO UPDATE SET amount_cents = excluded.amount_cents`,
+    ).run(categoryId, month, amountCents)
+    return { ok: true }
+  } catch (error) {
+    if (isMissingReference(error)) return { ok: false, reason: 'not-found' }
+    throw error
+  }
+}

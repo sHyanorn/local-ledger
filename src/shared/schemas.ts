@@ -29,6 +29,11 @@ const name = text(NAME_MAX, 1)
 const cents = z.number().int().min(-MAX_CENTS).max(MAX_CENTS)
 /** A calendar date from 1900 to 2999. */
 const date = z.string().refine(isIsoDate)
+/** A calendar month, YYYY-MM, from 1900 to 2999. */
+const month = z
+  .string()
+  .regex(/^\d{4}-\d{2}$/)
+  .refine((value) => isIsoDate(`${value}-01`))
 
 export const accountFields = z.strictObject({
   name,
@@ -133,6 +138,12 @@ export const schemas = {
     .extend({ id: id.optional() }),
   ruleDismiss: z.strictObject({ pattern: text(DESCRIPTION_MAX, 1) }),
   transferLink: z.strictObject({ id, otherId: id }),
+  budgetMonth: z.strictObject({ month }),
+  budgetSet: z.strictObject({
+    categoryId: id,
+    month,
+    amountCents: z.number().int().min(0).max(MAX_CENTS).nullable(),
+  }),
   transferReject: z.strictObject({ outId: id, inId: id }),
   transactionPage: z.strictObject({
     filter: transactionFilter,

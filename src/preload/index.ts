@@ -65,6 +65,11 @@ const api: LedgerApi = {
     suggest: (transactionId) => invoke('rules:suggest', { id: transactionId }),
     decline: (pattern) => invoke('rules:decline', { pattern }),
   },
+  budgets: {
+    month: (month) => invoke('budgets:month', { month }),
+    set: (categoryId, month, amountCents) =>
+      invoke('budgets:set', { categoryId, month, amountCents }),
+  },
   transfers: {
     possible: () => invoke('transfers:possible', undefined),
     count: () => invoke('transfers:count', undefined),

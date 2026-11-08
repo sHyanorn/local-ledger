@@ -90,6 +90,16 @@ export interface LedgerApi {
     /** Stops suggesting rules for this payee. */
     decline(pattern: string): Promise<void>
   }
+  readonly budgets: {
+    /** Each category's budget in effect and its spending in the month (YYYY-MM). */
+    month(month: string): Promise<Results['budgets:month']>
+    /** Sets a category's budget from the month on; null ends it from then. */
+    set(
+      categoryId: number,
+      month: string,
+      amountCents: number | null,
+    ): Promise<Results['budgets:set']>
+  }
   readonly transfers: {
     /** Pairs that may be one transfer but have other candidates. */
     possible(): Promise<Results['transfers:possible']>
