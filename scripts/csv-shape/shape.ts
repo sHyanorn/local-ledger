@@ -1,7 +1,7 @@
 // The structure of a bank CSV export, to check the import templates against
 // real files: encoding, line endings, quoting, columns, and the kind of value
 // in each column. It never includes a value, a file name or a path; header
-// names appear only for a first row that holds no date or amount.
+// names appear only when they are NAB's or Westpac's own.
 import { readTable } from '../../src/main/import/csv'
 import { detectLayout } from '../../src/main/import/templates'
 import { dateOrders, parseBankAmount } from '../../src/main/import/values'
@@ -69,7 +69,16 @@ export function describe(bytes: Buffer, index: number): string[] {
   const header =
     !first.some((cell) => dateOrders([cell]).length > 0) &&
     !first.some((cell) => cell.trim() !== '' && parseBankAmount(cell) !== null)
-  if (header) out.push(`  header ${JSON.stringify(first)}`)
+  // Only a bank's own header, matched word for word, is safe to print; any
+  // other first row may be data or a preamble with names and numbers.
+  if (
+    header &&
+    (layout?.template === 'nab' || layout?.template === 'westpac')
+  ) {
+    out.push(`  header ${JSON.stringify(first)}`)
+  } else if (header) {
+    out.push(`  first row, not printed: ${first.map(kind).join('; ')}`)
+  }
   const data = header ? table.rows.slice(1) : table.rows
   const widths = new Map<number, number>()
   for (const row of data) {

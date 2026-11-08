@@ -35,4 +35,17 @@ suite('csv:shape', () => {
       '  column 4 (quoted): amount +, 2 decimals ×4; amount -, 2 decimals ×2',
     ])
   })
+
+  it('does not print a first row it cannot recognize as a bank header', () => {
+    const output = describe(
+      Buffer.from(
+        'Statement for Fake Person 000-000 12345678\n' +
+          '2026-05-29T10:00:00,AUD 1 234.56,SALARY FAKE PERSON 0400000000\n',
+      ),
+      0,
+    ).join('\n')
+    expect(output).not.toContain('Fake Person')
+    expect(output).not.toContain('SALARY')
+    expect(output).toContain('first row, not printed: text')
+  })
 })
