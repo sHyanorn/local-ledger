@@ -241,6 +241,13 @@ describe('date order', () => {
     expect(layout?.dateOrders).toEqual(['mdy'])
   })
 
+  it('lists one order when a month name settles it', () => {
+    expect(detectLayout(file(['29 May 26', '01 Jun 26']))?.dateOrders).toEqual([
+      'dmy',
+    ])
+    expect(read('nab.csv').layout.dateOrders).toEqual(['dmy'])
+  })
+
   it('lists every order that reads them all, day first first', () => {
     const layout = detectLayout(file(early))
     expect(layout?.mapping.dateOrder).toBe('dmy')

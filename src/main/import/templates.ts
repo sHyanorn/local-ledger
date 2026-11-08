@@ -89,9 +89,15 @@ function layout(
       ] as const,
   )
   const most = Math.max(...read.map(([, count]) => count))
-  const best = read
+  const fitting = read
     .filter(([, count]) => count === most)
     .map(([order]) => order)
+  // Orders that read every date alike, as a month name makes them, are one.
+  const differ = (order: DateOrder) =>
+    dates.some(
+      (date) => parseDate(date, order) !== parseDate(date, fitting[0] ?? order),
+    )
+  const best = fitting.filter((order, index) => index === 0 || differ(order))
   return {
     template,
     mapping: { ...mapping, dateOrder: best[0] ?? 'dmy' },
