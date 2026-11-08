@@ -19,6 +19,8 @@ src/
 tests/
   unit/       Vitest
   e2e/        Playwright for Electron
+  native/     Encrypted database under Electron, checks of the packaged app
+scripts/      Repository checks run by npm scripts
 ```
 
 ## Working practices
@@ -31,11 +33,14 @@ tests/
 ## Common commands
 
 ```bash
+npm ci && npm run setup:electron   # install scripts are off (.npmrc)
 npm run dev
 npm test
-npm run test:e2e
-npm run lint && npm run typecheck
+npm run test:e2e     # on Linux: as a non-root user, under xvfb-run
+npm run test:native  # encrypted database under Electron
+npm run lint && npm run typecheck && npm run format:check
 npm run build        # build installers
+npm run build:dir && npm run test:package   # unpacked build and its checks
 npm run seed         # generate fake demo data
 ```
 

@@ -1,10 +1,11 @@
 # Tasks
 
 ## M0 Setup
-- [ ] Scaffold a React + TypeScript project with electron-vite and add Zustand
-- [ ] Configure oxlint, Prettier, Vitest and Playwright
-- [ ] Apply the Electron security configuration from CLAUDE.md and write tests for it
-- [ ] CI: lint, type check, unit tests
+- [x] Scaffold a React + TypeScript project with electron-vite and add Zustand
+- [x] Configure oxlint, Prettier, Vitest and Playwright
+- [x] Apply the Electron security configuration from CLAUDE.md and write tests for it
+- [x] Open an encrypted database under Electron on Ubuntu, Windows and macOS; package Windows and macOS and check the result
+- [x] CI: lint, type check, unit tests, e2e tests and the native checks
 
 ## M1 Encrypted storage
 - [ ] Argon2id key derivation and parameter configuration
@@ -13,6 +14,7 @@
 - [ ] Idle auto-lock
 - [ ] Change the master password
 - [ ] Encryption tests
+- [ ] Keep keys in Buffers and zero them after use; state in the plan and in `docs/SECURITY_DESIGN.md` what cannot be wiped (the master password arrives over IPC as a string, and the key reaches SQLite as a hex string)
 
 ## M2 Data core
 - [ ] Typed IPC API with zod validation
@@ -29,12 +31,12 @@
 ## M4 Budgets and reports
 - [ ] Budget setup and overspending alerts
 - [ ] Overview and report charts
-- [ ] Excel and PDF export
+- [ ] Excel and PDF export, preferring options with few dependencies
 
 ## M5 Polish and release
 - [ ] Apple-style UI polish, dark mode, keyboard shortcuts
 - [ ] Encrypted backup and restore
-- [ ] Package for macOS and Windows with electron-builder
+- [ ] Release workflow: macOS and Windows installers, checksums and provenance attestation (D006)
 - [ ] Playwright end-to-end tests
 - [ ] Write `docs/SECURITY_DESIGN.md`
 - [ ] English README, screenshots and GIFs; publish the first release

@@ -4,13 +4,13 @@
 
 A personal finance desktop app whose data stays on the local machine in a fully encrypted database: import bank CSVs, categorize automatically, set budgets, view monthly charts, and export to Excel and PDF.
 
-## 2. Capabilities to demonstrate
+## 2. Components
 
-| Capability | Where it shows |
+| Component | Contents |
 |---|---|
-| Desktop development | Electron multi-process architecture, IPC, native menus, packaging and code signing, auto-update |
-| Security | Whole-database encryption, key derivation, Electron hardening, auto-lock |
-| Frontend and design | React + Zustand, Apple-style UI, dark mode, smooth interactions |
+| Desktop shell | Electron main, preload and renderer processes, typed IPC, native menus, macOS and Windows packaging |
+| Security | Whole-database encryption, Argon2id key derivation, Electron hardening, auto-lock |
+| Interface | React + Zustand, macOS-style design, dark mode, keyboard shortcuts |
 | Data processing | CSV parsing and column mapping, deduplication, rule-based categorization, export |
 
 ## 3. Scope
@@ -38,7 +38,7 @@ A personal finance desktop app whose data stays on the local machine in a fully 
 
 - Multiple currencies (AUD, CNY), with manually entered exchange rates
 - Local machine-learning categorization (naive Bayes, fully offline)
-- Auto-update (GitHub Releases)
+- Update notice: a menu item that opens the GitHub Releases page
 
 ### Out of scope
 
@@ -98,6 +98,6 @@ All amounts are stored as integers (cents).
 
 ## 8. Deliverables
 
-- macOS and Windows installers (GitHub Releases)
-- English README: screenshots, GIFs, security design notes, download links
+- macOS and Windows installers (GitHub Releases), unsigned (D006), with SHA-256 checksums and a build provenance attestation
+- English README: screenshots, GIFs, security design notes, download links, first-launch steps on each platform, and how to verify a download
 - `docs/SECURITY_DESIGN.md`: Electron hardening checklist and encryption scheme
