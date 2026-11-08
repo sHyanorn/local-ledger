@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { listBatches, undoBatch } from '../../src/main/import/batches'
 import { ImportSession } from '../../src/main/import/session'
 import { createAccount } from '../../src/main/ledger/accounts'
+import { createCategory } from '../../src/main/ledger/categories'
+import { createRule } from '../../src/main/ledger/rules'
 import {
   createTransaction,
   deleteTransaction,
@@ -69,6 +71,16 @@ const add = (
   if (!result.ok) throw new Error('no transaction')
   return result.id
 }
+const card = () => {
+  const result = createAccount(db, {
+    name: 'Fake Card',
+    type: 'credit',
+    currency: 'AUD',
+    openingBalanceCents: 0,
+  })
+  if (!result.ok) throw new Error('no account')
+  return result.id
+}
 const links = () =>
   db
     .prepare(
@@ -129,6 +141,31 @@ describe('pairing', () => {
     ])
     expect(pairTransfers(db)).toBe(4)
     expect(links().map((link) => [link.outId, link.inId])).toEqual(pairs)
+  })
+
+  it('leaves recurring transfers that arrive a day later for review', () => {
+    const days = [
+      '2026-05-01',
+      '2026-05-02',
+      '2026-05-03',
+      '2026-05-04',
+      '2026-05-05',
+      '2026-05-06',
+    ]
+    for (const date of days) add(everyday, date, -500)
+    for (const date of days) {
+      add(savings, `2026-05-0${Number(date.slice(-1)) + 1}`, 500)
+    }
+    expect(pairTransfers(db)).toBe(0)
+    expect(possibleTransfers(db).length).toBeGreaterThan(0)
+  })
+
+  it('does not pair a same-day refund over the real transfer a day later', () => {
+    add(everyday, '2026-05-01', -5000)
+    add(savings, '2026-05-02', 5000, 'Fake Real Transfer')
+    add(card(), '2026-05-01', 5000, 'Fake Refund')
+    expect(pairTransfers(db)).toBe(0)
+    expect(possibleTransfers(db)).toHaveLength(2)
   })
 
   it('waits when only the money in has another candidate', () => {
@@ -309,6 +346,14 @@ describe('pairing after an import', () => {
     add(everyday, '2026-04-01', -2500, 'Fake Old Purchase')
     add(savings, '2026-04-02', 2500, 'Fake Old Refund')
     add(everyday, '2026-05-27', -125000, 'Fake To Savings')
+    const category = createCategory(db, { name: 'Fake Moves', parentId: null })
+    if (!category.ok) throw new Error('no category')
+    createRule(db, {
+      pattern: 'fake from',
+      match: 'contains',
+      categoryId: category.id,
+      apply: false,
+    })
     const session = new ImportSession()
     const opened = session.open(
       db,
@@ -324,6 +369,14 @@ describe('pairing after an import', () => {
       selected: [0],
     })
     expect(result).toMatchObject({ ok: true, paired: 1 })
+    expect(
+      db
+        .prepare(
+          "SELECT category_id FROM transactions WHERE description = 'Fake From Everyday'",
+        )
+        .pluck()
+        .get(),
+    ).toBeNull()
     expect(possibleTransfers(db).map((pair) => pair.out.description)).toEqual([
       'Fake Old Purchase',
     ])

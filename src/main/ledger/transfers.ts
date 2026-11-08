@@ -50,28 +50,46 @@ function candidates(db: Db): Candidate[] {
 }
 
 /**
- * Candidates each side of which has no other; or, for transfers that recur
- * with the same amount, no other dated the same day.
+ * The pairs that are sure. Candidates that share a transaction form a group;
+ * a group of one pair is sure. In a larger group, as when equal transfers
+ * recur within days of each other, the same-day pairs are sure only if they
+ * account for every transaction in the group, one partner each; otherwise
+ * the whole group waits for the user.
  */
 function unique(all: readonly Candidate[]): Candidate[] {
-  const tally = (pairs: readonly Candidate[], side: 'outId' | 'inId') => {
-    const counts = new Map<number, number>()
-    for (const pair of pairs)
-      counts.set(pair[side], (counts.get(pair[side]) ?? 0) + 1)
-    return counts
+  const parent = new Map<number, number>()
+  const root = (id: number): number => {
+    const up = parent.get(id) ?? id
+    if (up === id) return id
+    const top = root(up)
+    parent.set(id, top)
+    return top
   }
-  const outs = tally(all, 'outId')
-  const ins = tally(all, 'inId')
-  const sameDay = all.filter((pair) => pair.days === 0)
-  const sameDayOuts = tally(sameDay, 'outId')
-  const sameDayIns = tally(sameDay, 'inId')
-  return all.filter(
-    (pair) =>
-      (outs.get(pair.outId) === 1 && ins.get(pair.inId) === 1) ||
-      (pair.days === 0 &&
-        sameDayOuts.get(pair.outId) === 1 &&
-        sameDayIns.get(pair.inId) === 1),
-  )
+  for (const { outId, inId } of all) parent.set(root(outId), root(inId))
+
+  const groups = new Map<number, Candidate[]>()
+  for (const pair of all) {
+    const key = root(pair.outId)
+    groups.set(key, [...(groups.get(key) ?? []), pair])
+  }
+  const sure: Candidate[] = []
+  for (const pairs of groups.values()) {
+    if (pairs.length === 1) {
+      sure.push(...pairs)
+      continue
+    }
+    const members = new Set(pairs.flatMap((pair) => [pair.outId, pair.inId]))
+    const sameDay = pairs.filter((pair) => pair.days === 0)
+    const partners = new Map<number, number>()
+    for (const pair of sameDay) {
+      for (const id of [pair.outId, pair.inId]) {
+        partners.set(id, (partners.get(id) ?? 0) + 1)
+      }
+    }
+    const everyOnce = [...members].every((id) => partners.get(id) === 1)
+    if (everyOnce) sure.push(...sameDay)
+  }
+  return sure
 }
 
 const confirm = (db: Db, outId: number, inId: number) =>

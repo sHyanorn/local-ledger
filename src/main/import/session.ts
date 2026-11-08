@@ -295,7 +295,13 @@ export class ImportSession {
         batchId,
       )
       rememberMapping(db, pending, request.mapping)
-      return { id: batchId, count, paired: pairTransfers(db, batchId) }
+      const paired = pairTransfers(db, batchId)
+      // A transfer needs no category; one a rule gave on import goes.
+      db.prepare(
+        `UPDATE transactions SET category_id = NULL
+         WHERE import_batch_id = ? AND id IN (SELECT id FROM transfer_members)`,
+      ).run(batchId)
+      return { id: batchId, count, paired }
     })()
     this.clear()
     return { ok: true, ...imported }
