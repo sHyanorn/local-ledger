@@ -162,6 +162,8 @@ export function updateTransaction(
       `UPDATE transactions SET account_id = @accountId, date = @date,
            amount_cents = @amountCents, description = @description,
            category_id = @categoryId, notes = @notes,
+           -- A fingerprint belongs to its account's imports.
+           hash = CASE WHEN account_id IS @accountId THEN hash END,
            edited = edited OR account_id IS NOT @accountId
              OR date IS NOT @date OR amount_cents IS NOT @amountCents
              OR description IS NOT @description

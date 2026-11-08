@@ -330,6 +330,37 @@ describe('pairing after an import', () => {
   })
 })
 
+describe('moving an imported transaction', () => {
+  it('drops its fingerprint, so the same row can sit in both accounts', () => {
+    const session = new ImportSession()
+    const text = new TextEncoder().encode('01/05/2026,-1.00,Fake Same,1\n')
+    for (const accountId of [everyday, savings]) {
+      const opened = session.open(db, 'same.csv', Uint8Array.from(text))
+      if (!opened.ok) throw new Error(opened.reason)
+      previewAndCommit(session, {
+        id: opened.file.id,
+        encoding: opened.file.encoding,
+        mapping: opened.file.mapping!,
+        targets: [{ key: '', accountId }],
+        selected: [0],
+      })
+    }
+    const [first] = pageTransactions(db, {
+      filter: { accountId: everyday },
+      limit: 1,
+    }).rows
+    expect(
+      updateTransaction(db, { ...first!, accountId: savings, notes: '' }),
+    ).toEqual({ ok: true })
+    expect(
+      db
+        .prepare('SELECT hash IS NULL FROM transactions WHERE id = ?')
+        .pluck()
+        .get(first!.id),
+    ).toBe(1)
+  })
+})
+
 describe('the seeded ledger', () => {
   it('pairs every savings transfer and card repayment', () => {
     insertLedger(db, generateLedger({ end: new Date(2026, 10, 8) }))
