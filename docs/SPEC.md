@@ -89,7 +89,7 @@ All amounts are stored as integers (cents). An imported transaction's `hash` is 
 
 ## 6. Interface
 
-- Sidebar: Overview, Transactions, Budgets, Reports, Settings
+- Sidebar: Overview, Transactions, Transfers (pairs to review), Budgets, Reports, Settings
 - Overview: this month's income and expense cards, budget progress, recent transactions
 - Style: modeled on native macOS apps, with the system font, a translucent sidebar, subtle animations and keyboard shortcuts
 - All demo screenshots use fake data

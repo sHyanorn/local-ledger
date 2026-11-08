@@ -53,7 +53,7 @@ What the app does:
 - On unlock, lock and a password change that commits, the renderer process that showed the previous page ends.
 - A password change that fails keeps its page so it can say so, and clears its fields; the typed passwords stay in that process as strings until the next lock ends it.
 - The data handlers keep no reference to rows between calls. A test shows a transaction, locks, and checks that its text is gone from the pages and no longer reachable in the main process heap: a heap snapshot collects garbage first and here keeps strings whole. It does not see the contents of Buffers and other binary arrays, nor memory already freed.
-- A CSV file being imported waits in the main process until it is imported, another is chosen, or the vault locks or unlocks; then its bytes are zeroed and its parsed rows dropped. A test imports one file, leaves another waiting, locks, and checks that neither file's text is reachable.
+- A CSV file being imported waits in the main process until it is imported, another is chosen, or the vault locks or unlocks; then its bytes are zeroed and its parsed rows dropped. Bytes read but refused are zeroed too. A test imports one file, leaves another waiting, locks, and checks that neither file's text is reachable.
 
 What it cannot do, and does not claim:
 
@@ -65,9 +65,9 @@ What it cannot do, and does not claim:
 
 ## Importing files
 
-- Only the system open dialog, shown by the main process, picks a file; the page cannot name a path, and its IPC payloads carry no paths.
-- A file is refused whole past 10 MB (checked before reading), 50,000 rows, 64 columns or 64 KB in one record. Fields are split by `csv-parse`; dates and amounts are read strictly, and every request from the page is validated with zod and computed again in the main process before anything is written.
-- Text from a file is stored as it is, without its control characters, and shown only as text, so a cell such as `=HYPERLINK(...)` does nothing in the app. Exports (M4) must neutralize such text for spreadsheets.
+- Only the system open dialog, shown by the main process, picks a file; the page cannot name a path, and its IPC payloads carry no paths. Only a regular file is read, through one handle, and never more than the limit, whatever size the file system reports; if the vault locked while the dialog was open, nothing is read.
+- A file is refused whole past 10 MB, 50,000 rows, 64 columns or 64 KB in one record. Fields are split by `csv-parse`; dates and amounts are read strictly. Every request from the page is validated with zod, and an import is computed again in the main process from the settings of the last preview, refusing any others, before anything is written.
+- Text from a file is stored without its control characters and invisible format characters, and shown only as text, so a cell such as `=HYPERLINK(...)` does nothing in the app. Exports (M4) must neutralize such text for spreadsheets.
 - The source file stays where it is, unencrypted, and its name is stored inside the vault for the import history. Deleting or protecting the original is up to the user.
 
 ## Electron hardening
