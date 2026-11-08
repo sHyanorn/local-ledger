@@ -1,0 +1,6 @@
+out
+release
+test-results
+playwright-report
+package-lock.json
+*.md

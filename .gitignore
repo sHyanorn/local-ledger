@@ -12,3 +12,5 @@ out/
 release/
 *.db
 *.sqlite
+test-results/
+playwright-report/

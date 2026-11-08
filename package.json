@@ -15,12 +15,19 @@
     "compile": "electron-vite build",
     "start": "electron-vite preview",
     "build": "npm run compile && electron-builder",
-    "build:dir": "npm run compile && electron-builder --dir"
+    "build:dir": "npm run compile && electron-builder --dir",
+    "lint": "oxlint && node scripts/check-sandbox-flags.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:e2e": "npm run compile && playwright test"
   },
   "dependencies": {
     "better-sqlite3-multiple-ciphers": "13.0.3"
   },
   "devDependencies": {
+    "@playwright/test": "1.65.0",
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
@@ -28,10 +35,13 @@
     "electron": "45.2.3",
     "electron-builder": "26.18.1",
     "electron-vite": "6.0.0",
+    "oxlint": "1.92.0",
+    "prettier": "3.9.10",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "typescript": "7.0.2",
     "vite": "8.3.6",
+    "vitest": "5.1.0",
     "zustand": "5.1.0"
   }
 }
