@@ -156,3 +156,34 @@ test('a vault whose database is missing is reported, and nothing is deleted', as
     await again.close()
   }
 })
+
+test.describe('automatic lock', () => {
+  test.beforeEach(async ({ app, page }) => {
+    await createVault(app, page)
+  })
+
+  for (const event of ['lock-screen', 'suspend']) {
+    test(`locks when the system emits ${event}`, async ({ app }) => {
+      const locked = await replacedBy(app, () =>
+        app.evaluate(({ powerMonitor }, name) => {
+          powerMonitor.emit(name)
+        }, event),
+      )
+      expect(await locked.evaluate(() => window.ledger.vault.status())).toBe(
+        'locked',
+      )
+    })
+  }
+
+  test('locks after five minutes of system idle time', async ({ app }) => {
+    const locked = await replacedBy(app, () =>
+      app.evaluate(({ powerMonitor }) => {
+        // The real check reads this on each poll.
+        powerMonitor.getSystemIdleTime = () => 5 * 60
+      }),
+    )
+    expect(await locked.evaluate(() => window.ledger.vault.status())).toBe(
+      'locked',
+    )
+  })
+})

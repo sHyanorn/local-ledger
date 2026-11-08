@@ -67,6 +67,10 @@ export class Vault {
     this.checkpoint = checkpoint
   }
 
+  get unlocked(): boolean {
+    return this.#db !== null
+  }
+
   get state(): VaultState {
     if (this.#db) return 'unlocked'
     if (!existsSync(this.dir)) return 'new'

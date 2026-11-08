@@ -1,5 +1,6 @@
 import { join } from 'node:path'
-import { app } from 'electron'
+import { app, powerMonitor } from 'electron'
+import { watchForLock } from './auto-lock'
 import { hardenApp } from './hardening'
 import { handle } from './ipc'
 import { setMenu } from './menu'
@@ -44,7 +45,11 @@ export function startApp(): void {
     }
     open()
     vault.onChange(() => window?.replaceView())
-    setMenu({ lock: () => void vault.lock(), packaged: app.isPackaged })
+    const lock = () => {
+      if (vault.unlocked) void vault.lock()
+    }
+    setMenu({ lock, packaged: app.isPackaged })
+    watchForLock(powerMonitor, lock)
 
     app.on('second-instance', () => {
       if (!window) return open()
