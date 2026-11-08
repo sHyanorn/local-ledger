@@ -2,13 +2,7 @@
 // otherwise the text is UTF-8 if it decodes as UTF-8 without error, and
 // Windows-1252 if not, since that decodes any byte sequence.
 
-export const ENCODINGS = [
-  'utf-8',
-  'utf-16le',
-  'utf-16be',
-  'windows-1252',
-] as const
-export type Encoding = (typeof ENCODINGS)[number]
+import type { Encoding } from '../../shared/imports'
 
 const BOMS: readonly [Encoding, readonly number[]][] = [
   ['utf-8', [0xef, 0xbb, 0xbf]],

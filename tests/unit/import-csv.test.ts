@@ -8,11 +8,8 @@ import {
   readTable,
 } from '../../src/main/import/csv'
 import { decode } from '../../src/main/import/decode'
-import {
-  applyMapping,
-  cleanText,
-  type Mapping,
-} from '../../src/main/import/mapping'
+import { applyMapping, cleanText } from '../../src/main/import/mapping'
+import type { Mapping } from '../../src/shared/imports'
 import {
   dateOrders,
   parseBankAmount,

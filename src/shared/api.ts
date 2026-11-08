@@ -1,3 +1,4 @@
+import type { ImportTarget, Mapping, Encoding } from './imports'
 import type { Results, VaultState } from './ipc'
 import type {
   AccountFields,
@@ -54,4 +55,25 @@ export interface LedgerApi {
     ): Promise<Results['transactions:set-category']>
     delete(id: number): Promise<Results['transactions:delete']>
   }
+  readonly imports: {
+    /** Asks the user for a CSV file and reads it; the file waits in the main process. */
+    open(): Promise<Results['import:open']>
+    preview(request: ImportRequest): Promise<Results['import:preview']>
+    /** Imports the rows whose indexes are selected. */
+    commit(
+      request: ImportRequest,
+      selected: number[],
+    ): Promise<Results['import:commit']>
+    discard(id: string): Promise<void>
+    batches(): Promise<Results['import:batches']>
+    /** Removes an import's transactions, edited or not. */
+    undo(batchId: number): Promise<Results['import:undo']>
+  }
+}
+
+export interface ImportRequest {
+  id: string
+  encoding: Encoding
+  mapping: Mapping
+  targets: ImportTarget[]
 }

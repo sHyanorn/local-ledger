@@ -2,12 +2,14 @@
 // The banks do not publish their layouts; these follow open-source parsers
 // written against real exports (D024). A bank's own category column is never
 // read: the ledger's categories are the user's.
+import {
+  DATE_ORDERS,
+  type DateOrder,
+  type Mapping,
+  type TemplateId,
+} from '../../shared/imports'
 import type { Row } from './csv'
-import type { Mapping } from './mapping'
-import { dateOrders, parseBankAmount, type DateOrder } from './values'
-
-export const TEMPLATES = ['commbank', 'nab', 'anz', 'westpac'] as const
-export type TemplateId = (typeof TEMPLATES)[number]
+import { dateOrders, parseBankAmount, parseDate } from './values'
 
 export interface Layout {
   /** The bank whose layout this is, or null for a guess. */
@@ -15,11 +17,20 @@ export interface Layout {
   mapping: Mapping
   /** The column naming the bank account, when one file holds several. */
   accountColumn: number | null
-  /** The date orders every date fits; more than one means the user chooses. */
+  /** The date orders the dates fit; more than one means the user chooses. */
   dateOrders: DateOrder[]
 }
 
 const SAMPLE = 50
+
+/**
+ * Most rows pass: all but a tenth, or all but one in a short file, so a
+ * stray summary line or a mistyped date does not hide the layout.
+ */
+function mostly<T>(rows: readonly T[], test: (row: T) => boolean): boolean {
+  const passing = rows.filter(test).length
+  return passing > 0 && rows.length - passing <= Math.max(1, rows.length / 10)
+}
 
 const isAmount = (cell: string | undefined) =>
   cell !== undefined && cell.trim() !== '' && parseBankAmount(cell) !== null
@@ -62,7 +73,10 @@ function layout(
   dates: readonly string[],
   accountColumn: number | null = null,
 ): Layout {
-  const orders = dateOrders(dates)
+  const filled = dates.filter((date) => date.trim() !== '')
+  const orders = DATE_ORDERS.filter((order) =>
+    mostly(filled, (date) => parseDate(date, order) !== null),
+  )
   return {
     template,
     mapping: { ...mapping, dateOrder: orders[0] ?? 'dmy' },
@@ -105,7 +119,8 @@ function bankLayout(rows: readonly Row[]): Layout | null {
   }
 
   const sample = data(false)
-  const dated = sample.every(
+  const dated = mostly(
+    sample,
     (row) =>
       dateOrders([row.cells[0] ?? '']).includes('dmy') &&
       isAmount(row.cells[1]),
@@ -118,11 +133,14 @@ function bankLayout(rows: readonly Row[]): Layout | null {
     amount: { kind: 'signed', column: 1, negate: false },
   } satisfies Omit<Mapping, 'dateOrder'>
   // CommBank adds a running balance; ANZ has none, and may add five more columns.
-  if (sample.every((row) => width(row.cells) === 4 && isAmount(row.cells[3]))) {
+  if (
+    mostly(sample, (row) => width(row.cells) === 4 && isAmount(row.cells[3]))
+  ) {
     return layout('commbank', mapping, column(sample, 0))
   }
   if (
-    sample.every(
+    mostly(
+      sample,
       (row) =>
         (row.cells.length === 3 || row.cells.length === 8) &&
         !isAmount(row.cells[3]),
@@ -146,11 +164,11 @@ function guessLayout(rows: readonly Row[]): Layout | null {
   const sample = rows.slice(header ? 1 : 0, SAMPLE + 1)
   if (sample.length === 0) return null
   const columns = Math.max(...sample.map((row) => row.cells.length))
-  const share = (index: number, test: (cell: string | undefined) => boolean) =>
-    sample.filter((row) => test(row.cells[index])).length / sample.length
+  const fits = (index: number, test: (cell: string | undefined) => boolean) =>
+    mostly(sample, (row) => test(row.cells[index]))
   const indexes = [...Array(columns).keys()]
 
-  const date = indexes.find((index) => share(index, isDate) >= 0.9)
+  const date = indexes.find((index) => fits(index, isDate))
   if (date === undefined) return null
 
   const named = (pattern: RegExp) =>
@@ -165,7 +183,7 @@ function guessLayout(rows: readonly Row[]): Layout | null {
       (index) =>
         index !== date &&
         !/balance/i.test(names[index] ?? '') &&
-        share(index, isAmount) >= 0.9,
+        fits(index, isAmount),
     )
     if (column !== undefined) amount = { kind: 'signed', column, negate: false }
   }

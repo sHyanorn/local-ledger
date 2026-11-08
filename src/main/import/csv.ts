@@ -1,23 +1,17 @@
 import { CsvError, parse, type Options } from 'csv-parse/sync'
-import { decode, type Encoding } from './decode'
+import type { Encoding, FileProblem } from '../../shared/imports'
+import { MAX_COLUMNS } from '../../shared/imports'
+import { decode } from './decode'
 
 /** A file larger than this is refused before it is read. */
 export const MAX_FILE_BYTES = 10 * 1024 * 1024
 export const MAX_ROWS = 50_000
-export const MAX_COLUMNS = 64
+export { MAX_COLUMNS }
 /** Characters in one record; a whole year of a bank account is far less. */
 export const MAX_RECORD = 64 * 1024
 
 const DELIMITERS = [',', ';', '\t'] as const
 const SAMPLE_LINES = 20
-
-export type FileProblem =
-  | 'too-large'
-  | 'too-many-rows'
-  | 'too-many-columns'
-  | 'record-too-long'
-  | 'not-csv'
-  | 'empty'
 
 /** The file as a whole cannot be imported; the code says why. */
 export class FileError extends Error {

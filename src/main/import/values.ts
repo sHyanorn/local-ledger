@@ -1,11 +1,8 @@
 // Dates and amounts as banks write them, read into the ledger's forms:
 // YYYY-MM-DD and integer cents.
 import { isIsoDate } from '../../shared/dates'
+import { DATE_ORDERS, type DateOrder } from '../../shared/imports'
 import { parseAmount } from '../../shared/money'
-
-/** The order of day, month and year in a numeric date. */
-export const DATE_ORDERS = ['dmy', 'mdy', 'ymd'] as const
-export type DateOrder = (typeof DATE_ORDERS)[number]
 
 const MONTH_NAMES = [
   'january',

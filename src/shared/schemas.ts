@@ -1,6 +1,7 @@
 // The schemas the main process checks every IPC payload against.
 import { z } from 'zod'
 import { isIsoDate } from './dates'
+import { DATE_ORDERS, ENCODINGS, MAX_COLUMNS } from './imports'
 import {
   ACCOUNT_TYPES,
   DESCRIPTION_MAX,
@@ -61,12 +62,56 @@ export const transactionFilter = z.strictObject({
 
 export const transactionCursor = z.strictObject({ date, id })
 
+const column = z
+  .number()
+  .int()
+  .min(0)
+  .max(MAX_COLUMNS - 1)
+
+export const amountColumns = z.discriminatedUnion('kind', [
+  /** One column, money out negative; `negate` for files that write it positive. */
+  z.strictObject({ kind: z.literal('signed'), column, negate: z.boolean() }),
+  /** Money out and money in in separate columns, both written positive. */
+  z.strictObject({ kind: z.literal('split'), debit: column, credit: column }),
+])
+
+/** Which columns of a CSV file hold what. */
+export const mapping = z.strictObject({
+  /** The first row names the columns. */
+  header: z.boolean(),
+  date: column,
+  dateOrder: z.enum(DATE_ORDERS),
+  /** The first of these columns that is not empty. */
+  description: z.array(column).min(1).max(3),
+  amount: amountColumns,
+})
+
+/** The account for one group of a file's rows; null skips the group. */
+export const importTarget = z.strictObject({
+  /** The bank account the rows name, or '' for a file of one account. */
+  key: z.string().max(64),
+  accountId: id.nullable(),
+})
+
+const importRequest = z.strictObject({
+  id: z.uuid(),
+  encoding: z.enum(ENCODINGS),
+  mapping,
+  targets: z.array(importTarget).min(1).max(50),
+})
+
 export const schemas = {
   id: z.strictObject({ id }),
   accountUpdate: accountFields.extend({ id }),
   categoryUpdate: categoryFields.extend({ id }),
   transactionUpdate: transactionFields.extend({ id }),
   transactionCategory: z.strictObject({ id, categoryId: id.nullable() }),
+  importPreview: importRequest,
+  importCommit: importRequest.extend({
+    /** The indexes of the preview rows to import. */
+    selected: z.array(z.number().int().min(0).max(50_000)).max(50_000),
+  }),
+  importDiscard: z.strictObject({ id: z.uuid() }),
   transactionPage: z.strictObject({
     filter: transactionFilter,
     after: transactionCursor.optional(),
@@ -79,3 +124,6 @@ export type CategoryFields = z.infer<typeof categoryFields>
 export type TransactionFields = z.infer<typeof transactionFields>
 export type TransactionFilter = z.infer<typeof transactionFilter>
 export type TransactionCursor = z.infer<typeof transactionCursor>
+export type AmountColumns = z.infer<typeof amountColumns>
+export type Mapping = z.infer<typeof mapping>
+export type ImportTarget = z.infer<typeof importTarget>

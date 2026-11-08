@@ -141,7 +141,11 @@ export function updateTransaction(
       .prepare(
         `UPDATE transactions SET account_id = @accountId, date = @date,
            amount_cents = @amountCents, description = @description,
-           category_id = @categoryId, notes = @notes
+           category_id = @categoryId, notes = @notes,
+           edited = edited OR account_id IS NOT @accountId
+             OR date IS NOT @date OR amount_cents IS NOT @amountCents
+             OR description IS NOT @description
+             OR category_id IS NOT @categoryId OR notes IS NOT @notes
          WHERE id = @id`,
       )
       .run({ id, ...row(fields) })
@@ -159,8 +163,12 @@ export function setTransactionCategory(
 ): Outcome<'not-found'> {
   try {
     const { changes } = db
-      .prepare('UPDATE transactions SET category_id = ? WHERE id = ?')
-      .run(categoryId, id)
+      .prepare(
+        `UPDATE transactions SET category_id = @categoryId,
+           edited = edited OR category_id IS NOT @categoryId
+         WHERE id = @id`,
+      )
+      .run({ id, categoryId })
     return changes > 0 ? { ok: true } : { ok: false, reason: 'not-found' }
   } catch (error) {
     if (isMissingReference(error)) return { ok: false, reason: 'not-found' }

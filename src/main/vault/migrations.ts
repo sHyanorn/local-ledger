@@ -78,6 +78,23 @@ export const migrations: readonly Migration[] = [
       CREATE UNIQUE INDEX categories_name
         ON categories (ifnull(parent_id, 0), name COLLATE NOCASE);
     `),
+
+  // 3: CSV import. An imported row's hash is its fingerprint, unique in its
+  // account; `edited` marks a row the user changed, for undoing an import.
+  (db) =>
+    db.exec(`
+      DROP INDEX transactions_hash;
+      CREATE UNIQUE INDEX transactions_hash
+        ON transactions (account_id, hash) WHERE hash IS NOT NULL;
+      ALTER TABLE transactions
+        ADD COLUMN edited INTEGER NOT NULL DEFAULT 0 CHECK (edited IN (0, 1));
+      CREATE INDEX transactions_import_batch ON transactions (import_batch_id);
+
+      CREATE TABLE import_mappings (
+        signature TEXT PRIMARY KEY,
+        mapping TEXT NOT NULL
+      ) STRICT;
+    `),
 ]
 
 export class NewerSchemaError extends Error {

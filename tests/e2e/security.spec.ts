@@ -154,11 +154,19 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
       accounts: methods('accounts'),
       categories: methods('categories'),
       transactions: methods('transactions'),
+      imports: methods('imports'),
       unlockReplaced: String(vault.unlock).includes('replaced'),
     }
   })
   expect(api).toEqual({
-    keys: ['version', 'vault', 'accounts', 'categories', 'transactions'],
+    keys: [
+      'version',
+      'vault',
+      'accounts',
+      'categories',
+      'transactions',
+      'imports',
+    ],
     version: pkg.version,
     vault: ['changePassword', 'create', 'lock', 'status', 'unlock'],
     accounts: ['create', 'delete', 'list', 'update'],
@@ -171,6 +179,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
       'totals',
       'update',
     ],
+    imports: ['batches', 'commit', 'discard', 'open', 'preview', 'undo'],
     unlockReplaced: false,
   })
 })
@@ -363,7 +372,19 @@ ledgerTest(
   'every data channel refuses while the vault is locked',
   async ({ page }) => {
     const results = await page.evaluate(async () => {
-      const { accounts, categories, transactions } = window.ledger
+      const { accounts, categories, transactions, imports } = window.ledger
+      const request = {
+        id: crypto.randomUUID(),
+        encoding: 'utf-8' as const,
+        mapping: {
+          header: false,
+          date: 0,
+          dateOrder: 'dmy' as const,
+          description: [2],
+          amount: { kind: 'signed' as const, column: 1, negate: false },
+        },
+        targets: [{ key: '', accountId: 1 }],
+      }
       const calls = [
         () => accounts.list(),
         () =>
@@ -379,6 +400,11 @@ ledgerTest(
         () => transactions.totals({}),
         () => transactions.setCategory(1, null),
         () => transactions.delete(1),
+        () => imports.open(),
+        () => imports.preview(request),
+        () => imports.commit(request, [0]),
+        () => imports.batches(),
+        () => imports.undo(1),
       ]
       return Promise.all(
         calls.map((call) =>
@@ -389,7 +415,7 @@ ledgerTest(
         ),
       )
     })
-    expect(results).toHaveLength(8)
+    expect(results).toHaveLength(13)
     for (const result of results) expect(result).toMatch(/Error: locked$/)
   },
 )

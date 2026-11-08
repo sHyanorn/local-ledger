@@ -1,39 +1,15 @@
 // Which columns hold what, and the rows read through it. Every value is
 // checked here, so a row either becomes a transaction or names its problem.
+import type { AmountColumns, Mapping, RowError } from '../../shared/imports'
 import { DESCRIPTION_MAX } from '../../shared/ledger'
 import type { Row } from './csv'
-import { parseBankAmount, parseDate, type DateOrder } from './values'
-
-export type AmountColumns =
-  /** One column, money out negative; `negate` for files that write it positive. */
-  | { kind: 'signed'; column: number; negate: boolean }
-  /** Money out and money in in separate columns, both written positive. */
-  | { kind: 'split'; debit: number; credit: number }
-
-export interface Mapping {
-  /** The first row names the columns. */
-  header: boolean
-  date: number
-  dateOrder: DateOrder
-  /** The first of these columns that is not empty. */
-  description: number[]
-  amount: AmountColumns
-}
+import { parseBankAmount, parseDate } from './values'
 
 export interface ParsedRow {
   line: number
   date: string
   cents: number
   description: string
-}
-
-export type RowProblem =
-  'date' | 'amount' | 'description' | 'description-too-long'
-export interface RowError {
-  line: number
-  problem: RowProblem
-  /** The cell at fault, shown to the user and never logged. */
-  value: string
 }
 
 /**

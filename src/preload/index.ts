@@ -46,6 +46,15 @@ const api: LedgerApi = {
       invoke('transactions:set-category', { id, categoryId }),
     delete: (id) => invoke('transactions:delete', { id }),
   },
+  imports: {
+    open: () => invoke('import:open', undefined),
+    preview: (request) => invoke('import:preview', request),
+    commit: (request, selected) =>
+      invoke('import:commit', { ...request, selected }),
+    discard: (id) => invoke('import:discard', { id }),
+    batches: () => invoke('import:batches', undefined),
+    undo: (batchId) => invoke('import:undo', { id: batchId }),
+  },
 }
 
 contextBridge.exposeInMainWorld('ledger', api)

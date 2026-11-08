@@ -9,6 +9,12 @@ import {
   transactionFilter,
 } from './schemas'
 import type {
+  FileProblem,
+  ImportBatch,
+  ImportFile,
+  ImportPreview,
+} from './imports'
+import type {
   Account,
   Category,
   CurrencyTotal,
@@ -56,6 +62,12 @@ export const channels = {
   'transactions:update': schemas.transactionUpdate,
   'transactions:set-category': schemas.transactionCategory,
   'transactions:delete': schemas.id,
+  'import:open': z.undefined(),
+  'import:preview': schemas.importPreview,
+  'import:commit': schemas.importCommit,
+  'import:discard': schemas.importDiscard,
+  'import:batches': z.undefined(),
+  'import:undo': schemas.id,
 } as const
 
 export type Channel = keyof typeof channels
@@ -92,4 +104,17 @@ export interface Results {
   'transactions:update': Outcome<'not-found'>
   'transactions:set-category': Outcome<'not-found'>
   'transactions:delete': Outcome<'not-found'>
+  'import:open':
+    | { ok: true; file: ImportFile }
+    | { ok: false; reason: FileProblem | 'cancelled' }
+  'import:preview':
+    | { ok: true; preview: ImportPreview }
+    | { ok: false; reason: FileProblem | 'not-found' }
+  'import:commit':
+    | { ok: true; id: number; count: number }
+    | { ok: false; reason: FileProblem | 'not-found' | 'nothing' }
+  'import:discard': void
+  'import:batches': ImportBatch[]
+  'import:undo':
+    { ok: true; count: number } | { ok: false; reason: 'not-found' }
 }

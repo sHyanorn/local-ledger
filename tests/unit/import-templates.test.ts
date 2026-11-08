@@ -202,4 +202,26 @@ describe('guessed layouts', () => {
     )
     expect(layout?.template).toBeNull()
   })
+
+  it('still finds the layout and date order past one bad row', () => {
+    const layout = detectLayout(
+      rows(
+        ['13/05/2026', '-1.00', 'Fake A', '1.00'],
+        ['31/02/2026', '-1.00', 'Fake B', '1.00'],
+        ['14/05/2026', '-1.00', 'Fake C', '1.00'],
+        ['Closing balance', '', '', '1.00'],
+      ),
+    )
+    // Two bad rows of four is past the tolerance.
+    expect(layout).toBeNull()
+    const tidy = detectLayout(
+      rows(
+        ['13/05/2026', '-1.00', 'Fake A', '1.00'],
+        ['31/02/2026', '-1.00', 'Fake B', '1.00'],
+        ['14/05/2026', '-1.00', 'Fake C', '1.00'],
+      ),
+    )
+    expect(tidy?.template).toBe('commbank')
+    expect(tidy?.dateOrders).toEqual(['dmy'])
+  })
 })
