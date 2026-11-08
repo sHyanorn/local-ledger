@@ -65,9 +65,9 @@ What it cannot do, and does not claim:
 
 ## Importing files
 
-- Only the system open dialog, shown by the main process, picks a file; the page cannot name a path, and its IPC payloads carry no paths. Only a regular file is read, through one handle, and never more than the limit, whatever size the file system reports; if the vault locked while the dialog was open, nothing is read.
+- Only the system open dialog, shown by the main process, picks a file; the page cannot name a path, and its IPC payloads carry no paths. Only a regular file is read: the path is checked before it is opened, without waiting, and the open handle must be that same file. It is read through that handle, never past the limit, whatever size the file system reports; if the vault locked while the dialog was open, nothing is read.
 - A file is refused whole past 10 MB, 50,000 rows, 64 columns or 64 KB in one record. Fields are split by `csv-parse`; dates and amounts are read strictly. Every request from the page is validated with zod, and an import is computed again in the main process from the settings of the last preview, refusing any others, before anything is written.
-- Text from a file is stored without its control characters and invisible format characters, and shown only as text, so a cell such as `=HYPERLINK(...)` does nothing in the app. Exports (M4) must neutralize such text for spreadsheets.
+- Text from a file is stored without control characters, bidirectional controls or zero-width spaces, and shown only as text, so a cell such as `=HYPERLINK(...)` does nothing in the app. Exports (M4) must neutralize such text for spreadsheets.
 - The source file stays where it is, unencrypted, and its name is stored inside the vault for the import history. Deleting or protecting the original is up to the user.
 
 ## Electron hardening

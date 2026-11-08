@@ -45,5 +45,6 @@
 - [ ] English README, screenshots and GIFs; publish the first release
 
 ## Nice to have
+- [ ] Check the bank layouts against real exports, should any become available (D024): every check so far used public, made-up samples
 - [ ] Archive an account: hide it from lists while keeping its transactions
 - [ ] Recovery key: a random key, shown once at setup, that also seals the data key (D013 leaves room for it)
