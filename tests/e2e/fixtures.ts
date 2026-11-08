@@ -99,7 +99,7 @@ export const lockScreen = (app: ElectronApplication) =>
   )
 
 /** Has the open or save dialog answer with this path, or as cancelled for null. */
-function answerDialog(
+function stubDialog(
   app: ElectronApplication,
   kind: 'open' | 'save',
   path: string | null,
@@ -131,11 +131,11 @@ function answerDialog(
 
 /** The open dialog answers with this file, or as cancelled for null. */
 export const chooseFile = (app: ElectronApplication, path: string | null) =>
-  answerDialog(app, 'open', path)
+  stubDialog(app, 'open', path)
 
 /** The save dialog answers with this path, or as cancelled for null. */
 export const saveTo = (app: ElectronApplication, path: string | null) =>
-  answerDialog(app, 'save', path)
+  stubDialog(app, 'save', path)
 
 /**
  * Fails a test that set a dialog answer the app never asked for, so a test
@@ -197,8 +197,11 @@ export const test = base.extend<{
   app: async ({ userData }, provide) => {
     const app = await launch(userData)
     await provide(app)
-    await expectDialogsAsked(app)
-    await app.close()
+    try {
+      await expectDialogsAsked(app)
+    } finally {
+      await app.close()
+    }
   },
   page: async ({ app }, provide) => {
     await provide(await app.firstWindow())
@@ -231,8 +234,11 @@ export const ledgerTest = test.extend<{ ledger: SeedLedger; home: Page }>({
       '--js-flags=--heap-snapshot-string-limit=1000000000',
     ])
     await provide(app)
-    await expectDialogsAsked(app)
-    await app.close()
+    try {
+      await expectDialogsAsked(app)
+    } finally {
+      await app.close()
+    }
   },
   home: async ({ app, page }, provide) => {
     const home = await unlock(app, page)
