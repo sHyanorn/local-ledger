@@ -372,6 +372,27 @@ describe('ImportSession', () => {
     expect(rows()).toHaveLength(2)
   })
 
+  it('lists no errors from an account that is skipped', () => {
+    const everyday = account()
+    const session = new ImportSession()
+    const text =
+      'Bank Account,Date,Narrative,Debit Amount,Credit Amount,Balance,Categories,Serial\n' +
+      '1111,29/05/2026,Fake Kept,1.00,,1,OTHER,\n' +
+      '2222,31/02/2026,Fake Skipped Bad Date,1.00,,1,OTHER,\n'
+    const file = opened(session, bytes(text))
+    const preview = session.preview(db, {
+      ...request(file, everyday),
+      targets: [
+        { key: '1111', accountId: everyday },
+        { key: '2222', accountId: null },
+      ],
+    })
+    expect(preview.ok && preview.preview).toMatchObject({
+      rows: [{ description: 'Fake Kept' }],
+      errors: [],
+    })
+  })
+
   it('splits a file of several accounts, and skips an account given none', () => {
     const everyday = account()
     const session = new ImportSession()
@@ -527,9 +548,21 @@ describe('import history', () => {
       notes: '',
     })
     setTransactionCategory(db, ids[2]!, null)
+    // A note alone is a change.
+    const third = db
+      .prepare(
+        'SELECT account_id AS accountId, date, amount_cents AS amountCents, description FROM transactions WHERE id = ?',
+      )
+      .get(ids[2]) as typeof second
+    updateTransaction(db, {
+      id: ids[2]!,
+      ...third,
+      categoryId: null,
+      notes: 'Fake note',
+    })
 
     expect(listBatches(db)).toMatchObject([
-      { id: 1, fileName: 'anz.csv', count: 3, edited: 1 },
+      { id: 1, fileName: 'anz.csv', count: 3, edited: 2 },
     ])
     expect(undoBatch(db, 1)).toEqual({ ok: true, count: 3 })
     expect(rows()).toMatchObject([{ description: 'Fake Kept' }])
