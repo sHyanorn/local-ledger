@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { PASSWORD_MIN, passwordLength } from '../../../shared/password'
+import { newPasswordProblem } from '../password-rules'
 import { useVault } from '../store'
 
 export function Setup() {
@@ -10,12 +10,7 @@ export function Setup() {
   const [confirm, setConfirm] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
-  const problem =
-    passwordLength(password) < PASSWORD_MIN
-      ? `Use at least ${PASSWORD_MIN} characters.`
-      : confirm !== password
-        ? 'The passwords do not match.'
-        : null
+  const problem = newPasswordProblem(password, confirm)
 
   const submit = (event: FormEvent) => {
     event.preventDefault()

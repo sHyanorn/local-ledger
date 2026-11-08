@@ -187,3 +187,43 @@ test.describe('automatic lock', () => {
     )
   })
 })
+
+test('changing the password re-keys the vault in a new page process', async ({
+  app,
+  page,
+  userData,
+}) => {
+  const NEW = 'a new fake passphrase for tests'
+  const home = await createVault(app, page)
+  await home.getByRole('button', { name: 'Change Password…' }).click()
+  await home.getByLabel('Current password').fill('not the fake passphrase')
+  await home.getByLabel('New password', { exact: true }).fill(NEW)
+  await home.getByLabel('Confirm new password').fill(NEW)
+  await home.getByRole('button', { name: 'Change Password' }).click()
+  await expect(home.getByRole('alert')).toHaveText('Wrong password.')
+
+  const changingPid = await rendererPid(app)
+  await home.getByLabel('Current password').fill(PASSWORD)
+  const changed = await replacedBy(app, () =>
+    home.getByRole('button', { name: 'Change Password' }).click(),
+  )
+  await expectExited(changingPid)
+  expect(readdirSync(vaultDir(userData)).sort()).toEqual([
+    'ledger-2.db',
+    'vault.json',
+  ])
+
+  const locked = await replacedBy(app, () =>
+    changed.getByRole('button', { name: 'Lock' }).click(),
+  )
+  expect(
+    await locked.evaluate((old) => window.ledger.vault.unlock(old), PASSWORD),
+  ).toEqual({ ok: false, reason: 'wrong-password' })
+  await locked.getByLabel('Master password').fill(NEW)
+  const unlocked = await replacedBy(app, () =>
+    locked.getByRole('button', { name: 'Unlock' }).click(),
+  )
+  expect(await unlocked.evaluate(() => window.ledger.vault.status())).toBe(
+    'unlocked',
+  )
+})

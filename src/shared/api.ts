@@ -8,5 +8,9 @@ export interface LedgerApi {
     create(password: string): Promise<Results['vault:create']>
     unlock(password: string): Promise<Results['vault:unlock']>
     lock(): Promise<void>
+    changePassword(
+      current: string,
+      next: string,
+    ): Promise<Results['vault:change-password']>
   }
 }

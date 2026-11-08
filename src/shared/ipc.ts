@@ -44,5 +44,5 @@ export interface Results {
   'vault:create': Outcome<'exists'>
   'vault:unlock': Outcome<'wrong-password' | 'no-vault' | 'damaged' | 'newer'>
   'vault:lock': void
-  'vault:change-password': Outcome<'wrong-password' | 'locked'>
+  'vault:change-password': Outcome<'wrong-password' | 'locked' | 'damaged'>
 }

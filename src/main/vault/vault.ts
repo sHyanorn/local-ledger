@@ -2,6 +2,7 @@
 // directory under the user data directory. Holds the open database while
 // unlocked; locking closes it. Operations run one at a time.
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -12,9 +13,9 @@ import {
 } from 'node:fs'
 import { join } from 'node:path'
 import type { Outcome, VaultState } from '../../shared/ipc'
-import { openDatabase, WrongKeyError } from './database'
+import { changeKey, openDatabase, WrongKeyError } from './database'
 import type { Db } from './database'
-import { noCheckpoint, syncDirectory, writeFileAtomic } from './files'
+import { noCheckpoint, syncDirectory, syncFile, writeFileAtomic } from './files'
 import type { Checkpoint } from './files'
 import { DEFAULT_KDF } from './kdf'
 import type { Derive, KdfParams } from './kdf'
@@ -143,6 +144,75 @@ export class Vault {
       this.#db.close()
       this.#db = null
       this.#emit()
+    })
+  }
+
+  /**
+   * Seals a new data key under the new password and re-encrypts the
+   * database with it, on a copy. Replacing vault.json is the single commit
+   * point: a crash before it leaves the old password working, after it the
+   * new one; the other generation is removed on the next successful open.
+   */
+  changePassword(
+    current: string,
+    next: string,
+  ): Promise<Outcome<'wrong-password' | 'locked' | 'damaged'>> {
+    return this.#run(async () => {
+      const db = this.#db
+      if (!db) return { ok: false, reason: 'locked' }
+      const file = this.#readFile()
+      if (!file) return { ok: false, reason: 'damaged' }
+      const oldKey = await openKey(file, current, this.derive)
+      if (!oldKey) return { ok: false, reason: 'wrong-password' }
+      const generation = file.generation + 1
+      const created = await createKey(next, generation, this.derive, this.kdf)
+      const currentPath = join(this.dir, databaseName(file.generation))
+      const nextPath = join(this.dir, databaseName(generation))
+      const temporary = `${nextPath}.tmp`
+      let committed = false
+      try {
+        db.close()
+        this.#db = null
+        rmSync(temporary, { force: true })
+        copyFileSync(currentPath, temporary)
+        this.checkpoint('copied')
+        const copy = openDatabase(temporary, oldKey)
+        try {
+          changeKey(copy, created.dataKey)
+          if (copy.pragma('integrity_check', { simple: true }) !== 'ok') {
+            throw new Error('the re-encrypted copy failed integrity_check')
+          }
+        } finally {
+          copy.close()
+        }
+        syncFile(temporary)
+        this.checkpoint('re-encrypted')
+        renameSync(temporary, nextPath)
+        syncDirectory(this.dir)
+        this.checkpoint('renamed')
+        writeFileAtomic(
+          join(this.dir, VAULT_FILE),
+          serializeVaultFile(created.file),
+          this.checkpoint,
+        )
+        committed = true
+        this.checkpoint('committed')
+        const opened = this.#openWithKey(created.file, created.dataKey)
+        return opened.ok ? opened : { ok: false, reason: 'damaged' }
+      } catch (error) {
+        // Not a crash: put the vault back as it was, or as committed.
+        if (!committed) {
+          rmSync(temporary, { force: true })
+          rmSync(nextPath, { force: true })
+          this.#openWithKey(file, oldKey)
+        } else {
+          this.#openWithKey(created.file, created.dataKey)
+        }
+        throw error
+      } finally {
+        oldKey.fill(0)
+        created.dataKey.fill(0)
+      }
     })
   }
 

@@ -17,6 +17,8 @@ const api: LedgerApi = {
     create: (password) => invoke('vault:create', { password }),
     unlock: (password) => invoke('vault:unlock', { password }),
     lock: () => invoke('vault:lock', undefined),
+    changePassword: (current, next) =>
+      invoke('vault:change-password', { current, next }),
   },
 }
 

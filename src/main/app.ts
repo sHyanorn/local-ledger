@@ -29,6 +29,11 @@ export function startApp(): void {
     handle('vault:create', ({ password }) => vault.create(password), devOrigin)
     handle('vault:unlock', ({ password }) => vault.unlock(password), devOrigin)
     handle('vault:lock', () => vault.lock(), devOrigin)
+    handle(
+      'vault:change-password',
+      ({ current, next }) => vault.changePassword(current, next),
+      devOrigin,
+    )
 
     const webPreferences = windowWebPreferences(
       join(__dirname, '../preload/index.js'),

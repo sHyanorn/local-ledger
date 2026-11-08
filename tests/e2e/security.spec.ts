@@ -155,7 +155,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
   expect(api).toEqual({
     keys: ['version', 'vault'],
     version: pkg.version,
-    vault: ['create', 'lock', 'status', 'unlock'],
+    vault: ['changePassword', 'create', 'lock', 'status', 'unlock'],
     unlockReplaced: false,
   })
 })

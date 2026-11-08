@@ -108,7 +108,7 @@ input:focus {
   color: var(--muted);
 }
 
-.panel button {
+.panel > button {
   justify-self: end;
 }
 
@@ -130,4 +130,10 @@ input:focus {
   justify-content: space-between;
   padding: 12px 16px;
   border-bottom: 1px solid var(--line);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
