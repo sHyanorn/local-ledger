@@ -16,6 +16,13 @@ const items = () =>
     ...(Array.isArray(item.submenu) ? item.submenu : []),
   ])
 
+/** Clicks the menu item with this id. */
+const click = (id: string) => {
+  const handler = items().find((entry) => entry.id === id)?.click
+  if (typeof handler !== 'function') throw new Error(`no item ${id}`)
+  ;(handler as () => void)()
+}
+
 const base = { lock: () => {}, command: () => {}, openReleases: () => {} }
 
 beforeEach(() => {
@@ -53,17 +60,14 @@ it.each([
   setMenu({ ...base, command, packaged: true })
   const item = items().find((entry) => entry.id === id)
   expect(item?.accelerator).toBe(accelerator)
-  ;(item?.click as () => void)()
+  click(id)
   expect(command).toHaveBeenCalledWith(id)
 })
 
 it('opens the releases page from Check for Updates', () => {
   const openReleases = vi.fn()
   setMenu({ ...base, openReleases, packaged: true })
-  ;(
-    items().find((entry) => entry.id === 'check-for-updates')
-      ?.click as () => void
-  )()
+  click('check-for-updates')
   expect(openReleases).toHaveBeenCalledOnce()
 })
 
