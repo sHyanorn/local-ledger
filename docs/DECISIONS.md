@@ -100,7 +100,8 @@
 - Decision: accounts, categories and transactions each have list, create, update and delete channels; transactions also have paged listing and totals. Every payload is checked in the main process against a schema in `src/shared/schemas.ts`: names up to 100 characters, descriptions 500, notes 2,000, searches 200; amounts are integers within ±10¹¹ units; dates must exist on the calendar; at most 500 rows a page. Text is trimmed before it is stored. An update replaces the whole record
 - Results: expected refusals are outcomes with a reason (`duplicate`, `in-use`, `not-found`, `too-deep`, `currency-in-use`); anything else reaches the page only as the code `forbidden`, `invalid-argument`, `locked` or `failed`. A call while the vault is locked fails with `locked`
 - The page imports `src/shared/ledger.ts`, which holds the constants and types and no zod: zod probes for `new Function`, which the CSP reports as a violation
-- Repositories in `src/main/ledger` prepare their statements per call and keep nothing between calls, so no decrypted row stays in the main process once a reply is sent
+- Repositories in `src/main/ledger` prepare their statements per call and keep no reference to rows between calls; what still stays in memory until garbage collection, and in SQLite's page cache, is described in SECURITY_DESIGN
+- Text is trimmed and stored in Unicode's composed form (NFC). Dates run from 1900 to 2999
 
 ## D018 Transaction list and search
 - Date: 2026-11-08
@@ -111,15 +112,15 @@
 ## D019 Seed data and demo vault
 - Date: 2026-11-08
 - Decision: `scripts/seed` generates a ledger from a seeded random generator (mulberry32), so a seed and an end date always give the same data. Every merchant and name is invented. The default is about 1,500 transactions over 18 months in four accounts, one of them in yuan: salary, rent and bills on schedules, day-to-day spending by weight, one trip, refunds, and transfers that appear in both accounts (card repayments, savings), which M3 needs for transfer detection
-- `npm run seed` bundles the script with Vite and writes a vault to `.demo/user-data`, git-ignored, with a fixed fake password it prints; it refuses to touch an existing vault and never writes to the app's user data directory. `npm run demo` starts the app on it. Tests call the same generator, with a fast key derivation
-- The package check fails when `app.asar` holds anything beyond the main, preload and renderer builds, `package.json` and runtime dependencies
+- `npm run seed` bundles the script with Vite and writes a vault to `.demo/user-data`, git-ignored, with a fixed fake password it prints; it refuses to touch an existing vault, and refuses the app's own user data directories (the packaged app's and a development build's). `npm run demo` starts the app on it. Tests call the same generator, with a fast key derivation
+- The package check fails when `app.asar` holds anything beyond the main, preload and renderer builds, `package.json` and `node_modules`, where electron-builder puts the runtime dependencies
 
 ## D020 Money and currencies
 - Date: 2026-11-08
-- Decision: amounts stay integer cents (D003) end to end: text becomes cents and cents become text by string arithmetic, and formatting hands `Intl.NumberFormat` a decimal string, never a float. Currencies are limited to those with two decimal places (AUD, CAD, CNY, EUR, GBP, HKD, NZD, SGD, USD). Each account has one currency; totals and balances are given per currency and never added across currencies. Formatting uses `en-AU`
+- Decision: amounts stay integer cents (D003) end to end: text becomes cents and cents become text by string arithmetic, and formatting hands `Intl.NumberFormat` a decimal string, never a float. Currencies are limited to those with two decimal places (AUD, CAD, CNY, EUR, GBP, HKD, NZD, SGD, USD). Each account has one currency; totals and balances are given per currency and never added across currencies. Formatting uses `en-AU`. A sum is exact up to 2⁵³ cents, about 90 trillion units
 - Later: conversion between currencies (Nice to have)
 
 ## D021 Accounts and categories
 - Date: 2026-11-08
-- Decision: an account's opening balance is a field of the account, not a transaction, so reports will not count it as income; the balance is the opening balance plus every transaction. Names are unique without regard to case. An account can be deleted only without transactions, and its currency changes only while it has none. Categories nest two levels: a category with subcategories stays at the top. Deleting a category deletes its subcategories too; their transactions become uncategorized and their budgets go with them, and the confirmation says how many transactions it affects
+- Decision: an account's opening balance is a field of the account, not a transaction, so reports will not count it as income; the balance is the opening balance plus every transaction. Names are unique without regard to ASCII case; stored in composed form, names that look the same collide. An account can be deleted only without transactions, and its currency changes only while it has none. Categories nest two levels: a category with subcategories stays at the top. Deleting a category deletes its subcategories too; their transactions become uncategorized and their budgets go with them, and the confirmation says how many transactions it affects
 - Later: archiving accounts (Nice to have); rules that point to a deleted category (M3)

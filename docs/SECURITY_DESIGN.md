@@ -51,7 +51,8 @@ What the app does:
 - The data key, the sealing key, the encoded password and the raw key literal live in buffers the app owns and fills with zeros after use, also when an operation fails or is cancelled. While unlocked, the only copy of the data key is inside SQLite.
 - Argon2id runs in a worker thread that ends after each derivation, releasing its 64 MiB.
 - On unlock, lock and a password change that commits, the renderer process that showed the previous page ends.
-- The data handlers keep nothing between calls. A test shows a transaction, locks, and checks that its text is gone from the pages and no longer reachable in the main process heap (a heap snapshot, which collects garbage first). A change that fails keeps its page so it can say so, and clears its fields; the typed passwords stay in that process as strings until the next lock ends it.
+- A password change that fails keeps its page so it can say so, and clears its fields; the typed passwords stay in that process as strings until the next lock ends it.
+- The data handlers keep no reference to rows between calls. A test shows a transaction, locks, and checks that its text is gone from the pages and no longer reachable in the main process heap: a heap snapshot collects garbage first and here keeps strings whole. It does not see the contents of Buffers and other binary arrays, nor memory already freed.
 
 What it cannot do, and does not claim:
 
