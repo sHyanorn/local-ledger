@@ -72,6 +72,15 @@ describe('decode', () => {
     const be = utf16('a,b\n', false).subarray(2)
     expect(decode(le)).toEqual({ text: 'a,b\n', encoding: 'utf-16le' })
     expect(decode(be)).toEqual({ text: 'a,b\n', encoding: 'utf-16be' })
+    // A character with a zero low byte among ASCII text.
+    const mixed = utf16(
+      `${'Fake Shop,1.00\n'.repeat(20)}\u0100\u3000\n`,
+      true,
+    ).subarray(2)
+    expect(decode(mixed).encoding).toBe('utf-16le')
+    expect(decode(new TextEncoder().encode('Fake Café,1.00\n')).encoding).toBe(
+      'utf-8',
+    )
   })
 
   it('uses the encoding it is given', () => {
@@ -252,6 +261,10 @@ describe('cleanText', () => {
 
   it('drops invisible format characters', () => {
     expect(cleanText('Fake\u202eShop\u200b Cafe\u2066')).toBe('FakeShop Cafe')
+    // Joiners and soft hyphens carry meaning; they stay.
+    expect(cleanText('\u{1F469}\u200d\u{1F4BB} Fake\u00adShop\u200c')).toBe(
+      '\u{1F469}\u200d\u{1F4BB} Fake\u00adShop\u200c',
+    )
   })
 
   it('keeps text that a spreadsheet would read as a formula', () => {

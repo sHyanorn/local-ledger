@@ -1,6 +1,7 @@
 // Bank exports name no encoding. A byte order mark decides when there is one;
-// otherwise the text is UTF-8 if it decodes as UTF-8 without error, and
-// Windows-1252 if not, since that decodes any byte sequence.
+// then UTF-16 when every other byte is zero, as ASCII text in it has; then
+// UTF-8 if the bytes decode as UTF-8 without error, and Windows-1252 if not,
+// since that decodes any byte sequence.
 
 import type { Encoding } from '../../shared/imports'
 
@@ -33,8 +34,9 @@ function utf16Of(bytes: Uint8Array): Encoding | null {
   }
   const half = sample.length / 2
   if (half < 2) return null
-  if (odd > half * 0.3 && even === 0) return 'utf-16le'
-  if (even > half * 0.3 && odd === 0) return 'utf-16be'
+  // A few zeros on the other side are characters such as U+0100 or U+3000.
+  if (odd > half * 0.3 && even <= odd * 0.02) return 'utf-16le'
+  if (even > half * 0.3 && odd <= even * 0.02) return 'utf-16be'
   return null
 }
 
