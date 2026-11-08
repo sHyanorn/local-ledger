@@ -17,7 +17,7 @@ import type { Db } from '../vault/database'
 
 /** Days apart that a reworded or hand-entered transaction may be. */
 export const MATCH_DAYS = 4
-/** Existing transactions considered for each incoming row, nearest first. */
+/** Unclaimed existing transactions considered for each incoming row, nearest first. */
 const NEAREST = 10
 
 export interface IncomingRow {
@@ -98,6 +98,21 @@ export function classify(db: Db, rows: readonly IncomingRow[]): Classified[] {
     return { fingerprint, status: found ? 'duplicate' : 'new', match: null }
   })
 
+  // Transactions matched exactly are no candidates; they leave before the
+  // limit below, so they cannot crowd out a real one.
+  db.exec(
+    'CREATE TEMP TABLE IF NOT EXISTS dedup_taken (id INTEGER PRIMARY KEY)',
+  )
+  db.exec('DELETE FROM temp.dedup_taken')
+  const take = db.prepare(
+    'INSERT OR IGNORE INTO temp.dedup_taken (id) VALUES (?)',
+  )
+  for (const id of taken) take.run(id)
+
+  // Each new row, in file order, takes the best of its nearest unclaimed
+  // candidates and claims it. Looking at a few each keeps many alike rows
+  // on alike days from comparing every one with every other, and claiming
+  // as it goes means no row runs short of candidates.
   const near = db.prepare<
     [number, number, string, string, string],
     { id: number; date: string; amountCents: number; description: string }
@@ -105,19 +120,15 @@ export function classify(db: Db, rows: readonly IncomingRow[]): Classified[] {
     `SELECT id, date, amount_cents AS amountCents, description
      FROM transactions
      WHERE account_id = ? AND amount_cents = ? AND date BETWEEN ? AND ?
+       AND id NOT IN (SELECT id FROM temp.dedup_taken)
      ORDER BY abs(julianday(date) - julianday(?)), id
      LIMIT ${NEAREST}`,
   )
-  // Many alike rows on alike days would otherwise compare every one with
-  // every other; a few nearest candidates each are enough to choose from.
-  const pairs: {
-    position: number
-    match: ExistingMatch
-    days: number
-    alike: number
-  }[] = []
   rows.forEach((row, position) => {
-    if (result[position]?.status !== 'new') return
+    const entry = result[position]
+    if (entry?.status !== 'new') return
+    let best: { match: ExistingMatch; days: number; alike: number } | null =
+      null
     for (const match of near.all(
       row.accountId,
       row.cents,
@@ -125,25 +136,24 @@ export function classify(db: Db, rows: readonly IncomingRow[]): Classified[] {
       shiftDate(row.date, MATCH_DAYS),
       row.date,
     )) {
-      if (taken.has(match.id)) continue
-      pairs.push({
-        position,
-        match,
-        days: Math.abs(dayNumber(match.date) - dayNumber(row.date)),
-        alike: similarity(wordsOf(match.description), wordsOf(row.description)),
-      })
+      const days = Math.abs(dayNumber(match.date) - dayNumber(row.date))
+      const alike = similarity(
+        wordsOf(match.description),
+        wordsOf(row.description),
+      )
+      // Nearest date first, then the most alike; the query gives ties by id.
+      if (
+        !best ||
+        days < best.days ||
+        (days === best.days && alike > best.alike)
+      ) {
+        best = { match, days, alike }
+      }
     }
-  })
-  // Closest dates first, then the most alike, then file order: stable and greedy.
-  pairs.sort(
-    (a, b) => a.days - b.days || b.alike - a.alike || a.position - b.position,
-  )
-  for (const pair of pairs) {
-    const entry = result[pair.position]
-    if (!entry || entry.match || taken.has(pair.match.id)) continue
-    taken.add(pair.match.id)
+    if (!best) return
+    take.run(best.match.id)
     entry.status = 'possible'
-    entry.match = pair.match
-  }
+    entry.match = best.match
+  })
   return result
 }

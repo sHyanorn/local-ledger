@@ -231,6 +231,58 @@ describe('classify', () => {
     ).toBeGreaterThan(0)
   })
 
+  it('finds a hand-entered match past ten rows matched exactly', () => {
+    const everyday = account()
+    const session = new ImportSession()
+    const text = Array.from(
+      { length: 10 },
+      (_, index) => `03/05/2026,-4.50,Fake Same ${index},1`,
+    ).join('\n')
+    const first = opened(session, bytes(text))
+    previewAndCommit(session, {
+      ...request(first, everyday),
+      selected: [...Array(10).keys()],
+    })
+    const hand = manual(everyday, '2026-05-05', -450, 'Fake Typed By Hand')
+    const result = classify(db, [
+      ...Array.from({ length: 10 }, (_, index) => ({
+        index,
+        accountId: everyday,
+        date: '2026-05-03',
+        cents: -450,
+        description: `Fake Same ${index}`,
+      })),
+      {
+        index: 10,
+        accountId: everyday,
+        date: '2026-05-03',
+        cents: -450,
+        description: 'Fake New Wording',
+      },
+    ])
+    expect(result[10]).toMatchObject({
+      status: 'possible',
+      match: { id: hand },
+    })
+  })
+
+  it('offers every alike row a candidate when there are more than ten', () => {
+    const everyday = account()
+    for (let i = 0; i < 14; i++)
+      manual(everyday, '2026-05-03', -450, 'Fake Old Wording')
+    const result = classify(
+      db,
+      Array.from({ length: 14 }, (_, index) => ({
+        index,
+        accountId: everyday,
+        date: '2026-05-03',
+        cents: -450,
+        description: 'Fake New Wording',
+      })),
+    )
+    expect(result.every((entry) => entry.status === 'possible')).toBe(true)
+  })
+
   it('ignores other amounts, other accounts, and dates more than four days apart', () => {
     const everyday = account()
     const savings = account('Fake Savings')
