@@ -1,15 +1,47 @@
 // `--self-test` checks that the window renders and that the bundled SQLCipher
 // module opens an encrypted database, then exits 0 or 1. CI runs it on the
-// packaged app, which no test driver can reach. It uses a random throwaway
-// key and prints no key material.
+// packaged app, which no test driver can reach. It works in a temporary user
+// data directory, uses a random throwaway key and prints no key material.
 import { randomBytes } from 'node:crypto'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import Database from 'better-sqlite3-multiple-ciphers'
 import { app } from 'electron'
 import type { BrowserWindow } from 'electron'
 
 export const SELF_TEST_SWITCH = 'self-test'
+
+const PREFIX = 'local-ledger-self-test-'
+let userData: string | undefined
+
+/**
+ * Points the user data directory, and with it the Chromium profile, at a
+ * new temporary directory, so the self-test never reads or writes the
+ * user's data. Must run before the app is ready.
+ */
+export function isolateUserData(): void {
+  const temp = app.getPath('temp')
+  // Chromium writes its profile on the way out, after the self-test has
+  // removed the directory, so each run clears what the last one left.
+  for (const name of readdirSync(temp)) {
+    if (name.startsWith(PREFIX)) remove(join(temp, name))
+  }
+  userData = mkdtempSync(join(temp, PREFIX))
+  app.setPath('userData', userData)
+}
+
+function remove(dir: string): void {
+  try {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 3 })
+  } catch {
+    // Best effort: another run, or the profile, may still hold files.
+  }
+}
+
+function exit(code: number): void {
+  if (userData) remove(userData)
+  app.exit(code)
+}
 
 function check(ok: boolean, step: string): void {
   if (!ok) throw new Error(step)
@@ -108,12 +140,16 @@ export async function runSelfTest(
     )
     await checkWindow(window, url)
     checkDatabase()
+    check(
+      app.getPath('userData') === userData,
+      'the user data directory is a temporary one',
+    )
     console.log('self-test passed')
-    app.exit(0)
+    exit(0)
   } catch (error) {
     console.error(
       `self-test failed: ${error instanceof Error ? error.message : error}`,
     )
-    app.exit(1)
+    exit(1)
   }
 }

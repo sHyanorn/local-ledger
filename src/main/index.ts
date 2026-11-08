@@ -3,7 +3,7 @@ import { app, BrowserWindow } from 'electron'
 import { hardenApp } from './hardening'
 import { registerAppScheme, serveAppScheme } from './protocol'
 import { APP_ORIGIN, refusedSwitches, windowWebPreferences } from './security'
-import { runSelfTest, SELF_TEST_SWITCH } from './self-test'
+import { isolateUserData, runSelfTest, SELF_TEST_SWITCH } from './self-test'
 
 const devUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL
 const devOrigin = devUrl === undefined ? undefined : new URL(devUrl).origin
@@ -52,5 +52,6 @@ if (refused.length > 0) {
   console.error(`Refusing to start with --${refused.join(', --')}.`)
   app.exit(1)
 } else {
+  if (app.commandLine.hasSwitch(SELF_TEST_SWITCH)) isolateUserData()
   start()
 }

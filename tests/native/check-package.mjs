@@ -6,13 +6,16 @@ import { execFileSync, spawn } from 'node:child_process'
 import {
   closeSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   openSync,
   readSync,
   readdirSync,
   rmSync,
+  statSync,
+  writeFileSync,
 } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { FuseState, FuseV1Options, getCurrentFuseWire } from '@electron/fuses'
 import pkg from '../../package.json' with { type: 'json' }
@@ -144,6 +147,35 @@ function checkFiles(resources) {
   )
 }
 
+/** Where the packaged app keeps its data when nothing overrides it. */
+function defaultUserData() {
+  const name = config.productName ?? pkg.name
+  if (process.platform === 'darwin') {
+    return join(homedir(), 'Library', 'Application Support', name)
+  }
+  if (process.platform === 'win32') {
+    return join(
+      process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'),
+      name,
+    )
+  }
+  return join(process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'), name)
+}
+
+/**
+ * Names, sizes and modification times of everything under dir.
+ * @param {string} dir
+ */
+function snapshot(dir) {
+  return listDir(dir)
+    .map((file) => {
+      const stats = statSync(join(dir, file))
+      return `${file} ${stats.size} ${stats.mtimeMs}`
+    })
+    .sort()
+    .join('\n')
+}
+
 /**
  * Runs the packaged app until it exits, or kills it after a minute.
  * @param {string} executable
@@ -181,18 +213,29 @@ async function checkLaunch(executable) {
   const marker = 'ran-as-node'
   const scratch = mkdtempSync(join(tmpdir(), 'ledger-package-'))
   const netLog = join(scratch, 'net-log.json')
+  const userData = defaultUserData()
+  const sentinel = !existsSync(userData)
+  if (sentinel) {
+    mkdirSync(userData, { recursive: true })
+    writeFileSync(join(userData, 'vault.json'), '{"sentinel":true}')
+  }
+  const before = snapshot(userData)
   const selfTest = await run(
     executable,
     [
       '--inspect=0',
       '--self-test',
       `--log-net-log=${netLog}`,
-      `--user-data-dir=${join(scratch, 'profile')}`,
       '-e',
       `console.log('${marker}')`,
     ],
     { ELECTRON_RUN_AS_NODE: '1' },
   )
+  check(
+    snapshot(userData) === before,
+    `the self-test leaves ${userData} untouched`,
+  )
+  if (sentinel) rmSync(userData, { recursive: true, force: true })
   const requests = existsSync(netLog) ? networkRequests(netLog) : ['no net log']
   check(
     requests.length === 0,
