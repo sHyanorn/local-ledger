@@ -11,6 +11,7 @@ export class AppWindow {
   readonly #url: string
   readonly #webPreferences: WebPreferences
   #view: WebContentsView | null = null
+  #shown = false
 
   constructor(url: string, webPreferences: WebPreferences) {
     this.#url = url
@@ -30,27 +31,42 @@ export class AppWindow {
       this.#view?.webContents.close()
       this.#view = null
     })
-    this.replaceView().once('did-finish-load', () => this.window.show())
+    this.replaceView()
   }
 
   get contents(): WebContents | undefined {
     return this.#view?.webContents
   }
 
-  /** Loads the page in a new view and closes the old one with its process. */
-  replaceView(): WebContents {
-    const view = new WebContentsView({ webPreferences: this.#webPreferences })
-    view.setBackgroundColor(background())
-    this.window.contentView.addChildView(view)
+  /**
+   * Loads the page in a new view and closes the old one with its process,
+   * also when the new one cannot be made.
+   */
+  replaceView(): void {
     const old = this.#view
-    this.#view = view
-    this.#fit()
-    void view.webContents.loadURL(this.#url)
-    if (old) {
-      this.window.contentView.removeChildView(old)
-      old.webContents.close()
+    this.#view = null
+    try {
+      const view = new WebContentsView({ webPreferences: this.#webPreferences })
+      view.setBackgroundColor(background())
+      this.window.contentView.addChildView(view)
+      this.#view = view
+      this.#fit()
+      // Until a page has rendered, the window waits for whichever view is
+      // current, since a lock can replace the first one before it loads.
+      if (!this.#shown) {
+        view.webContents.once('did-finish-load', () => {
+          if (this.#view !== view || this.#shown) return
+          this.#shown = true
+          this.window.show()
+        })
+      }
+      void view.webContents.loadURL(this.#url)
+    } finally {
+      if (old) {
+        this.window.contentView.removeChildView(old)
+        old.webContents.close()
+      }
     }
-    return view.webContents
   }
 
   #fit(): void {

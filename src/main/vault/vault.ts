@@ -11,6 +11,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
 } from 'node:fs'
 import { join } from 'node:path'
 import type { Outcome, VaultState } from '../../shared/ipc'
@@ -86,6 +87,8 @@ export class Vault {
   #pending = 0
   #locks = 0
   #listeners = new Set<Listener>()
+  /** Connections whose close failed because a statement was still running. */
+  #unclosed = new Set<Db>()
 
   /** @param root the user data directory; the vault lives in its `vault` folder */
   constructor(
@@ -97,6 +100,7 @@ export class Vault {
     this.derive = derive
     this.kdf = kdf
     this.checkpoint = checkpoint
+    this.#recoverStaged()
   }
 
   get unlocked(): boolean {
@@ -201,14 +205,12 @@ export class Vault {
    */
   lock(): boolean {
     this.#locks++
+    this.#closeUnclosed()
     const db = this.#db
     if (!db && this.#pending === 0) return false
-    try {
-      db?.close()
-    } finally {
-      this.#db = null
-      this.#emit()
-    }
+    this.#db = null
+    if (db) this.#close(db)
+    this.#emit()
     return true
   }
 
@@ -274,7 +276,7 @@ export class Vault {
     const currentPath = join(this.dir, databaseName(file.generation))
     const nextPath = join(this.dir, databaseName(created.file.generation))
     const temporary = `${nextPath}.tmp`
-    this.#db?.close()
+    if (this.#db) this.#close(this.#db)
     this.#db = null
     try {
       rmSync(temporary, { force: true })
@@ -329,7 +331,8 @@ export class Vault {
       console.error(
         `password change committed, then failed: ${errorCode(error)}`,
       )
-      this.#tryOpen(created.file, created.dataKey, { removeLeftovers: false })
+      if (!this.#db)
+        this.#tryOpen(created.file, created.dataKey, { removeLeftovers: false })
       return { ok: true }
     }
     if (named === file.generation) this.#tryOpen(file, oldKey, { emit: false })
@@ -350,6 +353,7 @@ export class Vault {
     dataKey: Uint8Array,
     { removeLeftovers = true, emit = true }: OpenOptions = {},
   ): Outcome<'damaged' | 'newer'> {
+    this.#closeUnclosed()
     let db: Db
     try {
       db = openDatabase(join(this.dir, databaseName(file.generation)), dataKey)
@@ -402,7 +406,61 @@ export class Vault {
     }
   }
 
-  /** Staging directories were never the vault, so they are always safe to remove. */
+  /**
+   * Closes a connection. One that is busy, with a statement still being
+   * stepped, cannot close now; it is kept and closed at the next lock or
+   * open. Nothing reaches it meanwhile, since the vault no longer hands it out.
+   */
+  #close(db: Db): void {
+    try {
+      db.close()
+    } catch (error) {
+      this.#unclosed.add(db)
+      console.error(`closing the database failed: ${errorCode(error)}`)
+    }
+  }
+
+  #closeUnclosed(): void {
+    for (const db of this.#unclosed) {
+      try {
+        db.close()
+        this.#unclosed.delete(db)
+      } catch {
+        // Still busy.
+      }
+    }
+  }
+
+  /**
+   * A whole vault in a staging directory, with none in place, means the
+   * rename that put it in place was lost, in a power cut after a failed
+   * directory flush: it is the vault, so it goes back into place. The
+   * newest wins if there are several.
+   */
+  #recoverStaged(): void {
+    try {
+      if (existsSync(this.dir) || !existsSync(this.root)) return
+      const staged = readdirSync(this.root)
+        .filter((name) => name.startsWith(STAGING_PREFIX))
+        .flatMap((name) => {
+          const dir = join(this.root, name)
+          const time = wholeVaultTime(dir)
+          return time === null ? [] : [{ dir, time }]
+        })
+        .sort((a, b) => b.time - a.time)
+      if (!staged[0]) return
+      renameSync(staged[0].dir, this.dir)
+      flushDirectory(this.root)
+    } catch {
+      // Left as found; the vault reads as new.
+    }
+  }
+
+  /**
+   * Removes staging directories before a create. Any left by an earlier run
+   * held no whole vault, or startup would have recovered it; any from this
+   * run belong to an attempt that failed.
+   */
   #removeStaging(): void {
     mkdirSync(this.root, { recursive: true })
     for (const name of readdirSync(this.root)) {
@@ -422,5 +480,18 @@ export class Vault {
         console.error(`vault listener failed: ${errorCode(error)}`)
       }
     }
+  }
+}
+
+/** When a directory holds a whole vault, the time its vault.json was written. */
+function wholeVaultTime(dir: string): number | null {
+  try {
+    const path = join(dir, VAULT_FILE)
+    const file = parseVaultFile(readFileSync(path, 'utf8'))
+    if (!file || !existsSync(join(dir, databaseName(file.generation))))
+      return null
+    return statSync(path).mtimeMs
+  } catch {
+    return null
   }
 }

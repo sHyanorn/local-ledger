@@ -35,11 +35,11 @@ A wrong password fails the GCM check without touching the database. A sealing ke
 
 ## Lifecycle
 
-- **Create**: the vault is built in a staging directory and renamed into place, so a crash leaves no vault or a whole one.
+- **Create**: the vault is built in a staging directory and renamed into place, so a crash leaves no vault or a whole one. If the rename was lost (a power cut after a failed directory flush), the app finds the whole vault in its staging directory at startup and puts it back.
 - **Unlock**: derive the sealing key in a worker thread, unseal the data key, open the current generation and run `quick_check`. Only then, and once a directory flush shows that `vault.json` names that generation on disk, are leftovers of an interrupted change removed.
 - **Lock**: close the database; SQLite3 Multiple Ciphers wipes its key schedule when it frees the cipher context. The page is replaced, and its renderer process exits; this happens on every lock, also when the vault was already locked, so a password typed but not submitted does not survive it. A lock takes effect at once, without waiting for other vault operations, and cancels an unlock, create or password change that is still deriving its key.
 - **Auto-lock**: after 5 minutes of system idle time, when the screen locks, when the computer sleeps, when the window closes. Closing the window also ends its page process.
-- **Change password**: a new data key under the new password. The database is copied, the copy re-encrypted, checked with `integrity_check`, flushed and renamed to the next generation. Renaming the new `vault.json` over the old one is the single commit point: a crash before it leaves the old password working, after it the new one. A failure without a crash reopens whichever generation `vault.json` on disk names: before the commit the page reports the failure and the old password stays, after it the change stands. The old generation is deleted only once a directory flush shows the new `vault.json` on disk. Copies of the old generation, in backups, synced folders or unallocated disk blocks, still open with the old password. Tests copy the disk at each of the five steps of a change and check that exactly one password works, and fail the change at each step without a crash and check the same.
+- **Change password**: a new data key under the new password. The database is copied, the copy re-encrypted, checked with `integrity_check`, flushed and renamed to the next generation. Renaming the new `vault.json` over the old one is the single commit point: a crash before it leaves the old password working, after it the new one. A failure without a crash reopens whichever generation `vault.json` on disk names: before the commit the page reports the failure and the old password stays, after it the change stands. The old generation is deleted only after a later directory flush succeeds; Windows cannot flush a directory and relies on NTFS. Copies of the old generation, in backups, synced folders or unallocated disk blocks, still open with the old password. Tests copy the disk at each of the five steps of a change and check that exactly one password works, and fail the change at each step without a crash and check the same.
 - **Damaged vault**: a missing or invalid `vault.json`, a missing current database, or one that is empty or fails `quick_check`, is reported and nothing is deleted.
 
 On Windows, a directory cannot be flushed; renames rely on NTFS `MoveFileEx` semantics.
@@ -50,7 +50,7 @@ What the app does:
 
 - The data key, the sealing key, the encoded password and the raw key literal live in buffers the app owns and fills with zeros after use, also when an operation fails or is cancelled. While unlocked, the only copy of the data key is inside SQLite.
 - Argon2id runs in a worker thread that ends after each derivation, releasing its 64 MiB.
-- On unlock, lock and password change, the renderer process that showed the previous page ends.
+- On unlock, lock and a password change that commits, the renderer process that showed the previous page ends. A change that fails keeps its page, which holds the typed passwords, so it can say so; the next lock ends it.
 
 What it cannot do, and does not claim:
 

@@ -29,13 +29,6 @@ export function startApp(): void {
     handle('vault:create', ({ password }) => vault.create(password), devOrigin)
     handle('vault:unlock', ({ password }) => vault.unlock(password), devOrigin)
     handle(
-      'vault:lock',
-      () => {
-        vault.lock()
-      },
-      devOrigin,
-    )
-    handle(
       'vault:change-password',
       ({ current, next }) => vault.changePassword(current, next),
       devOrigin,
@@ -61,12 +54,14 @@ export function startApp(): void {
     const lock = () => {
       if (!vault.lock()) window?.replaceView()
     }
+    handle('vault:lock', lock, devOrigin)
     setMenu({ lock, packaged: app.isPackaged })
     watchForLock(powerMonitor, lock)
 
     app.on('second-instance', () => {
       if (!window) return open()
       if (window.window.isMinimized()) window.window.restore()
+      window.window.show()
       window.window.focus()
     })
     app.on('activate', () => {

@@ -11,6 +11,8 @@ import {
   writeSync,
   closeSync,
   truncateSync,
+  renameSync,
+  utimesSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -204,6 +206,31 @@ describe('unlock and lock', () => {
     expect(seen).toEqual(['unlocked'])
   })
 
+  it.each([
+    ['lock', () => vault.lock()],
+    ['unlock', () => vault.unlock(PASSWORD)],
+  ])(
+    'closes a connection busy with a statement at the next %s after it ends',
+    async (_next, next) => {
+      await vault.unlock(PASSWORD)
+      const db = vault.database()
+      db.prepare(
+        "INSERT INTO accounts (name, type, currency) VALUES ('Fake Bank', 'bank', 'AUD')",
+      ).run()
+      const rows = db.prepare('SELECT name FROM accounts').iterate()
+      rows.next()
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+      expect(vault.lock()).toBe(true)
+      expect(vault.state).toBe('locked')
+      expect(db.open).toBe(true)
+      expect(log).toHaveBeenCalledWith('closing the database failed: TypeError')
+      log.mockRestore()
+      rows.return?.()
+      await next()
+      expect(db.open).toBe(false)
+    },
+  )
+
   it('stays unlocked when a listener fails', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     vault.onChange(() => {
@@ -371,6 +398,55 @@ describe('the data key', () => {
 })
 
 describe('staging', () => {
+  /** A whole vault left in a staging directory, as a lost rename leaves it. */
+  const unrename = async (password: string, name: string, age = 0) => {
+    const elsewhere = mkdtempSync(join(tmpdir(), 'ledger-staged-'))
+    const made = new Vault(elsewhere, { derive: deriveHere, kdf: FAST })
+    await made.create(password)
+    made.lock()
+    const time = Date.now() / 1000 - age
+    utimesSync(join(made.dir, 'vault.json'), time, time)
+    renameSync(made.dir, join(root, name))
+    rmSync(elsewhere, { recursive: true })
+  }
+
+  it('puts a whole staged vault back when none is in place', async () => {
+    await unrename(PASSWORD, 'vault.creating-lost')
+    mkdirSync(join(root, 'vault.creating-partial'))
+    const recovered = new Vault(root, { derive: deriveHere, kdf: FAST })
+    expect(recovered.state).toBe('locked')
+    expect(await recovered.unlock(PASSWORD)).toEqual({ ok: true })
+    recovered.lock()
+    expect(readdirSync(root).sort()).toEqual([
+      'vault',
+      'vault.creating-partial',
+    ])
+  })
+
+  it('does not put back a staged vault without its database', async () => {
+    await unrename(PASSWORD, 'vault.creating-lost')
+    rmSync(join(root, 'vault.creating-lost', 'ledger-1.db'))
+    expect(new Vault(root, { derive: deriveHere, kdf: FAST }).state).toBe('new')
+  })
+
+  it('puts back the newest of several', async () => {
+    await unrename('an older fake passphrase', 'vault.creating-a', 60)
+    await unrename(PASSWORD, 'vault.creating-b')
+    const recovered = new Vault(root, { derive: deriveHere, kdf: FAST })
+    expect(await recovered.unlock(PASSWORD)).toEqual({ ok: true })
+    recovered.lock()
+  })
+
+  it('leaves a staged vault alone when one is in place', async () => {
+    await vault.create(PASSWORD)
+    vault.lock()
+    await unrename('another fake passphrase', 'vault.creating-a')
+    const again = new Vault(root, { derive: deriveHere, kdf: FAST })
+    expect(await again.unlock(PASSWORD)).toEqual({ ok: true })
+    again.lock()
+    expect(readdirSync(root).sort()).toEqual(['vault', 'vault.creating-a'])
+  })
+
   it('removes staging directories left by an interrupted create', async () => {
     mkdirSync(join(root, 'vault.creating-old'))
     writeFileSync(join(root, 'vault.creating-old', 'vault.json'), '{}')
