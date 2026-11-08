@@ -1,27 +1,20 @@
 import { randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import type { ElectronApplication, Page } from '@playwright/test'
-import { DEMO_PASSWORD } from '../../scripts/seed/demo'
+import type { Page } from '@playwright/test'
 import {
+  chooseFile,
   expect,
-  ledgerTest,
-  rendererPid,
   expectExited,
+  ledgerTest,
+  mainHeapSnapshot,
+  rendererPid,
   replacedBy,
+  sidebar,
+  unlock,
 } from './fixtures'
 
 const sample = (name: string) => resolve(__dirname, '../fixtures/csv', name)
-
-/** The open dialog answers with this file, or as cancelled for null. */
-function chooseFile(app: ElectronApplication, path: string | null) {
-  return app.evaluate(({ dialog }, chosen) => {
-    dialog.showOpenDialog = (async () => ({
-      canceled: chosen === null,
-      filePaths: chosen === null ? [] : [chosen],
-    })) as typeof dialog.showOpenDialog
-  }, path)
-}
 
 const everydayId = (page: Page) =>
   page.evaluate(async () => {
@@ -99,15 +92,9 @@ ledgerTest(
     }, accountId)
 
     const locked = await replacedBy(app, () =>
-      home
-        .getByRole('navigation', { name: 'Ledger' })
-        .getByRole('button', { name: 'Lock' })
-        .click(),
+      sidebar(home).getByRole('button', { name: 'Lock' }).click(),
     )
-    await locked.getByLabel('Master password').fill(DEMO_PASSWORD)
-    const unlocked = await replacedBy(app, () =>
-      locked.getByRole('button', { name: 'Unlock' }).click(),
-    )
+    const unlocked = await unlock(app, locked)
     expect(
       await unlocked.evaluate(
         (request) => window.ledger.imports.preview(request),
@@ -123,9 +110,9 @@ ledgerTest(
 ledgerTest(
   'imports through the page, then undoes the import from Settings',
   async ({ app, home }) => {
-    const sidebar = home.getByRole('navigation', { name: 'Ledger' })
+    const nav = sidebar(home)
     await chooseFile(app, sample('westpac.csv'))
-    await sidebar.getByRole('button', { name: /^Everyday/ }).click()
+    await nav.getByRole('button', { name: /^Everyday/ }).click()
     await home.getByRole('button', { name: 'Import CSV…' }).click()
     await expect(
       home.getByRole('heading', { name: 'Import westpac.csv' }),
@@ -158,7 +145,7 @@ ledgerTest(
       list.getByRole('row').filter({ hasText: 'DEPOSIT FAKE EMPLOYER' }),
     ).toHaveCount(0)
 
-    await sidebar.getByRole('button', { name: 'Settings' }).click()
+    await nav.getByRole('button', { name: 'Settings' }).click()
     await home.getByRole('button', { name: 'Undo…' }).click()
     const confirm = home.getByRole('alertdialog', { name: 'Undo Import?' })
     await expect(confirm).toContainText(
@@ -166,7 +153,7 @@ ledgerTest(
     )
     await confirm.getByRole('button', { name: 'Undo Import' }).click()
     await expect(home.getByRole('heading', { name: 'Imports' })).toHaveCount(0)
-    await sidebar.getByRole('button', { name: /^Everyday/ }).click()
+    await nav.getByRole('button', { name: /^Everyday/ }).click()
     await home.getByRole('searchbox', { name: 'Search' }).fill('FAKE')
     await expect(home.getByText('No matching transactions')).toBeVisible()
   },
@@ -232,19 +219,12 @@ ledgerTest(
 
     const shown = await rendererPid(app)
     const locked = await replacedBy(app, () =>
-      home
-        .getByRole('navigation', { name: 'Ledger' })
-        .getByRole('button', { name: 'Lock' })
-        .click(),
+      sidebar(home).getByRole('button', { name: 'Lock' }).click(),
     )
     await expectExited(shown)
     await expect(locked.getByLabel('Master password')).toBeVisible()
 
-    const snapshotFile = testInfo.outputPath('main.heapsnapshot')
-    await app.evaluate((_electron, path) => {
-      process.getBuiltinModule('v8').writeHeapSnapshot(path)
-    }, snapshotFile)
-    const snapshot = readFileSync(snapshotFile, 'utf8')
+    const snapshot = await mainHeapSnapshot(app, testInfo)
     expect(snapshot.includes(control), 'the control is found').toBe(true)
     expect(snapshot.includes(imported), 'imported text is reachable').toBe(
       false,

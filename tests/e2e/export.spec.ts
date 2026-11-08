@@ -1,23 +1,16 @@
 import { randomUUID } from 'node:crypto'
 import { chmodSync, existsSync, readFileSync, statSync } from 'node:fs'
-import type { ElectronApplication, Page } from '@playwright/test'
-import { DEMO_PASSWORD } from '../../scripts/seed/demo'
+import type { Page } from '@playwright/test'
 import { strFromU8, unzipSync } from 'fflate'
-import { expect, ledgerTest, replacedBy } from './fixtures'
-
-/** The save dialog answers with this path, or as cancelled for null. */
-function saveTo(app: ElectronApplication, path: string | null, lock = false) {
-  return app.evaluate(
-    ({ dialog, powerMonitor }, { path, lock }) => {
-      dialog.showSaveDialog = (async () => {
-        // The vault locks while the dialog is open.
-        if (lock) powerMonitor.emit('lock-screen')
-        return { canceled: path === null, filePath: path ?? '' }
-      }) as typeof dialog.showSaveDialog
-    },
-    { path, lock },
-  )
-}
+import {
+  expect,
+  ledgerTest,
+  lockScreen,
+  mainHeapSnapshot,
+  saveTo,
+  sidebar,
+  unlock,
+} from './fixtures'
 
 const thisMonth = () => {
   const today = new Date()
@@ -78,21 +71,6 @@ ledgerTest(
   },
 )
 
-/** Unlocks from the locked page and returns the page that replaces it. */
-async function unlock(app: ElectronApplication, page: Page): Promise<Page> {
-  await page.getByLabel('Master password').fill(DEMO_PASSWORD)
-  return replacedBy(app, () =>
-    page.getByRole('button', { name: 'Unlock' }).click(),
-  )
-}
-
-const lock = (app: ElectronApplication) =>
-  replacedBy(app, () =>
-    app.evaluate(({ powerMonitor }) => {
-      powerMonitor.emit('lock-screen')
-    }),
-  )
-
 ledgerTest(
   'a lock and unlock while the save dialog is open writes nothing',
   async ({ app, home }, testInfo) => {
@@ -115,7 +93,7 @@ ledgerTest(
     await expect
       .poll(() => app.evaluate(() => 'answerDialog' in globalThis))
       .toBe(true)
-    await unlock(app, await lock(app))
+    await unlock(app, await lockScreen(app))
     // The vault is open again, but not the one the export began in.
     await app.evaluate(() => {
       ;(globalThis as unknown as { answerDialog: () => void }).answerDialog()
@@ -185,10 +163,7 @@ ledgerTest(
   async ({ app, home }, testInfo) => {
     const path = testInfo.outputPath('from-dialog.pdf')
     await saveTo(app, path)
-    await home
-      .getByRole('navigation', { name: 'Ledger' })
-      .getByRole('button', { name: 'Reports' })
-      .click()
+    await sidebar(home).getByRole('button', { name: 'Reports' }).click()
     await home.getByRole('button', { name: 'Export…' }).click()
     const dialog = home.getByRole('alertdialog', { name: /^Export / })
     await expect(dialog).toHaveAccessibleDescription(/not encrypted/)
@@ -250,16 +225,8 @@ ledgerTest(
         ),
       ).toEqual({ ok: true })
     }
-    await replacedBy(app, () =>
-      app.evaluate(({ powerMonitor }) => {
-        powerMonitor.emit('lock-screen')
-      }),
-    )
-    const file = testInfo.outputPath('main.heapsnapshot')
-    await app.evaluate((_electron, path) => {
-      process.getBuiltinModule('v8').writeHeapSnapshot(path)
-    }, file)
-    const snapshot = readFileSync(file, 'utf8')
+    await lockScreen(app)
+    const snapshot = await mainHeapSnapshot(app, testInfo)
     expect(snapshot.includes(control), 'the control is found').toBe(true)
     expect(snapshot.includes(marker), 'the exported text is reachable').toBe(
       false,

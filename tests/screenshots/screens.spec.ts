@@ -2,8 +2,8 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import type { ElectronApplication, Page } from '@playwright/test'
-import { expect, ledgerTest } from '../e2e/fixtures'
+import type { Page } from '@playwright/test'
+import { chooseFile, expect, ledgerTest, sidebar } from '../e2e/fixtures'
 
 const OUT = resolve(__dirname, '../../docs/screenshots')
 const SIZE = { width: 1100, height: 720 }
@@ -15,8 +15,6 @@ const PAGES: [string, string | RegExp][] = [
   ['reports', 'Reports'],
   ['settings', 'Settings'],
 ]
-
-const sidebar = (page: Page) => page.getByRole('navigation', { name: 'Ledger' })
 
 /** A few budgets, so the Budgets page and Overview show progress. */
 async function setBudgets(page: Page) {
@@ -50,16 +48,6 @@ ledgerTest('README screenshots', async ({ home }) => {
     }
   }
 })
-
-/** Shows a file to the open dialog. */
-function chooseFile(app: ElectronApplication, path: string) {
-  return app.evaluate(({ dialog }, path) => {
-    dialog.showOpenDialog = (async () => ({
-      canceled: false,
-      filePaths: [path],
-    })) as typeof dialog.showOpenDialog
-  }, path)
-}
 
 ledgerTest(
   'README GIF: import a bank file and see the month',

@@ -1,7 +1,4 @@
-import type { Page } from '@playwright/test'
-import { expect, ledgerTest, replacedBy } from './fixtures'
-
-const sidebar = (page: Page) => page.getByRole('navigation', { name: 'Ledger' })
+import { expect, ledgerTest, replacedBy, sidebar } from './fixtures'
 
 ledgerTest(
   'the lock time setting decides when idle time locks the vault',

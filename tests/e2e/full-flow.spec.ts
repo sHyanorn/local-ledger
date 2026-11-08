@@ -1,10 +1,14 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import type { Page } from '@playwright/test'
 import { strFromU8, unzipSync } from 'fflate'
-import { createVault, expect, test } from './fixtures'
-
-const sidebar = (page: Page) => page.getByRole('navigation', { name: 'Ledger' })
+import {
+  chooseFile,
+  createVault,
+  expect,
+  saveTo,
+  sidebar,
+  test,
+} from './fixtures'
 
 /** Months from May 2026, the month of the sample file, to this one. */
 const monthsSinceSample = () => {
@@ -33,12 +37,7 @@ test('a new user sets a password, imports, categorizes, budgets and exports', as
 
   // Import a bank file through the open dialog.
   const sample = resolve(__dirname, '../fixtures/csv/commbank.csv')
-  await app.evaluate(({ dialog }, path) => {
-    dialog.showOpenDialog = (async () => ({
-      canceled: false,
-      filePaths: [path],
-    })) as typeof dialog.showOpenDialog
-  }, sample)
+  await chooseFile(app, sample)
   await sidebar(home).getByRole('button', { name: 'Fake Everyday' }).click()
   await home.getByRole('button', { name: 'Import CSV…' }).click()
   await expect(home.getByText('CommBank format')).toBeVisible()
@@ -76,12 +75,7 @@ test('a new user sets a password, imports, categorizes, budgets and exports', as
 
   // Export the month as a workbook.
   const path = testInfo.outputPath('statement.xlsx')
-  await app.evaluate(({ dialog }, path) => {
-    dialog.showSaveDialog = (async () => ({
-      canceled: false,
-      filePath: path,
-    })) as typeof dialog.showSaveDialog
-  }, path)
+  await saveTo(app, path)
   await sidebar(home).getByRole('button', { name: 'Reports' }).click()
   for (let n = 0; n < monthsSinceSample(); n++) {
     await home.getByRole('button', { name: 'Previous Month' }).click()

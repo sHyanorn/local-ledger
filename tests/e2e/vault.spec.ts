@@ -11,10 +11,12 @@ import {
   expect,
   expectExited,
   launch,
+  lockScreen,
   PASSWORD,
   rendererPid,
   replacedBy,
   test,
+  unlock,
 } from './fixtures'
 
 const vaultDir = (userData: string) => join(userData, 'vault')
@@ -100,10 +102,7 @@ test.describe('unlock and lock', () => {
       await expect(page.getByRole('alert')).toHaveText('Wrong password.')
 
       const lockedPid = await rendererPid(again)
-      await page.getByLabel('Master password').fill(PASSWORD)
-      const home = await replacedBy(again, () =>
-        page.getByRole('button', { name: 'Unlock' }).click(),
-      )
+      const home = await unlock(again, page, PASSWORD)
       await expect(home.getByRole('button', { name: 'Lock' })).toBeVisible()
       await expectExited(lockedPid)
     } finally {
@@ -188,11 +187,7 @@ test.describe('unlock and lock', () => {
     )
     await locked.getByLabel('Master password').fill(PASSWORD)
     const typedPid = await rendererPid(app)
-    const cleared = await replacedBy(app, () =>
-      app.evaluate(({ powerMonitor }) => {
-        powerMonitor.emit('lock-screen')
-      }),
-    )
+    const cleared = await lockScreen(app)
     await expectExited(typedPid)
     await expect(cleared.getByLabel('Master password')).toHaveValue('')
   })
@@ -230,8 +225,9 @@ test('a vault whose database is missing is reported, and nothing is deleted', as
       shown.getByRole('button', { name: 'Restore from Backup…' }),
     ).toBeVisible()
     expect(
-      await shown.evaluate(() =>
-        window.ledger.vault.unlock('fake ledger passphrase for tests'),
+      await shown.evaluate(
+        (password) => window.ledger.vault.unlock(password),
+        PASSWORD,
       ),
     ).toEqual({ ok: false, reason: 'damaged' })
     expect(readdirSync(vaultDir(userData))).toEqual(['vault.json'])
@@ -306,10 +302,7 @@ test('a password change that fails says so, and the old password still works', a
   expect(
     await locked.evaluate((next) => window.ledger.vault.unlock(next), NEW),
   ).toEqual({ ok: false, reason: 'wrong-password' })
-  await locked.getByLabel('Master password').fill(PASSWORD)
-  const unlocked = await replacedBy(app, () =>
-    locked.getByRole('button', { name: 'Unlock' }).click(),
-  )
+  const unlocked = await unlock(app, locked, PASSWORD)
   expect(await unlocked.evaluate(() => window.ledger.vault.status())).toBe(
     'unlocked',
   )
@@ -350,10 +343,7 @@ test('changing the password re-keys the vault in a new page process', async ({
   expect(
     await locked.evaluate((old) => window.ledger.vault.unlock(old), PASSWORD),
   ).toEqual({ ok: false, reason: 'wrong-password' })
-  await locked.getByLabel('Master password').fill(NEW)
-  const unlocked = await replacedBy(app, () =>
-    locked.getByRole('button', { name: 'Unlock' }).click(),
-  )
+  const unlocked = await unlock(app, locked, NEW)
   expect(await unlocked.evaluate(() => window.ledger.vault.status())).toBe(
     'unlocked',
   )

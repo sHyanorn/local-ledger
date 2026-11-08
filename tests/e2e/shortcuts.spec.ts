@@ -1,7 +1,6 @@
 import type { ElectronApplication, Page } from '@playwright/test'
-import { expect, ledgerTest, replacedBy } from './fixtures'
+import { expect, ledgerTest, replacedBy, sidebar } from './fixtures'
 
-const sidebar = (page: Page) => page.getByRole('navigation', { name: 'Ledger' })
 const current = (page: Page, name: string | RegExp) =>
   expect(sidebar(page).getByRole('button', { name })).toHaveAttribute(
     'aria-current',

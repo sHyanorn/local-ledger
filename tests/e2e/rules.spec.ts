@@ -1,8 +1,7 @@
 import { resolve } from 'node:path'
 import type { Page } from '@playwright/test'
-import { expect, ledgerTest } from './fixtures'
+import { chooseFile, expect, ledgerTest, sidebar } from './fixtures'
 
-const sidebar = (page: Page) => page.getByRole('navigation', { name: 'Ledger' })
 const list = (page: Page) => page.getByRole('table', { name: 'Transactions' })
 
 async function setCategory(page: Page, nth: number, category: string) {
@@ -59,15 +58,7 @@ ledgerTest(
     ).toBeVisible()
 
     // A later import gets its category from a rule.
-    await app.evaluate(
-      ({ dialog }, path) => {
-        dialog.showOpenDialog = (async () => ({
-          canceled: false,
-          filePaths: [path],
-        })) as typeof dialog.showOpenDialog
-      },
-      resolve(__dirname, '../fixtures/csv/anz.csv'),
-    )
+    await chooseFile(app, resolve(__dirname, '../fixtures/csv/anz.csv'))
     await home.evaluate(async () => {
       const categories = await window.ledger.categories.list()
       const travel = categories.find((category) => category.name === 'Travel')!

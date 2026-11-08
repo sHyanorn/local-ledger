@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 import type { SeedLedger } from '../../scripts/seed/generate'
 import { isoDate } from '../../src/shared/dates'
@@ -8,8 +7,10 @@ import {
   expect,
   expectExited,
   ledgerTest as test,
+  mainHeapSnapshot,
   rendererPid,
   replacedBy,
+  sidebar,
 } from './fixtures'
 
 /** Uncategorized and not one side of a seeded transfer, which the seed pairs. */
@@ -25,7 +26,6 @@ const needsCategory = (row: { category: string | null; description: string }) =>
 const table = (page: Page) => page.getByRole('table', { name: 'Transactions' })
 const rows = (page: Page) => table(page).getByRole('rowgroup').getByRole('row')
 const totals = (page: Page) => page.locator('.totals')
-const sidebar = (page: Page) => page.getByRole('navigation', { name: 'Ledger' })
 const n = (count: number) => count.toLocaleString('en-AU')
 
 /** The seeded total of a set of rows, in one currency. */
@@ -251,12 +251,8 @@ test('after a lock, no transaction text stays in a page or reachable in the main
   // A heap snapshot collects garbage first, so it holds only what is still
   // reachable. It does not hold the contents of Buffers and other binary
   // arrays; SECURITY_DESIGN says so.
-  const file = testInfo.outputPath('main.heapsnapshot')
-  await app.evaluate((_electron, path) => {
-    process.getBuiltinModule('v8').writeHeapSnapshot(path)
-  }, file)
   // Booleans, so a failure does not print a snapshot of many megabytes.
-  const snapshot = readFileSync(file, 'utf8')
+  const snapshot = await mainHeapSnapshot(app, testInfo)
   expect(snapshot.includes(control), 'the control is found').toBe(true)
   expect(snapshot.includes(marker), 'the transaction is reachable').toBe(false)
 })

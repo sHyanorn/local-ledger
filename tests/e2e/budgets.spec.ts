@@ -1,7 +1,4 @@
-import type { Page } from '@playwright/test'
-import { expect, ledgerTest } from './fixtures'
-
-const sidebar = (page: Page) => page.getByRole('navigation', { name: 'Ledger' })
+import { expect, ledgerTest, sidebar } from './fixtures'
 
 ledgerTest(
   'a budget shows spending against it, counts when over, and can end',

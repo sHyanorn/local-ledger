@@ -1,8 +1,7 @@
 import type { Page } from '@playwright/test'
 import { formatAmount } from '../../src/shared/money'
-import { expect, ledgerTest as test } from './fixtures'
+import { expect, ledgerTest as test, sidebar } from './fixtures'
 
-const sidebar = (page: Page) => page.getByRole('navigation', { name: 'Ledger' })
 const accountButton = (page: Page, name: string) =>
   sidebar(page).getByRole('button', { name: new RegExp(`^${name}`) })
 

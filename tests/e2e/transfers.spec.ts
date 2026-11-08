@@ -1,7 +1,6 @@
 import type { Page } from '@playwright/test'
-import { expect, ledgerTest } from './fixtures'
+import { expect, ledgerTest, sidebar } from './fixtures'
 
-const sidebar = (page: Page) => page.getByRole('navigation', { name: 'Ledger' })
 const list = (page: Page) => page.getByRole('table', { name: 'Transactions' })
 
 ledgerTest(

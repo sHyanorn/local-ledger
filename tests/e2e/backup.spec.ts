@@ -1,22 +1,21 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import type { ElectronApplication, Page } from '@playwright/test'
 import { DEMO_PASSWORD } from '../../scripts/seed/demo'
-import { expect, launch, ledgerTest, replacedBy } from './fixtures'
-
-function saveTo(app: ElectronApplication, path: string | null) {
-  return app.evaluate(({ dialog }, path) => {
-    dialog.showSaveDialog = (async () => ({
-      canceled: path === null,
-      filePath: path ?? '',
-    })) as typeof dialog.showSaveDialog
-  }, path)
-}
+import {
+  chooseFile,
+  expect,
+  expectDialogsAsked,
+  launch,
+  ledgerTest,
+  lockScreen,
+  replacedBy,
+  saveTo,
+  sidebar,
+  unlock,
+} from './fixtures'
 
 const openBackup = async (page: Page) => {
-  await page
-    .getByRole('navigation', { name: 'Ledger' })
-    .getByRole('button', { name: 'Settings' })
-    .click()
+  await sidebar(page).getByRole('button', { name: 'Settings' }).click()
   await page.getByRole('button', { name: 'Back Up…' }).click()
   return page.getByRole('dialog', { name: 'Back Up Vault' })
 }
@@ -45,15 +44,6 @@ ledgerTest(
     }
   },
 )
-
-function chooseBackup(app: ElectronApplication, path: string) {
-  return app.evaluate(({ dialog }, path) => {
-    dialog.showOpenDialog = (async () => ({
-      canceled: false,
-      filePaths: [path],
-    })) as typeof dialog.showOpenDialog
-  }, path)
-}
 
 /** A backup of the seeded vault, saved at path. */
 async function makeBackup(app: ElectronApplication, page: Page, path: string) {
@@ -85,11 +75,8 @@ ledgerTest(
     })
     expect(added).toBe(true)
 
-    await chooseBackup(app, path)
-    await home
-      .getByRole('navigation', { name: 'Ledger' })
-      .getByRole('button', { name: 'Settings' })
-      .click()
+    await chooseFile(app, path)
+    await sidebar(home).getByRole('button', { name: 'Settings' }).click()
     await home.getByRole('button', { name: 'Restore from Backup…' }).click()
     const dialog = home.getByRole('dialog', { name: 'Restore from Backup' })
     await dialog.getByRole('button', { name: 'Choose Backup…' }).click()
@@ -118,9 +105,7 @@ ledgerTest(
     const restored = await replacedBy(app, () =>
       dialog.getByRole('button', { name: 'Restore' }).click(),
     )
-    await expect(
-      restored.getByRole('navigation', { name: 'Ledger' }),
-    ).toBeVisible()
+    await expect(sidebar(restored)).toBeVisible()
     const found = await restored.evaluate(async () => {
       const page = await window.ledger.transactions.page(
         { text: 'Fake After Backup' },
@@ -142,7 +127,7 @@ ledgerTest(
   async ({ app, home, userData }, testInfo) => {
     const path = testInfo.outputPath('forgotten.llbackup')
     await makeBackup(app, home, path)
-    await chooseBackup(app, path)
+    await chooseFile(app, path)
     expect(await home.evaluate(() => window.ledger.restore.open())).toEqual({
       ok: true,
       name: 'forgotten.llbackup',
@@ -158,17 +143,10 @@ ledgerTest(
         name.startsWith('vault.restoring-'),
       )
     expect(staged()).toHaveLength(1)
-    const locked = await replacedBy(app, () =>
-      app.evaluate(({ powerMonitor }) => {
-        powerMonitor.emit('lock-screen')
-      }),
-    )
+    const locked = await lockScreen(app)
     // Gone at the lock itself, before any unlock.
     expect(staged()).toEqual([])
-    await locked.getByLabel('Master password').fill(DEMO_PASSWORD)
-    const again = await replacedBy(app, () =>
-      locked.getByRole('button', { name: 'Unlock' }).click(),
-    )
+    const again = await unlock(app, locked)
     expect(
       await again.evaluate(
         (password) => window.ledger.restore.commit(password),
@@ -189,7 +167,7 @@ ledgerTest(
       await expect(
         setup.getByRole('heading', { name: 'Create a master password' }),
       ).toBeVisible()
-      await chooseBackup(fresh, path)
+      await chooseFile(fresh, path)
       // A lock at setup, with no vault to lock, still drops a checked backup.
       expect(
         await setup.evaluate(() => window.ledger.restore.open()),
@@ -200,11 +178,7 @@ ledgerTest(
           DEMO_PASSWORD,
         ),
       ).toMatchObject({ ok: true })
-      const afterLock = await replacedBy(fresh, () =>
-        fresh.evaluate(({ powerMonitor }) => {
-          powerMonitor.emit('lock-screen')
-        }),
-      )
+      const afterLock = await lockScreen(fresh)
       expect(
         await afterLock.evaluate(() => window.ledger.restore.commit(null)),
       ).toEqual({ ok: false, reason: 'not-checked' })
@@ -229,16 +203,12 @@ ledgerTest(
       const restored = await replacedBy(fresh, () =>
         dialog.getByRole('button', { name: 'Restore' }).click(),
       )
-      await expect(
-        restored.getByRole('navigation', { name: 'Ledger' }),
-      ).toBeVisible()
+      await expect(sidebar(restored)).toBeVisible()
       const locked = await replacedBy(fresh, () =>
         restored.getByRole('button', { name: 'Lock' }).click(),
       )
-      await locked.getByLabel('Master password').fill(DEMO_PASSWORD)
-      await replacedBy(fresh, () =>
-        locked.getByRole('button', { name: 'Unlock' }).click(),
-      )
+      await unlock(fresh, locked)
+      await expectDialogsAsked(fresh)
     } finally {
       await fresh.close()
     }
