@@ -29,6 +29,10 @@ export type BudgetState = 'none' | 'under' | 'close' | 'over'
 export function budgetState(budget: CategoryBudget): BudgetState {
   if (budget.budgetCents === null) return 'none'
   if (budget.spentCents > budget.budgetCents) return 'over'
-  if (budget.spentCents >= budget.budgetCents * CLOSE_SHARE) return 'close'
+  if (
+    budget.budgetCents > 0 &&
+    budget.spentCents >= budget.budgetCents * CLOSE_SHARE
+  )
+    return 'close'
   return 'under'
 }

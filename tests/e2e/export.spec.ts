@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, readFileSync, statSync } from 'node:fs'
-import type { ElectronApplication } from '@playwright/test'
+import { chmodSync, existsSync, readFileSync, statSync } from 'node:fs'
+import type { ElectronApplication, Page } from '@playwright/test'
+import { DEMO_PASSWORD } from '../../scripts/seed/demo'
 import { strFromU8, unzipSync } from 'fflate'
 import { expect, ledgerTest, replacedBy } from './fixtures'
 
@@ -51,6 +52,10 @@ ledgerTest(
     )
     if (process.platform !== 'win32') {
       expect(statSync(xlsx).mode & 0o777).toBe(0o600)
+      // Saving over a file others can read makes it the user's only.
+      chmodSync(xlsx, 0o644)
+      expect(await save('xlsx')).toEqual({ ok: true })
+      expect(statSync(xlsx).mode & 0o777).toBe(0o600)
     }
 
     const pdf = testInfo.outputPath('statement.pdf')
@@ -73,21 +78,105 @@ ledgerTest(
   },
 )
 
+/** Unlocks from the locked page and returns the page that replaces it. */
+async function unlock(app: ElectronApplication, page: Page): Promise<Page> {
+  await page.getByLabel('Master password').fill(DEMO_PASSWORD)
+  return replacedBy(app, () =>
+    page.getByRole('button', { name: 'Unlock' }).click(),
+  )
+}
+
+const lock = (app: ElectronApplication) =>
+  replacedBy(app, () =>
+    app.evaluate(({ powerMonitor }) => {
+      powerMonitor.emit('lock-screen')
+    }),
+  )
+
 ledgerTest(
-  'a lock while the save dialog is open writes nothing',
+  'a lock and unlock while the save dialog is open writes nothing',
   async ({ app, home }, testInfo) => {
-    const path = testInfo.outputPath('locked.pdf')
-    await saveTo(app, path, true)
-    const result = await home
+    const path = testInfo.outputPath('lock-unlock.xlsx')
+    // The dialog stays open until answered.
+    await app.evaluate(({ dialog }, path) => {
+      dialog.showSaveDialog = (() =>
+        new Promise((resolve) => {
+          Object.assign(globalThis, {
+            answerDialog: () => resolve({ canceled: false, filePath: path }),
+          })
+        })) as typeof dialog.showSaveDialog
+    }, path)
+    void home
+      .evaluate(
+        (month) => window.ledger.export.save(month, 'AUD', 'xlsx'),
+        thisMonth(),
+      )
+      .catch(() => undefined)
+    await expect
+      .poll(() => app.evaluate(() => 'answerDialog' in globalThis))
+      .toBe(true)
+    await unlock(app, await lock(app))
+    // The vault is open again, but not the one the export began in.
+    await app.evaluate(() => {
+      ;(globalThis as unknown as { answerDialog: () => void }).answerDialog()
+    })
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    expect(existsSync(path)).toBe(false)
+  },
+)
+
+ledgerTest(
+  'a lock while the PDF prints writes nothing, and a later export works',
+  async ({ app, home }, testInfo) => {
+    const path = testInfo.outputPath('during-print.pdf')
+    await saveTo(app, path)
+    await app.evaluate(({ app: electron, powerMonitor }) => {
+      electron.once('browser-window-created', (_event, window) => {
+        const print = window.webContents.printToPDF.bind(window.webContents)
+        window.webContents.printToPDF = ((options) => {
+          const printing = print(options)
+          setImmediate(() => powerMonitor.emit('lock-screen'))
+          return printing
+        }) as typeof window.webContents.printToPDF
+      })
+    })
+    void home
       .evaluate(
         (month) => window.ledger.export.save(month, 'AUD', 'pdf'),
         thisMonth(),
       )
-      .catch((error: Error) => error.message)
-    // The page is replaced on lock, so the call may not answer at all.
-    if (typeof result === 'string')
-      expect(result).toMatch(/locked|closed|destroyed/i)
+      .catch(() => undefined)
+    // The print window is a window too; the locked page asks for the password.
+    let lockedPage: Page | undefined
+    await expect
+      .poll(async () => {
+        for (const page of app.windows()) {
+          const asks = await page
+            .getByLabel('Master password')
+            .isVisible()
+            .catch(() => false)
+          if (asks) lockedPage = page
+        }
+        return lockedPage !== undefined
+      })
+      .toBe(true)
+    const again = await unlock(app, lockedPage!)
     expect(existsSync(path)).toBe(false)
+    expect(
+      await app.evaluate(
+        ({ BrowserWindow }) => BrowserWindow.getAllWindows().length,
+      ),
+    ).toBe(0)
+
+    const next = testInfo.outputPath('after.xlsx')
+    await saveTo(app, next)
+    expect(
+      await again.evaluate(
+        (month) => window.ledger.export.save(month, 'AUD', 'xlsx'),
+        thisMonth(),
+      ),
+    ).toEqual({ ok: true })
+    expect(existsSync(next)).toBe(true)
   },
 )
 
@@ -104,7 +193,20 @@ ledgerTest(
     const dialog = home.getByRole('alertdialog', { name: /^Export / })
     await expect(dialog).toHaveAccessibleDescription(/not encrypted/)
     await dialog.getByLabel('PDF').check()
+    // Printing waits, so the dialog can be seen while it works.
+    await app.evaluate(({ app: electron }) => {
+      electron.once('browser-window-created', (_event, window) => {
+        const print = window.webContents.printToPDF.bind(window.webContents)
+        window.webContents.printToPDF = (async (options) => {
+          await new Promise((resolve) => setTimeout(resolve, 1000))
+          return print(options)
+        }) as typeof window.webContents.printToPDF
+      })
+    })
     await dialog.getByRole('button', { name: 'Export…' }).click()
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeDisabled()
+    await home.keyboard.press('Escape')
+    await expect(dialog).toBeVisible()
     await expect(dialog).toBeHidden()
     await expect(home.getByRole('region', { name: 'Notice' })).toContainText(
       'Exported',

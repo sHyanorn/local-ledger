@@ -17,13 +17,6 @@ export async function printPdf(
   signal: AbortSignal,
 ): Promise<Buffer> {
   if (signal.aborted) throw new PrintCancelled()
-  const page = servePrint(
-    {
-      'report.html': { type: 'text/html; charset=utf-8', body: html },
-      'report.css': { type: 'text/css; charset=utf-8', body: css },
-    },
-    'report.html',
-  )
   // A new window each time: no state carries from one export to the next.
   const window = new BrowserWindow({
     show: false,
@@ -39,6 +32,13 @@ export async function printPdf(
       webgl: false,
     },
   })
+  const page = servePrint(
+    {
+      'report.html': { type: 'text/html; charset=utf-8', body: html },
+      'report.css': { type: 'text/css; charset=utf-8', body: css },
+    },
+    'report.html',
+  )
   const cancel = () => window.destroy()
   signal.addEventListener('abort', cancel)
   try {

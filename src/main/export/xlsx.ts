@@ -58,16 +58,18 @@ const HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
 // eslint-disable-next-line no-control-regex
 const INVALID = /[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g
 
+/** Text without the characters XML cannot hold; a lone surrogate becomes U+FFFD. */
+export const xmlSafe = (text: string): string =>
+  text.toWellFormed().replace(INVALID, '')
+
 /**
- * Text as XML character data. Characters XML cannot hold are dropped (a lone
- * surrogate becomes U+FFFD); a carriage return is kept as a reference, since
- * parsers turn a literal one into a line feed; and `_xHHHH_`, which Excel
- * reads as an escaped character, has its underscore escaped the same way.
+ * Text as XML character data, from xmlSafe text. A carriage return is kept
+ * as a reference, since parsers turn a literal one into a line feed; and
+ * `_xHHHH_`, which Excel reads as an escaped character, has its underscore
+ * escaped the same way.
  */
 export function xmlText(text: string): string {
-  return text
-    .toWellFormed()
-    .replace(INVALID, '')
+  return xmlSafe(text)
     .replace(/_(x[0-9A-Fa-f]{4}_)/g, '_x005F_$1')
     .replace(/[&<>"\r]/g, (char) => `&#${char.charCodeAt(0)};`)
 }
@@ -90,8 +92,10 @@ function cellXml(cell: Cell, ref: string, bold: boolean): string {
   const weight = bold ? 1 : 0
   if (cell === null) return ''
   if (typeof cell === 'string') {
-    const style = (startsLikeFormula(cell) ? STYLE.quoted : STYLE.text) + weight
-    return `<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xmlText(cell)}</t></is></c>`
+    // Tested as written, after dropping what XML cannot hold.
+    const text = xmlSafe(cell)
+    const style = (startsLikeFormula(text) ? STYLE.quoted : STYLE.text) + weight
+    return `<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xmlText(text)}</t></is></c>`
   }
   if ('date' in cell) {
     return `<c r="${ref}" s="${STYLE.date + weight}"><v>${dateSerial(cell.date)}</v></c>`
@@ -178,5 +182,10 @@ export function workbook(sheets: Sheet[]): Uint8Array {
     files[`xl/worksheets/sheet${index + 1}.xml`] = strToU8(sheetXml(sheet))
   })
   // A fixed time, so a file says nothing about when it was made.
-  return zipSync(files, { level: 6, mtime: new Date(1980, 0, 1) })
+  const zipped = zipSync(files, { level: 6, mtime: new Date(1980, 0, 1) })
+  // The parts hold the sheets' text uncompressed.
+  for (const part of Object.values(files)) {
+    if (part instanceof Uint8Array) part.fill(0)
+  }
+  return zipped
 }

@@ -36,6 +36,8 @@ const DANGEROUS = [
   '＠SUM(A1)',
   '=HYPERLINK("http://example.invalid","x")',
 ]
+// A character XML cannot hold must not hide a formula start behind it.
+const HIDDEN = ['\uFFFE=1+1', '\u0001=HYPERLINK("x")', '\uFFFF\u0000@SUM(A1)']
 const SAFE = ['Fake Cafe', ' =1+1', "'=1+1", '1+1', 'a=b', '', '中文 Fake']
 
 describe('formula starts', () => {
@@ -163,6 +165,29 @@ describe('workbook', () => {
     expect(column('C').at(-1)?.content).toBe('0.05')
     expect(xfs[all[0]!.style]).toContain('fontId="1"')
     expect(xml).toContain('state="frozen"')
+  })
+
+  it('quotes a formula start behind characters XML drops', () => {
+    const { sheets, parts } = open(
+      workbook([
+        {
+          name: 'Fake',
+          widths: [],
+          rows: HIDDEN.map((text) => ({ cells: [text] })),
+        },
+      ]),
+    )
+    const styles = strFromU8(parts['xl/styles.xml']!)
+    const xfs = [...styles.split('<cellXfs')[1]!.matchAll(/<xf [^>]*\/>/g)]
+    const written = cells(sheets[0]!)
+    expect(written.map((cell) => unescape(cell.content!))).toEqual([
+      '=1+1',
+      '=HYPERLINK("x")',
+      '@SUM(A1)',
+    ])
+    for (const cell of written) {
+      expect(xfs[cell.style]![0]).toContain('quotePrefix="1"')
+    }
   })
 
   it('is the same bytes for the same sheets, and refuses bad sheet names', () => {

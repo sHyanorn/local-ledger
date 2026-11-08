@@ -32,6 +32,11 @@ export function ExportDialog({
   const [working, setWorking] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
 
+  // Once the file is being made it will be saved, so the dialog stays to say so.
+  const close = () => {
+    if (!working) onDone(false)
+  }
+
   const save = async (event: FormEvent) => {
     event.preventDefault()
     setWorking(true)
@@ -51,7 +56,7 @@ export function ExportDialog({
     <Dialog
       title={`Export ${formatMonth(month)}`}
       description={`The exported file is not encrypted. Anyone who has it can read these ${currency} transactions.`}
-      onClose={() => onDone(false)}
+      onClose={close}
     >
       <form className="form" onSubmit={(event) => void save(event)}>
         <fieldset className="segmented">
@@ -78,7 +83,8 @@ export function ExportDialog({
           <button
             type="button"
             className="secondary"
-            onClick={() => onDone(false)}
+            disabled={working}
+            onClick={close}
           >
             Cancel
           </button>

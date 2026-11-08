@@ -73,10 +73,10 @@ What it cannot do, and does not claim:
 
 ## Exporting
 
-- An export is a month's statement in one currency, as an Excel workbook or a PDF. It is not encrypted. The export dialog says so before the user goes on, and the file is written only where the user picks in the system save dialog, shown by the main process; the page cannot name a path. The file is created readable by the user only (mode 0600 where the file system has modes). The app keeps no list of exported files and never deletes or changes them.
+- An export is a month's statement in one currency, as an Excel workbook or a PDF. It is not encrypted. The export dialog says so before the user goes on, and the file is written only where the user picks in the system save dialog, shown by the main process; the page cannot name a path. The file is made readable by the user only (mode 0600 where the file system has modes), also when it replaces an existing file. The app keeps no list of exported files and never deletes or changes them.
 - Nothing else is written: the workbook is built in memory, and the PDF is printed from a page served from memory at a random `app://` path that exists only while it prints, marked `no-store`, by a hidden window made for that export with no preload and JavaScript off; its process ends after printing. The buffer holding the file is zeroed once written. The statement's text, as for any query, stays as strings in the main process until garbage collection.
 - A lock or unlock while the save dialog is open, or while the PDF prints, cancels the export, and nothing is written.
-- Spreadsheet formulas: every text cell is an inline string, so the file holds no formula. Text that starts like one (`=`, `+`, `-`, `@`, tab, carriage return, line feed, or the full-width `＝＋－＠`, following OWASP) is also marked with the cell's quote prefix, and all text cells use the Text format, so editing a cell does not turn it into a formula. Checked in LibreOffice; Excel and Numbers have not been tried (D030).
+- Spreadsheet formulas: every text cell is an inline string, so the file holds no formula. Text that starts like one, once characters XML cannot hold are dropped (`=`, `+`, `-`, `@`, tab, carriage return, line feed, or the full-width `＝＋－＠`, following OWASP) is also marked with the cell's quote prefix, and all text cells use the Text format, so editing a cell does not turn it into a formula. Checked in LibreOffice; Excel and Numbers have not been tried (D030).
 - The PDF's title is fixed text. The PDF records the time it was made.
 
 ## Electron hardening
