@@ -75,9 +75,13 @@ export function startApp(): void {
       openReleases: () => void shell.openExternal(RELEASES_URL),
       packaged: app.isPackaged,
     })
+    // The self-test runs on machines nobody is using, where any idle limit
+    // may already be past; screen lock and sleep still lock.
+    const selfTest = app.commandLine.hasSwitch(SELF_TEST_SWITCH)
     watchForLock(powerMonitor, lock, {
       // The vault's own setting while it is open; locking again is harmless.
       idleLimit: () => {
+        if (selfTest) return Number.POSITIVE_INFINITY
         try {
           return getSettings(vault.database()).idleLockMinutes * 60
         } catch {
@@ -95,7 +99,7 @@ export function startApp(): void {
     app.on('activate', () => {
       if (!window) open()
     })
-    if (app.commandLine.hasSwitch(SELF_TEST_SWITCH)) {
+    if (selfTest) {
       void runSelfTest(vault, () => window?.contents, pageUrl)
     }
   })
