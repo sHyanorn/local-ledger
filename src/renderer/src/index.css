@@ -14,6 +14,7 @@
   --line: #d2d2d7;
   --accent: #007aff;
   --danger: #d70015;
+  --positive: #248a3d;
   --selected: color-mix(in srgb, var(--accent) 14%, transparent);
   --hover: color-mix(in srgb, var(--fg) 6%, transparent);
 }
@@ -27,6 +28,7 @@
     --line: #3a3a3c;
     --accent: #0a84ff;
     --danger: #ff6961;
+    --positive: #30d158;
   }
 }
 
@@ -95,7 +97,8 @@ button.secondary {
 }
 
 input,
-select {
+select,
+textarea {
   font: inherit;
   color: inherit;
   background: var(--bg);
@@ -105,7 +108,12 @@ select {
   outline: none;
 }
 
-input:focus {
+textarea {
+  resize: vertical;
+}
+
+input:focus,
+textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
 }
@@ -377,4 +385,179 @@ button.icon:hover {
 
 .spacer {
   flex: 1;
+}
+
+/* Transactions */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.filters input[type='search'] {
+  width: 220px;
+}
+
+.totals {
+  margin-left: auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.table {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.rows {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.tr {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) 210px 120px;
+  align-items: center;
+  gap: 12px;
+  min-height: 34px;
+  padding: 0 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  /* Off-screen rows skip layout and paint, so long lists stay fast. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 35px;
+}
+
+.tr.with-account {
+  grid-template-columns: 104px minmax(0, 1fr) 210px 120px 120px;
+}
+
+.tr.head {
+  min-height: 28px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  content-visibility: visible;
+}
+
+.rows .tr:hover {
+  background: var(--hover);
+}
+
+.tr .date {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tr > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tr .amount {
+  text-align: right;
+}
+
+.amount.positive {
+  color: var(--positive);
+}
+
+button.link {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0;
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.link:hover {
+  text-decoration: underline;
+}
+
+/* Reads as text until pointed at or focused. */
+button.inline,
+select.inline {
+  width: 100%;
+  padding: 3px 6px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--fg);
+  appearance: none;
+  text-overflow: ellipsis;
+}
+
+button.inline {
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+button.inline.muted {
+  color: var(--muted);
+}
+
+button.inline:hover,
+select.inline:hover,
+select.inline:focus {
+  border-color: var(--line);
+  background: var(--bg);
+}
+
+.empty {
+  padding: 40px 16px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-self: end;
+  margin: 0;
+  padding: 2px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--panel);
+}
+
+.segmented legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.segmented label {
+  display: block;
+  padding: 5px 0;
+  border-radius: 5px;
+  color: var(--fg);
+  text-align: center;
+}
+
+.segmented label:has(input:checked) {
+  background: var(--bg);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 15%);
+}
+
+.segmented label:has(input:focus-visible) {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
 }
