@@ -421,6 +421,7 @@ ledgerTest(
         () => imports.commit(request, [0]),
         () => imports.batches(),
         () => imports.undo(1),
+        () => imports.discard(request.id),
         () => rules.list(),
         () =>
           rules.create({
@@ -449,7 +450,7 @@ ledgerTest(
         ),
       )
     })
-    expect(results).toHaveLength(25)
+    expect(results).toHaveLength(26)
     for (const result of results) expect(result).toMatch(/Error: locked$/)
   },
 )

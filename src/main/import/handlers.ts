@@ -1,6 +1,6 @@
 // IPC handlers for importing CSV files. The page never names a path: the
 // file comes from the system's open dialog, shown here.
-import { readFile, stat } from 'node:fs/promises'
+import { open, type FileHandle } from 'node:fs/promises'
 import { basename } from 'node:path'
 import { dialog, type BaseWindow } from 'electron'
 import { handle } from '../ipc'
@@ -36,18 +36,18 @@ export function handleImport(
       if (chosen.canceled || path === undefined) {
         return { ok: false, reason: 'cancelled' } as const
       }
-      let bytes: Uint8Array
-      try {
-        if ((await stat(path)).size > MAX_FILE_BYTES) {
-          return { ok: false, reason: 'too-large' } as const
-        }
-        bytes = await readFile(path)
-      } catch {
-        return { ok: false, reason: 'unreadable' } as const
-      }
       // The vault may have locked while the dialog was open.
+      db()
+      const bytes = await readChosen(path)
+      if (typeof bytes === 'string')
+        return { ok: false, reason: bytes } as const
       const name = cleanText(basename(path)).slice(0, 255) || 'file.csv'
-      return session.open(db(), name, bytes)
+      try {
+        return session.open(db(), name, bytes)
+      } catch (error) {
+        bytes.fill(0)
+        throw error
+      }
     },
     devOrigin,
   )
@@ -57,7 +57,49 @@ export function handleImport(
     devOrigin,
   )
   handle('import:commit', (request) => session.commit(db(), request), devOrigin)
-  handle('import:discard', ({ id }) => session.discard(id), devOrigin)
+  handle(
+    'import:discard',
+    ({ id }) => {
+      db()
+      session.discard(id)
+    },
+    devOrigin,
+  )
   handle('import:batches', () => listBatches(db()), devOrigin)
   handle('import:undo', ({ id }) => undoBatch(db(), id), devOrigin)
+}
+
+/**
+ * The file's bytes, read through one handle: only a regular file, and only
+ * up to the limit, whatever size the file system reports.
+ */
+async function readChosen(
+  path: string,
+): Promise<Uint8Array | 'too-large' | 'unreadable'> {
+  let handle: FileHandle | undefined
+  try {
+    handle = await open(path, 'r')
+    if (!(await handle.stat()).isFile()) return 'unreadable'
+    const buffer = Buffer.alloc(MAX_FILE_BYTES + 1)
+    let total = 0
+    while (total < buffer.length) {
+      const { bytesRead } = await handle.read(
+        buffer,
+        total,
+        buffer.length - total,
+        null,
+      )
+      if (bytesRead === 0) break
+      total += bytesRead
+    }
+    if (total > MAX_FILE_BYTES) {
+      buffer.fill(0)
+      return 'too-large'
+    }
+    return buffer.subarray(0, total)
+  } catch {
+    return 'unreadable'
+  } finally {
+    await handle?.close().catch(() => undefined)
+  }
 }

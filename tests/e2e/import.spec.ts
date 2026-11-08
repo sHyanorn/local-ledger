@@ -183,6 +183,12 @@ ledgerTest(
     await expect(alert).toBeVisible()
     await expect(alert).toContainText('The file could not be read as CSV.')
     await alert.getByRole('button', { name: 'OK' }).click()
+
+    // Only a regular file is read.
+    await chooseFile(app, testInfo.outputDir)
+    await home.getByRole('button', { name: 'Import CSV…' }).click()
+    await expect(alert).toContainText('The file could not be opened.')
+    await alert.getByRole('button', { name: 'OK' }).click()
   },
 )
 
