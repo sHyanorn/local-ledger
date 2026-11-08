@@ -9,6 +9,7 @@ export const test = base.extend<{ app: ElectronApplication; page: Page }>({
   app: async ({}, provide) => {
     // Playwright turns the Chromium sandbox off on Linux unless asked to keep it.
     const app = await electron.launch({ args: ['.'], chromiumSandbox: true })
+    await (await app.firstWindow()).waitForLoadState('load')
     await provide(app)
     await app.close()
   },

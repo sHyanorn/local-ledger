@@ -21,5 +21,11 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vitest.config.ts", "playwright.config.ts", "tests", "scripts"]
+  "include": [
+    "vitest.config.mts",
+    "playwright.config.ts",
+    "tests",
+    "scripts",
+    "src/renderer/src/env.d.ts"
+  ]
 }

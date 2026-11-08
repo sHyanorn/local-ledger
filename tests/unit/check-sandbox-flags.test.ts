@@ -20,4 +20,9 @@ describe('findSandboxFlags', () => {
   it('accepts the sandbox turned on', () => {
     expect(findSandboxFlags('sandbox: true\napp.enableSandbox()')).toEqual([])
   })
+
+  it('exempts a line marked as only reading the switch', () => {
+    const line = off("hasSwitch('no", "-sandbox') // sandbox-check: allow")
+    expect(findSandboxFlags(line)).toEqual([])
+  })
 })
