@@ -75,6 +75,10 @@ const api: LedgerApi = {
     trend: (categoryId, month, currency) =>
       invoke('reports:trend', { categoryId, month, currency }),
   },
+  export: {
+    save: (month, currency, format) =>
+      invoke('export:save', { month, currency, format }),
+  },
   transfers: {
     possible: () => invoke('transfers:possible', undefined),
     count: () => invoke('transfers:count', undefined),

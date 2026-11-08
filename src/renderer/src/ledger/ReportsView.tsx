@@ -3,7 +3,11 @@ import { groupedBars, horizontalBars, trendLine } from '../../../shared/charts'
 import type { Currency } from '../../../shared/money'
 import type { ReportData, TrendPoint } from '../../../shared/reports'
 import { ChartView } from '../components/ChartView'
-import { compactAmount, exactAmount, shortMonth } from './chart-format'
+import {
+  compactAmount,
+  exactAmount,
+  shortMonth,
+} from '../../../shared/chart-format'
 import { formatMonth, monthOf, shiftMonth } from './format'
 import { categoryName, useLedger } from './store'
 

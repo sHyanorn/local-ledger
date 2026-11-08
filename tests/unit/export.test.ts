@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { strFromU8, unzipSync } from 'fflate'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { csvField, startsLikeFormula } from '../../src/main/export/formula'
+import { PDF_TITLE, statementPage } from '../../src/main/export/report-page'
 import { statement, statementSheets } from '../../src/main/export/statement'
 import {
   columnName,
@@ -18,6 +19,7 @@ import { createCategory } from '../../src/main/ledger/categories'
 import { createTransaction } from '../../src/main/ledger/transactions'
 import { pairTransfers } from '../../src/main/ledger/transfers'
 import { openDatabase, type Db } from '../../src/main/vault/database'
+import { schemas } from '../../src/shared/schemas'
 
 // OWASP's formula starts, and the full-width forms Excel also reads.
 const DANGEROUS = [
@@ -284,5 +286,46 @@ describe('statement', () => {
       '=cmd|calc',
       '=Fake Savings',
     ])
+  })
+
+  it('prints as a page with no scripts, escaping every text', () => {
+    add(
+      'Fake Everyday',
+      '2026-11-02',
+      -450,
+      '<script>alert(1)</script>',
+      'Fake Coffee',
+    )
+    add('Fake Everyday', '2026-11-03', -100, 'Fake "quoted" & <b>bold</b>')
+    const html = statementPage(statement(db, '2026-11', 'AUD'))
+    expect(html).not.toMatch(/<script|<iframe|<img|<object|style=|on\w+=/i)
+    expect(html).toContain('&#60;script&#62;alert(1)&#60;/script&#62;')
+    expect(html).toContain(
+      'Fake &#34;quoted&#34; &#38; &#60;b&#62;bold&#60;/b&#62;',
+    )
+    expect(html).toContain(`<title>${PDF_TITLE}</title>`)
+    expect(html).toContain('<link rel="stylesheet" href="report.css">')
+
+    const empty = statementPage(statement(db, '2027-03', 'AUD'))
+    expect(empty).toContain('No transactions')
+    expect(empty).toContain('No spending')
+  })
+})
+
+describe('export payloads', () => {
+  it('take a month, a known currency and xlsx or pdf only', () => {
+    const valid = { month: '2026-11', currency: 'AUD', format: 'pdf' }
+    expect(schemas.exportSave.safeParse(valid).success).toBe(true)
+    for (const change of [
+      { format: 'csv' },
+      { format: 'html' },
+      { currency: 'JPY' },
+      { month: '2026-13' },
+      { path: '/tmp/x.pdf' },
+    ]) {
+      expect(
+        schemas.exportSave.safeParse({ ...valid, ...change }).success,
+      ).toBe(false)
+    }
   })
 })

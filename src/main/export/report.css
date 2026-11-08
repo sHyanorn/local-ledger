@@ -1,0 +1,151 @@
+/* The printed statement. Chart classes come from the renderer's charts.css. */
+
+:root {
+  --fg: #1d1d1f;
+  --muted: #6e6e73;
+  --line: #d2d2d7;
+  --accent: #007aff;
+  --positive: #248a3d;
+}
+
+@page {
+  size: A4;
+  margin: 16mm 14mm;
+}
+
+body {
+  margin: 0;
+  color: var(--fg);
+  font:
+    10pt/1.4 -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 6pt;
+}
+
+h1 {
+  margin: 0;
+  font-size: 18pt;
+  font-weight: 600;
+}
+
+h2 {
+  margin: 18pt 0 6pt;
+  font-size: 11pt;
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.totals {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8pt;
+  margin-top: 12pt;
+}
+
+.totals div {
+  border: 1px solid var(--line);
+  border-radius: 6pt;
+  padding: 8pt 10pt;
+}
+
+.totals strong {
+  display: block;
+  font-size: 14pt;
+  font-weight: 600;
+}
+
+section {
+  break-inside: avoid;
+}
+
+section.rows {
+  break-inside: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 3pt 4pt;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  font-weight: 600;
+}
+
+thead {
+  display: table-header-group;
+}
+
+tr {
+  break-inside: avoid;
+}
+
+.number {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+td.date {
+  white-space: nowrap;
+}
+
+.note {
+  display: block;
+  color: var(--muted);
+  font-size: 8.5pt;
+}
+
+.over {
+  color: #c4251c;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 4pt;
+  margin: 4pt 0 0;
+  color: var(--muted);
+  font-size: 8.5pt;
+}
+
+.legend .key {
+  width: 7pt;
+  height: 7pt;
+  margin-left: 8pt;
+  border-radius: 1.5pt;
+  print-color-adjust: exact;
+}
+
+.legend .key:first-child {
+  margin-left: 0;
+}
+
+.legend .key.income {
+  background: var(--positive);
+}
+
+.legend .key.spending {
+  background: var(--accent);
+}

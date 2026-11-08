@@ -1,5 +1,5 @@
-import type { Currency } from '../../../shared/money'
-import { formatAmount } from '../../../shared/money'
+import type { Currency } from './money'
+import { formatAmount } from './money'
 
 const compact = new Map<Currency, Intl.NumberFormat>()
 

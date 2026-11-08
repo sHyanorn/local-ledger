@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { app, powerMonitor } from 'electron'
 import { watchForLock } from './auto-lock'
 import { hardenApp } from './hardening'
+import { handleExport } from './export/handlers'
 import { handleImport } from './import/handlers'
 import { handle } from './ipc'
 import { handleLedger } from './ledger/handlers'
@@ -52,6 +53,7 @@ export function startApp(): void {
     }
     open()
     handleImport(vault, () => window?.window ?? null, devOrigin)
+    handleExport(vault, () => window?.window ?? null, devOrigin)
     vault.onChange(() => window?.replaceView())
     // Also replaces a page that was already locked, so a password typed
     // but not submitted does not survive a lock.

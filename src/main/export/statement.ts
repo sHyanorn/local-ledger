@@ -8,7 +8,7 @@ import {
 } from '../../shared/budgets'
 import type { Currency } from '../../shared/money'
 import { formatMonth, shiftMonth } from '../../shared/months'
-import type { MonthReport } from '../../shared/reports'
+import type { MonthReport, MonthTotals } from '../../shared/reports'
 import { reportData } from '../ledger/reports'
 import { monthBudgets } from '../ledger/budgets'
 import type { Db } from '../vault/database'
@@ -28,6 +28,8 @@ export interface Statement {
   month: string
   currency: Currency
   report: MonthReport
+  /** The twelve months to this one, oldest first. */
+  months: MonthTotals[]
   /** Top-level category names by id. */
   names: Map<number, string>
   /** Categories with a budget this month, for the home currency only. */
@@ -92,10 +94,12 @@ export function statement(
           .map((budget) => ({ ...budget, name: fullName(budget.categoryId) }))
           .sort((a, b) => a.name.localeCompare(b.name))
       : []
+  const { report, months } = reportData(db, month, currency)
   return {
     month,
     currency,
-    report: reportData(db, month, currency).report,
+    report,
+    months,
     names: new Map(categories.map((category) => [category.id, category.name])),
     budgets,
     rows,

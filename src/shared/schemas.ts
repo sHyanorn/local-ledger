@@ -11,6 +11,7 @@ import {
   PAGE_MAX,
   SEARCH_MAX,
 } from './ledger'
+import { EXPORT_FORMATS } from './export'
 import { CURRENCIES, MAX_CENTS } from './money'
 
 const id = z.number().int().positive().max(Number.MAX_SAFE_INTEGER)
@@ -139,6 +140,11 @@ export const schemas = {
   ruleDismiss: z.strictObject({ pattern: text(DESCRIPTION_MAX, 1) }),
   transferLink: z.strictObject({ id, otherId: id }),
   budgetMonth: z.strictObject({ month }),
+  exportSave: z.strictObject({
+    month,
+    currency: z.enum(CURRENCIES),
+    format: z.enum(EXPORT_FORMATS),
+  }),
   report: z.strictObject({ month, currency: z.enum(CURRENCIES) }),
   trend: z.strictObject({
     categoryId: id,

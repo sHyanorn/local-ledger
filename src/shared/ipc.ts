@@ -90,6 +90,7 @@ export const channels = {
   'budgets:set': schemas.budgetSet,
   'reports:month': schemas.report,
   'reports:trend': schemas.trend,
+  'export:save': schemas.exportSave,
 } as const
 
 export type Channel = keyof typeof channels
@@ -159,4 +160,5 @@ export interface Results {
   'budgets:set': Outcome<'not-found'>
   'reports:month': ReportData
   'reports:trend': TrendPoint[]
+  'export:save': Outcome<'cancelled' | 'busy' | 'unwritable'>
 }

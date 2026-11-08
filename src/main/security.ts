@@ -21,6 +21,17 @@ export const CONTENT_SECURITY_POLICY = [
   "object-src 'none'",
 ].join('; ')
 
+/** For a page printed to PDF: its own stylesheet, and nothing that runs. */
+export const PRINT_CONTENT_SECURITY_POLICY = [
+  "default-src 'none'",
+  "style-src 'self'",
+  "script-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+].join('; ')
+
 /**
  * Command line switches the app refuses to start with: those that weaken the
  * Chromium sandbox, and in packaged builds those that open a debugging port.

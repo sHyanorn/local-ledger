@@ -1,6 +1,7 @@
 import type { ImportTarget, Mapping, Encoding } from './imports'
 import type { Results, VaultState } from './ipc'
 import type { RuleFields, RuleMatch } from './rules'
+import type { ExportFormat } from './export'
 import type { Currency } from './money'
 import type {
   AccountFields,
@@ -110,6 +111,17 @@ export interface LedgerApi {
       month: string,
       currency: Currency,
     ): Promise<Results['reports:trend']>
+  }
+  readonly export: {
+    /**
+     * Asks where to save the month's statement in one currency, then writes
+     * it there, unencrypted.
+     */
+    save(
+      month: string,
+      currency: Currency,
+      format: ExportFormat,
+    ): Promise<Results['export:save']>
   }
   readonly transfers: {
     /** Pairs that may be one transfer but have other candidates. */
