@@ -51,6 +51,25 @@ export function handleImport(
     devOrigin,
   )
   handle(
+    'import:drop',
+    ({ name, bytes }) => {
+      // The page read the file; from here it is treated as a chosen one.
+      const copy = Buffer.from(bytes)
+      bytes.fill(0)
+      try {
+        return session.open(
+          db(),
+          cleanText(basename(name)).slice(0, 255) || 'file.csv',
+          copy,
+        )
+      } catch (error) {
+        copy.fill(0)
+        throw error
+      }
+    },
+    devOrigin,
+  )
+  handle(
     'import:preview',
     (request) => session.preview(db(), request),
     devOrigin,

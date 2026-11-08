@@ -33,6 +33,8 @@ export type RowProblem =
   'date' | 'amount' | 'description' | 'description-too-long'
 
 /** The most columns a mapping can name: the file limit. */
+/** A file larger than this is refused before it is read. */
+export const MAX_FILE_BYTES = 10 * 1024 * 1024
 export const MAX_COLUMNS = 64
 /** Rows shown while choosing the columns. */
 export const SAMPLE_ROWS = 8

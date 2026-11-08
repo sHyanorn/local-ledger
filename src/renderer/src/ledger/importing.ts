@@ -1,10 +1,11 @@
-import type {
-  DateOrder,
-  Encoding,
-  FileProblem,
-  ImportFile,
-  RowError,
-  TemplateId,
+import {
+  MAX_FILE_BYTES,
+  type DateOrder,
+  type Encoding,
+  type FileProblem,
+  type ImportFile,
+  type RowError,
+  type TemplateId,
 } from '../../../shared/imports'
 
 export const FILE_PROBLEMS: Record<FileProblem, string> = {
@@ -49,6 +50,21 @@ export function rowProblem({ problem, value }: RowError): string {
     case 'description-too-long':
       return 'description longer than 500 characters'
   }
+}
+
+/**
+ * Reads a file dropped on the window and hands its bytes to the main
+ * process, which reads them as it reads a chosen file.
+ */
+export async function dropImportFile(
+  file: File,
+): Promise<{ file: ImportFile } | { problem: string }> {
+  if (file.size > MAX_FILE_BYTES) return { problem: FILE_PROBLEMS['too-large'] }
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const result = await window.ledger.imports.drop(file.name, bytes)
+  bytes.fill(0)
+  if (result.ok) return { file: result.file }
+  return { problem: FILE_PROBLEMS[result.reason] }
 }
 
 /**

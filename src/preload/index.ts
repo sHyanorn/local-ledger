@@ -48,6 +48,7 @@ const api: LedgerApi = {
   },
   imports: {
     open: () => invoke('import:open', undefined),
+    drop: (name, bytes) => invoke('import:drop', { name, bytes }),
     preview: (request) => invoke('import:preview', request),
     commit: (request, selected) =>
       invoke('import:commit', { ...request, selected }),

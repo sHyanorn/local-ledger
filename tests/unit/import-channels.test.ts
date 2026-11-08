@@ -102,6 +102,42 @@ const cases: [Channel, unknown, unknown[]][] = [
   ],
 ]
 
+// Channels added in M5.
+const password = 'fake ledger passphrase'
+const m5: [Channel, unknown, unknown[]][] = [
+  [
+    'import:drop',
+    { name: 'fake.csv', bytes: new Uint8Array(3) },
+    [
+      { name: 'fake.csv' },
+      { name: 'fake.csv', bytes: 'a,b,c' },
+      { name: 'fake.csv', bytes: [1, 2, 3] },
+      { name: 'fake.csv', bytes: new Uint8Array(10 * 1024 * 1024 + 1) },
+      { name: 'x'.repeat(1025), bytes: new Uint8Array(3) },
+      { name: 'fake.csv', bytes: new Uint8Array(3), path: '/etc/passwd' },
+    ],
+  ],
+  ['settings:get', undefined, [{}]],
+  [
+    'backup:save',
+    { password },
+    [{}, { password: '' }, { password, path: '/tmp' }],
+  ],
+  ['restore:open', undefined, [{}, '/tmp/x.llbackup']],
+  ['restore:check', { password }, [{}, { password: '' }]],
+  [
+    'restore:commit',
+    { currentPassword: null },
+    [{}, { currentPassword: '' }, { currentPassword: 1 }],
+  ],
+  ['restore:discard', undefined, [{}]],
+  [
+    'export:save',
+    { month: '2026-11', currency: 'AUD', format: 'xlsx' },
+    [{ month: '2026-11', currency: 'AUD', format: 'csv' }],
+  ],
+]
+
 describe('M3 channels', () => {
   it.each(cases)(
     '%s accepts a valid payload and refuses bad ones',
@@ -112,6 +148,18 @@ describe('M3 channels', () => {
           channels[channel].safeParse(payload).success,
           JSON.stringify(payload)?.slice(0, 80),
         ).toBe(false)
+      }
+    },
+  )
+})
+
+describe('M5 channels', () => {
+  it.each(m5)(
+    '%s accepts a valid payload and refuses bad ones',
+    (channel, valid, invalid) => {
+      expect(channels[channel].safeParse(valid).success).toBe(true)
+      for (const payload of invalid) {
+        expect(channels[channel].safeParse(payload).success).toBe(false)
       }
     },
   )

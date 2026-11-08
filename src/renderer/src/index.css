@@ -1005,3 +1005,25 @@ select.inline:focus {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.ledger {
+  position: relative;
+}
+
+/* Shown while a file is dragged over the window. */
+.drop-target {
+  position: absolute;
+  inset: 8px;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--accent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  pointer-events: none;
+}
+
+.drop-target p {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+}

@@ -1,12 +1,10 @@
 import { CsvError, parse, type Options } from 'csv-parse/sync'
 import type { Encoding, FileProblem } from '../../shared/imports'
-import { MAX_COLUMNS } from '../../shared/imports'
+import { MAX_COLUMNS, MAX_FILE_BYTES } from '../../shared/imports'
 import { decode } from './decode'
 
-/** A file larger than this is refused before it is read. */
-export const MAX_FILE_BYTES = 10 * 1024 * 1024
 export const MAX_ROWS = 50_000
-export { MAX_COLUMNS }
+export { MAX_COLUMNS, MAX_FILE_BYTES }
 /** Characters in one record; a whole year of a bank account is far less. */
 export const MAX_RECORD = 64 * 1024
 

@@ -252,3 +252,50 @@ ledgerTest(
     expect(snapshot.includes(waiting), 'waiting text is reachable').toBe(false)
   },
 )
+
+ledgerTest(
+  'a CSV file dropped on the window opens in the import page',
+  async ({ home }) => {
+    const text = readFileSync(sample('commbank.csv'), 'utf8')
+    const drop = (name: string, content: string | number) =>
+      home.evaluate(
+        ([name, content]) => {
+          const bytes =
+            typeof content === 'number'
+              ? new Uint8Array(content)
+              : new TextEncoder().encode(content)
+          const transfer = new DataTransfer()
+          transfer.items.add(new File([bytes], name, { type: 'text/csv' }))
+          const target = document.querySelector('.ledger')!
+          for (const type of ['dragenter', 'dragover', 'drop']) {
+            target.dispatchEvent(
+              new DragEvent(type, {
+                dataTransfer: transfer,
+                bubbles: true,
+                cancelable: true,
+              }),
+            )
+          }
+        },
+        [name, content] as const,
+      )
+
+    // Over the limit: refused in the page, and by the main process too.
+    await drop('huge.csv', 10 * 1024 * 1024 + 1)
+    await expect(home.getByRole('region', { name: 'Notice' })).toContainText(
+      'larger than 10 MB',
+    )
+    expect(
+      await home.evaluate(() =>
+        window.ledger.imports
+          .drop('huge.csv', new Uint8Array(10 * 1024 * 1024 + 1))
+          .catch((error: Error) => error.message),
+      ),
+    ).toMatch(/invalid-argument/)
+
+    await drop('../../dropped bank.csv', text)
+    await expect(
+      home.getByRole('heading', { name: 'Import dropped bank.csv' }),
+    ).toBeVisible()
+  },
+)

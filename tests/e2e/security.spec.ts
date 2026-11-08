@@ -195,7 +195,15 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
       'totals',
       'update',
     ],
-    imports: ['batches', 'commit', 'discard', 'open', 'preview', 'undo'],
+    imports: [
+      'batches',
+      'commit',
+      'discard',
+      'drop',
+      'open',
+      'preview',
+      'undo',
+    ],
     rules: [
       'create',
       'decline',
@@ -435,6 +443,7 @@ ledgerTest(
         () => transactions.setCategory(1, null),
         () => transactions.delete(1),
         () => imports.open(),
+        () => imports.drop('fake.csv', new Uint8Array(3)),
         () => imports.preview(request),
         () => imports.commit(request, [0]),
         () => imports.batches(),
@@ -480,7 +489,7 @@ ledgerTest(
         ),
       )
     })
-    expect(results).toHaveLength(38)
+    expect(results).toHaveLength(39)
     for (const result of results) expect(result).toMatch(/Error: locked$/)
   },
 )

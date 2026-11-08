@@ -8,11 +8,12 @@ import {
   transactionFields,
   transactionFilter,
 } from './schemas'
-import type {
-  FileProblem,
-  ImportBatch,
-  ImportFile,
-  ImportPreview,
+import {
+  MAX_FILE_BYTES,
+  type FileProblem,
+  type ImportBatch,
+  type ImportFile,
+  type ImportPreview,
 } from './imports'
 import type { Rule, RuleReach, RuleSuggestion } from './rules'
 import type { PossibleTransfer, TransferSide } from './transfers'
@@ -69,6 +70,12 @@ export const channels = {
   'transactions:set-category': schemas.transactionCategory,
   'transactions:delete': schemas.id,
   'import:open': z.undefined(),
+  'import:drop': z.strictObject({
+    name: z.string().max(1024),
+    bytes: z
+      .instanceof(Uint8Array)
+      .refine((bytes) => bytes.byteLength <= MAX_FILE_BYTES),
+  }),
   'import:preview': schemas.importPreview,
   'import:commit': schemas.importCommit,
   'import:discard': schemas.importDiscard,
@@ -141,6 +148,8 @@ export interface Results {
   'import:open':
     | { ok: true; file: ImportFile }
     | { ok: false; reason: FileProblem | 'cancelled' }
+  'import:drop':
+    { ok: true; file: ImportFile } | { ok: false; reason: FileProblem }
   'import:preview':
     | { ok: true; preview: ImportPreview }
     | { ok: false; reason: FileProblem | 'not-found' }

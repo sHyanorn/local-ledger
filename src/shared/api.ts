@@ -62,6 +62,11 @@ export interface LedgerApi {
   readonly imports: {
     /** Asks the user for a CSV file and reads it; the file waits in the main process. */
     open(): Promise<Results['import:open']>
+    /** Reads a file dropped on the window, as open reads a chosen one. */
+    drop(
+      name: string,
+      bytes: Uint8Array<ArrayBuffer>,
+    ): Promise<Results['import:drop']>
     preview(request: ImportRequest): Promise<Results['import:preview']>
     /** Imports the rows whose indexes are selected. */
     commit(
