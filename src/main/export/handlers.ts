@@ -2,11 +2,12 @@
 // the main process asks the user where to save it, builds the file, and
 // writes it there. The file is not encrypted (SECURITY_DESIGN). A lock or
 // unlock while this runs cancels it, and nothing is written.
-import { dialog, type BaseWindow, type FileFilter } from 'electron'
+import type { BaseWindow, FileFilter } from 'electron'
 import chartCss from '../../renderer/src/charts.css?raw'
 import type { ExportFormat } from '../../shared/export'
 import type { Outcome } from '../../shared/ipc'
 import type { Currency } from '../../shared/money'
+import { showSave } from '../dialogs'
 import { handle } from '../ipc'
 import { writeOwnerOnly } from '../owner-only'
 import { LockedError, type Vault } from '../vault/vault'
@@ -55,14 +56,10 @@ export function handleExport(
     format: ExportFormat,
     signal: AbortSignal,
   ): Promise<Outcome<'cancelled' | 'unwritable'>> {
-    const options = {
+    const chosen = await showSave(window(), {
       defaultPath: `Statement ${month} ${currency}.${format}`,
       filters: [FILTERS[format]],
-    }
-    const parent = window()
-    const chosen = parent
-      ? await dialog.showSaveDialog(parent, options)
-      : await dialog.showSaveDialog(options)
+    })
     if (chosen.canceled || !chosen.filePath) {
       return { ok: false, reason: 'cancelled' }
     }

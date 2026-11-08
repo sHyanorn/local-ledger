@@ -2,11 +2,10 @@
 // process shows the save and open dialogs and keeps the chosen backup, and
 // the backup it has checked, until restored, discarded, or the vault locks
 // or unlocks.
-import { basename } from 'node:path'
-import { dialog, type BaseWindow } from 'electron'
-import { readChosen } from '../import/read-file'
-import { cleanText } from '../import/mapping'
+import type { BaseWindow } from 'electron'
 import { isoDate } from '../../shared/dates'
+import { fileLabel, showOpen, showSave } from '../dialogs'
+import { readChosen } from '../import/read-file'
 import { handle } from '../ipc'
 import { writeOwnerOnly } from '../owner-only'
 import { readBackup } from '../vault/backup'
@@ -55,16 +54,12 @@ export function handleBackup(
         if (made.reason === 'locked') throw new LockedError()
         return { ok: false, reason: made.reason }
       }
-      const options = {
+      const chosen = await showSave(window(), {
         defaultPath: `Local Ledger ${isoDate(new Date())}.${BACKUP_EXTENSION}`,
         filters: [
           { name: 'Local Ledger Backup', extensions: [BACKUP_EXTENSION] },
         ],
-      }
-      const parent = window()
-      const chosen = parent
-        ? await dialog.showSaveDialog(parent, options)
-        : await dialog.showSaveDialog(options)
+      })
       if (chosen.canceled || !chosen.filePath) {
         return { ok: false, reason: 'cancelled' }
       }
@@ -85,16 +80,12 @@ export function handleBackup(
       restoring()
       idle()
       const signal = state.signal
-      const options = {
-        properties: ['openFile' as const],
+      const picked = await showOpen(window(), {
+        properties: ['openFile'],
         filters: [
           { name: 'Local Ledger Backup', extensions: [BACKUP_EXTENSION] },
         ],
-      }
-      const parent = window()
-      const picked = parent
-        ? await dialog.showOpenDialog(parent, options)
-        : await dialog.showOpenDialog(options)
+      })
       const path = picked.filePaths[0]
       if (picked.canceled || path === undefined) {
         return { ok: false, reason: 'cancelled' } as const
@@ -108,7 +99,7 @@ export function handleBackup(
       if (signal.aborted) throw new LockedError()
       forget()
       chosen = { file, staged: null }
-      const name = cleanText(basename(path)).slice(0, 255) || 'backup'
+      const name = fileLabel(path, 'backup')
       return { ok: true, name } as const
     },
     devOrigin,

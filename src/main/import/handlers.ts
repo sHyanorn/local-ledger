@@ -1,11 +1,10 @@
 // IPC handlers for importing CSV files. The page never names a path: the
 // file comes from the system's open dialog, shown here.
-import { basename } from 'node:path'
-import { dialog, type BaseWindow } from 'electron'
+import type { BaseWindow } from 'electron'
+import { fileLabel, showOpen } from '../dialogs'
 import { handle } from '../ipc'
 import type { Vault } from '../vault/vault'
 import { undoBatch, listBatches } from './batches'
-import { cleanText } from './mapping'
 import { readChosen } from './read-file'
 import { ImportSession } from './session'
 
@@ -23,14 +22,10 @@ export function handleImport(
     'import:open',
     async () => {
       db() // Fails when locked, before any dialog opens.
-      const options = {
-        properties: ['openFile' as const],
+      const chosen = await showOpen(window(), {
+        properties: ['openFile'],
         filters: [{ name: 'CSV files', extensions: ['csv', 'txt'] }],
-      }
-      const parent = window()
-      const chosen = parent
-        ? await dialog.showOpenDialog(parent, options)
-        : await dialog.showOpenDialog(options)
+      })
       const path = chosen.filePaths[0]
       if (chosen.canceled || path === undefined) {
         return { ok: false, reason: 'cancelled' } as const
@@ -40,7 +35,7 @@ export function handleImport(
       const bytes = await readChosen(path)
       if (typeof bytes === 'string')
         return { ok: false, reason: bytes } as const
-      const name = cleanText(basename(path)).slice(0, 255) || 'file.csv'
+      const name = fileLabel(path, 'file.csv')
       try {
         return session.open(db(), name, bytes)
       } catch (error) {
@@ -57,11 +52,7 @@ export function handleImport(
       const copy = Buffer.from(bytes)
       bytes.fill(0)
       try {
-        return session.open(
-          db(),
-          cleanText(basename(name)).slice(0, 255) || 'file.csv',
-          copy,
-        )
+        return session.open(db(), fileLabel(name, 'file.csv'), copy)
       } catch (error) {
         copy.fill(0)
         throw error
