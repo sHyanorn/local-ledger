@@ -48,7 +48,22 @@ ledgerTest('a locked vault ignores menu commands', async ({ app, home }) => {
     sidebar(home).getByRole('button', { name: 'Lock' }).click(),
   )
   await expect(locked.getByLabel('Master password')).toBeVisible()
+  // Count what the main process sends to any page.
+  await app.evaluate(({ webContents }) => {
+    for (const contents of webContents.getAllWebContents()) {
+      const send = contents.send.bind(contents)
+      contents.send = (...args: Parameters<typeof send>) => {
+        const count = (globalThis as { sent?: number }).sent ?? 0
+        Object.assign(globalThis, { sent: count + 1 })
+        send(...args)
+      }
+    }
+  })
   await menu(app, 'new-transaction')
+  await menu(app, 'budgets')
+  expect(
+    await app.evaluate(() => (globalThis as { sent?: number }).sent ?? 0),
+  ).toBe(0)
   await expect(locked.getByRole('dialog')).toHaveCount(0)
   await expect(locked.getByLabel('Master password')).toBeVisible()
 })
