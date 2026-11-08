@@ -1,0 +1,53 @@
+/* Charts, for the page and for printed reports; see src/shared/charts.ts. */
+
+.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  font-family: inherit;
+}
+
+.chart .grid {
+  stroke: var(--line, #d2d2d7);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.chart .axis {
+  stroke: var(--muted, #6e6e73);
+  stroke-width: 1;
+}
+
+.chart .tick,
+.chart .label,
+.chart .value {
+  fill: var(--muted, #6e6e73);
+  font-size: 11px;
+}
+
+.chart .label {
+  fill: var(--fg, #1d1d1f);
+}
+
+.chart .bar {
+  fill: var(--accent, #007aff);
+}
+
+.chart .bar.income {
+  fill: var(--positive, #248a3d);
+}
+
+.chart .bar.spending {
+  fill: var(--accent, #007aff);
+}
+
+.chart .line {
+  fill: none;
+  stroke: var(--accent, #007aff);
+  stroke-width: 2;
+}
+
+.chart .dot {
+  fill: var(--accent, #007aff);
+}
