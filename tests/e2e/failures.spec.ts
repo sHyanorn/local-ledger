@@ -2,11 +2,13 @@
 import { resolve } from 'node:path'
 import {
   chooseFile,
+  createVault,
   expect,
   failNext,
   failOnNextPage,
   ledgerTest,
   lockScreen,
+  PASSWORD,
   sidebar,
   test,
 } from './fixtures'
@@ -63,4 +65,24 @@ test('a page that cannot read the vault state says so', async ({ app }) => {
       'The vault could not be read. Quit Local Ledger and open it again.',
     ),
   ).toBeVisible()
+})
+
+test('a wrong password, then a new password too short, shows only the second', async ({
+  app,
+  page,
+}) => {
+  const home = await createVault(app, page)
+  await home.getByRole('button', { name: 'Settings' }).click()
+  await home.getByRole('button', { name: 'Change Master Password…' }).click()
+  const alert = home.getByRole('alert')
+  const change = async (current: string, next: string) => {
+    await home.getByLabel('Current password').fill(current)
+    await home.getByLabel('New password', { exact: true }).fill(next)
+    await home.getByLabel('Confirm new password').fill(next)
+    await home.getByRole('button', { name: 'Change Password' }).click()
+  }
+  await change('not the fake passphrase', 'a new fake passphrase for tests')
+  await expect(alert).toHaveText('Wrong password.')
+  await change(PASSWORD, 'too short')
+  await expect(alert).toHaveText(/^Use at least \d+ characters\.$/)
 })

@@ -30,11 +30,12 @@ export function ChangePassword({ onCancel }: { onCancel: () => void }) {
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setSubmitted(true)
+    // A refusal of the last attempt says nothing about this one.
+    setRefused(null)
     if (problem || !current) return
     // No password that long was ever accepted.
     if (passwordLength(current) > PASSWORD_MAX) return fail('Wrong password.')
     setBusy(true)
-    setRefused(null)
     try {
       // On success the main process replaces this page.
       const result = await window.ledger.vault.changePassword(current, next)
