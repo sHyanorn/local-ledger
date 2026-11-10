@@ -421,7 +421,7 @@ for (const name of switches.sandboxOff) {
 }
 
 ledgerTest(
-  'every data channel refuses while the vault is locked',
+  'data calls from the page refuse while the vault is locked',
   async ({ page }) => {
     const results = await page.evaluate(async () => {
       const { accounts, categories, transactions, imports, rules, transfers } =
