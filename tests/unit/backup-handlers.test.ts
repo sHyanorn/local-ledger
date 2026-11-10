@@ -1,15 +1,8 @@
 // The restore channels in each vault state: with no vault, a locked one, one
 // that does not open, and an open one.
-import {
-  existsSync,
-  mkdtempSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { handleBackup } from '../../src/main/backup/handlers'
 import type { Handle } from '../../src/main/ipc'
 import { createAccount } from '../../src/main/ledger/accounts'
@@ -17,6 +10,7 @@ import { deriveHere } from '../../src/main/vault/kdf'
 import { REPLACED_PREFIX } from '../../src/main/vault/layout'
 import { Vault } from '../../src/main/vault/vault'
 import type { Channel, Payload, Results } from '../../src/shared/ipc'
+import { tempDirs } from '../support/temp-dir'
 import { FAST, NEW, OLD } from '../support/vault'
 
 const dialog = vi.hoisted(() => ({ path: '' }))
@@ -26,12 +20,7 @@ vi.mock('electron', () => ({
   },
 }))
 
-const roots: string[] = []
-const newRoot = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'ledger-handlers-'))
-  roots.push(dir)
-  return dir
-}
+const newRoot = tempDirs('ledger-handlers-')
 const open = (root: string) =>
   new Vault(root, { derive: deriveHere, kdf: FAST })
 const names = (vault: Vault) =>
@@ -69,10 +58,6 @@ beforeEach(async () => {
   source.lock()
   dialog.path = join(root, 'fake.llbackup')
   writeFileSync(dialog.path, made.file)
-})
-afterEach(() => {
-  for (const dir of roots.splice(0))
-    rmSync(dir, { recursive: true, force: true })
 })
 
 /** A vault under NEW, in the given state. */

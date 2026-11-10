@@ -6,14 +6,11 @@ import {
   copyFileSync,
   cpSync,
   existsSync,
-  mkdtempSync,
   readFileSync,
-  rmSync,
   writeFileSync,
 } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deriveHere } from '../../src/main/vault/kdf'
 import { Vault } from '../../src/main/vault/vault'
 import {
@@ -22,17 +19,16 @@ import {
   serializeVaultFile,
 } from '../../src/main/vault/vault-file'
 import { FAST, PASSWORD } from '../support/vault'
+import { tempDirs } from '../support/temp-dir'
 
 const FIXTURE = join(__dirname, '../fixtures/vault-v1/vault')
 
+const newDir = tempDirs('ledger-checksum-')
 let root: string
 let path: string
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'ledger-checksum-'))
+  root = newDir()
   path = join(root, 'vault', 'vault.json')
-})
-afterEach(() => {
-  rmSync(root, { recursive: true, force: true })
 })
 
 const open = (checkpoint?: (step: string) => void) =>

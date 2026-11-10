@@ -1,22 +1,22 @@
 // The notice after a password change: kept for the page that replaces the
 // one that made the change, and only while the vault that change left is
 // open.
-import { cpSync, mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { cpSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import type { Handle } from '../../src/main/ipc'
 import { handlePasswordChange } from '../../src/main/password-change'
 import { deriveHere } from '../../src/main/vault/kdf'
 import { Vault } from '../../src/main/vault/vault'
 import type { Channel, Payload, Results } from '../../src/shared/ipc'
 import { FAST, NEW, OLD } from '../support/vault'
+import { tempDirs } from '../support/temp-dir'
 
+const newDir = tempDirs('ledger-notice-')
 let root: string
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'ledger-notice-'))
+  root = newDir()
 })
-afterEach(() => rmSync(root, { recursive: true, force: true }))
 
 /** A vault under OLD and its handlers, called as the page calls them. */
 async function opened(checkpoint?: (step: string) => void) {

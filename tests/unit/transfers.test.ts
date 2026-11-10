@@ -22,6 +22,7 @@ import type { Db } from '../../src/main/vault/database'
 import { generateLedger } from '../../scripts/seed/generate'
 import { insertLedger } from '../../scripts/seed/insert'
 import { tempDatabase, type TempDatabase } from '../support/temp-database'
+import { previewAndCommit } from '../support/import'
 
 let temp: TempDatabase
 let db: Db
@@ -86,16 +87,6 @@ const reported = () =>
       id: number
     }[]
   ).map((row) => row.id)
-
-/** Commits as the page does: after previewing the same request. */
-const previewAndCommit = (
-  session: ImportSession,
-  request: Parameters<ImportSession['commit']>[1],
-) => {
-  const { selected: _selected, ...shown } = request
-  session.preview(db, shown)
-  return session.commit(db, request)
-}
 
 describe('pairing', () => {
   it('pairs opposite amounts in two accounts up to four days apart', () => {
@@ -319,7 +310,7 @@ describe('imports and transfers', () => {
       ),
     )
     if (!opened.ok) throw new Error(opened.reason)
-    const committed = previewAndCommit(session, {
+    const committed = previewAndCommit(db, session, {
       id: opened.file.id,
       encoding: opened.file.encoding,
       mapping: opened.file.mapping!,
@@ -354,7 +345,7 @@ describe('pairing after an import', () => {
       new TextEncoder().encode('27/05/2026,+1250.00,Fake From Everyday,1\n'),
     )
     if (!opened.ok) throw new Error(opened.reason)
-    const result = previewAndCommit(session, {
+    const result = previewAndCommit(db, session, {
       id: opened.file.id,
       encoding: opened.file.encoding,
       mapping: opened.file.mapping!,
@@ -383,7 +374,7 @@ describe('moving an imported transaction', () => {
     for (const accountId of [everyday, savings]) {
       const opened = session.open(db, 'same.csv', Uint8Array.from(text))
       if (!opened.ok) throw new Error(opened.reason)
-      previewAndCommit(session, {
+      previewAndCommit(db, session, {
         id: opened.file.id,
         encoding: opened.file.encoding,
         mapping: opened.file.mapping!,

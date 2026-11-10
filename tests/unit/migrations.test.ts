@@ -5,12 +5,10 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
 } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { BEFORE_MIGRATION, openDatabase } from '../../src/main/vault/database'
@@ -21,15 +19,16 @@ import type { Migration } from '../../src/main/vault/migrations'
 import { Vault } from '../../src/main/vault/vault'
 import { breakReferences, corruptIndex } from '../support/corrupt'
 import { PASSWORD } from '../support/vault'
+import { tempDirs } from '../support/temp-dir'
 
 const KEY = Buffer.alloc(32, 0xab)
+const newDir = tempDirs('ledger-migrate-')
 let dir: string
 let file: string
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'ledger-migrate-'))
+  dir = newDir()
   file = join(dir, 'ledger.db')
 })
-afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 const sha256 = (path: string) =>
   createHash('sha256').update(readFileSync(path)).digest('hex')

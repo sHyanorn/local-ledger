@@ -1,25 +1,20 @@
-import {
-  existsSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import Database from 'better-sqlite3-multiple-ciphers'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { deriveHere } from '../../src/main/vault/kdf'
 import { Vault } from '../../src/main/vault/vault'
 import { FAST, PASSWORD } from '../support/vault'
+import { tempDirs } from '../support/temp-dir'
 
 // Fake data that must never appear in clear on disk.
 const MARKERS = ['FAKE-PAYEE-7c1e9a', 'FAKE-NOTE-52bd04', 'FAKE-ACCOUNT-e83f11']
 
+const newDir = tempDirs('ledger-encryption-')
 let root: string
 let vault: Vault
 beforeEach(async () => {
-  root = mkdtempSync(join(tmpdir(), 'ledger-encryption-'))
+  root = newDir()
   vault = new Vault(root, { derive: deriveHere, kdf: FAST })
   await vault.create(PASSWORD)
   const db = vault.database()
@@ -36,7 +31,6 @@ beforeEach(async () => {
 })
 afterEach(async () => {
   vault.lock()
-  rmSync(root, { recursive: true, force: true })
 })
 
 /** The markers found in a file's bytes, as UTF-8 or UTF-16 text. */

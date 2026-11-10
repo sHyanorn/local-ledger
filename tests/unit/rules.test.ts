@@ -25,6 +25,7 @@ import { pairTransfers } from '../../src/main/ledger/transfers'
 import type { Db } from '../../src/main/vault/database'
 import type { RuleMatch } from '../../src/shared/rules'
 import { tempDatabase, type TempDatabase } from '../support/temp-database'
+import { previewAndCommit } from '../support/import'
 
 let temp: TempDatabase
 let db: Db
@@ -77,16 +78,6 @@ const categoryOf = (id: number) =>
     c: number | null
     edited: number
   }
-
-/** Commits as the page does: after previewing the same request. */
-const previewAndCommit = (
-  session: ImportSession,
-  request: Parameters<ImportSession['commit']>[1],
-) => {
-  const { selected: _selected, ...shown } = request
-  session.preview(db, shown)
-  return session.commit(db, request)
-}
 
 describe('matching', () => {
   it.each([
@@ -265,7 +256,7 @@ describe('applying', () => {
     expect(
       preview.ok && preview.preview.rows.map((row) => row.categoryId),
     ).toEqual([coffee, null])
-    previewAndCommit(session, { ...request, selected: [0, 1] })
+    previewAndCommit(db, session, { ...request, selected: [0, 1] })
     expect(
       db
         .prepare(

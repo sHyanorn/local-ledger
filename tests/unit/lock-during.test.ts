@@ -1,13 +1,6 @@
 // A lock while a backup, restore or file choice waits on a dialog, a file
 // read or a key derivation: the call fails as locked and nothing goes on.
-import {
-  existsSync,
-  mkdtempSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { handleBackup } from '../../src/main/backup/handlers'
@@ -18,6 +11,7 @@ import { deriveHere, type Derive } from '../../src/main/vault/kdf'
 import { REPLACED_PREFIX } from '../../src/main/vault/layout'
 import { LockedError, Vault } from '../../src/main/vault/vault'
 import type { Channel, Payload, Results } from '../../src/shared/ipc'
+import { tempDirs } from '../support/temp-dir'
 import { FAST, NEW, OLD } from '../support/vault'
 
 type Step = 'derive' | 'dialog' | 'read'
@@ -90,6 +84,7 @@ async function lockAt<T>(step: Step, vault: Vault, call: () => Promise<T>) {
   return result
 }
 
+const newRoot = tempDirs('ledger-lock-during-')
 let root: string
 let vault: Vault
 let call: <C extends Channel>(
@@ -99,7 +94,7 @@ let call: <C extends Channel>(
 
 /** An open vault under NEW, with a backup made under OLD beside it. */
 beforeEach(async () => {
-  root = mkdtempSync(join(tmpdir(), 'ledger-lock-during-'))
+  root = newRoot()
   const source = new Vault(join(root, 'source'), { derive, kdf: FAST })
   await source.create(OLD)
   createAccount(source.database(), {
@@ -130,7 +125,6 @@ beforeEach(async () => {
 afterEach(() => {
   held.steps.clear()
   vault.lock()
-  rmSync(root, { recursive: true, force: true })
 })
 
 /** The vault as it was: in place, under NEW, without the backup's account. */

@@ -1,9 +1,8 @@
 // Files written by an earlier build must keep opening: a vault and a backup
 // made with the test passphrase and fake data, checked as known answers.
-import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { cpSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { listAccounts } from '../../src/main/ledger/accounts'
 import { pageTransactions } from '../../src/main/ledger/transactions'
 import { readBackup } from '../../src/main/vault/backup'
@@ -11,6 +10,7 @@ import { deriveHere } from '../../src/main/vault/kdf'
 import { Vault } from '../../src/main/vault/vault'
 import { parseVaultFile } from '../../src/main/vault/vault-file'
 import { PASSWORD } from '../support/vault'
+import { tempDirs } from '../support/temp-dir'
 
 const FIXTURES = join(__dirname, '../fixtures/vault-v1')
 const base64 = (text: string) => Buffer.from(text, 'base64')
@@ -78,12 +78,10 @@ const VARIANTS: [string, string[], unknown][] = [
   ['an extra field', ['extra'], true],
 ]
 
+const newDir = tempDirs('ledger-files-')
 let root: string
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'ledger-files-'))
-})
-afterEach(() => {
-  rmSync(root, { recursive: true, force: true })
+  root = newDir()
 })
 
 describe('a vault from version 1', () => {

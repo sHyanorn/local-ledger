@@ -14,6 +14,7 @@ import { createCategory } from '../../src/main/ledger/categories'
 import type { Db } from '../../src/main/vault/database'
 import type { ImportFile, Mapping } from '../../src/shared/imports'
 import { tempDatabase, type TempDatabase } from '../support/temp-database'
+import { previewAndCommit } from '../support/import'
 
 let temp: TempDatabase
 let db: Db
@@ -83,16 +84,6 @@ const everything = (
   const preview = session.preview(db, request(file, accountId))
   if (!preview.ok) throw new Error(preview.reason)
   return preview.preview.rows.map((row) => row.index)
-}
-
-/** Commits as the page does: after previewing the same request. */
-const previewAndCommit = (
-  session: ImportSession,
-  request: Parameters<ImportSession['commit']>[1],
-) => {
-  const { selected: _selected, ...shown } = request
-  session.preview(db, shown)
-  return session.commit(db, request)
 }
 
 describe('fingerprints', () => {
@@ -236,7 +227,7 @@ describe('classify', () => {
       (_, index) => `03/05/2026,-4.50,Fake Same ${index},1`,
     ).join('\n')
     const first = opened(session, bytes(text))
-    previewAndCommit(session, {
+    previewAndCommit(db, session, {
       ...request(first, everyday),
       selected: [...Array(10).keys()],
     })
@@ -325,7 +316,7 @@ describe('ImportSession', () => {
     })
     expect(file.sample).toHaveLength(6)
 
-    const committed = previewAndCommit(session, {
+    const committed = previewAndCommit(db, session, {
       ...request(file, everyday),
       selected: everything(session, file, everyday),
     })
@@ -342,7 +333,7 @@ describe('ImportSession', () => {
       Array(6).fill('duplicate'),
     )
     expect(
-      previewAndCommit(session, {
+      previewAndCommit(db, session, {
         ...request(again, everyday),
         selected: [0, 1, 2, 3, 4, 5],
       }),
@@ -357,7 +348,10 @@ describe('ImportSession', () => {
     const session = new ImportSession()
     const line = '03/05/2026,"-4.50","Fake Cafe","+1.00"\n'
     const first = opened(session, bytes(line.repeat(2)))
-    previewAndCommit(session, { ...request(first, everyday), selected: [0, 1] })
+    previewAndCommit(db, session, {
+      ...request(first, everyday),
+      selected: [0, 1],
+    })
     const second = opened(session, bytes(line.repeat(3)))
     const preview = session.preview(db, request(second, everyday))
     expect(preview.ok && preview.preview.rows.map((row) => row.status)).toEqual(
@@ -381,7 +375,7 @@ describe('ImportSession', () => {
     expect(preview.ok && preview.preview.rows.map((row) => row.index)).toEqual([
       0, 1,
     ])
-    previewAndCommit(session, { ...request(file, everyday), selected: [1] })
+    previewAndCommit(db, session, { ...request(file, everyday), selected: [1] })
     expect(rows()).toMatchObject([{ description: 'Fake C' }])
   })
 
@@ -401,7 +395,7 @@ describe('ImportSession', () => {
       description: [1],
       amount: { kind: 'signed', column: 2, negate: false },
     }
-    previewAndCommit(session, {
+    previewAndCommit(db, session, {
       ...request(file, everyday, mapping),
       selected: [0, 1, 2],
     })
@@ -444,7 +438,7 @@ describe('ImportSession', () => {
     const file = opened(session, bytes('03/05/2026,-4.50,FAKE CAFE,1\n'))
     const preview = session.preview(db, request(file, everyday))
     expect(preview.ok && preview.preview.rows[0]?.status).toBe('possible')
-    previewAndCommit(session, { ...request(file, everyday), selected: [0] })
+    previewAndCommit(db, session, { ...request(file, everyday), selected: [0] })
     expect(rows()).toHaveLength(2)
   })
 
@@ -537,7 +531,10 @@ describe('ImportSession', () => {
     expect(session.preview(db, request(file, everyday)).ok).toBe(false)
     session.clear()
     expect(
-      previewAndCommit(session, { ...request(file, everyday), selected: [0] }),
+      previewAndCommit(db, session, {
+        ...request(file, everyday),
+        selected: [0],
+      }),
     ).toEqual({
       ok: false,
       reason: 'not-found',
@@ -551,7 +548,7 @@ describe('ImportSession', () => {
       'Posted,Details,Money Out,Money In,Balance\n2026-05-29,Fake Market Stall,15.26,,1234.56\n'
     const file = opened(session, bytes(text))
     const changed: Mapping = { ...file.mapping!, description: [1, 4] }
-    previewAndCommit(session, {
+    previewAndCommit(db, session, {
       ...request(file, everyday, changed),
       selected: [0],
     })
@@ -560,7 +557,7 @@ describe('ImportSession', () => {
     const later = text.replace('2026-05-29', '2026-05-30')
     const reopened = opened(session, bytes(later))
     const detected: Mapping = { ...changed, description: [1] }
-    previewAndCommit(session, {
+    previewAndCommit(db, session, {
       ...request(reopened, everyday, detected),
       selected: [0],
     })
@@ -592,7 +589,7 @@ describe('import history', () => {
     if (!groceries.ok) throw new Error('no category')
     const session = new ImportSession()
     const file = opened(session, sample('anz.csv'), 'anz.csv')
-    previewAndCommit(session, {
+    previewAndCommit(db, session, {
       ...request(file, everyday),
       selected: everything(session, file, everyday),
     })
@@ -651,7 +648,7 @@ describe('import history', () => {
     const everyday = account()
     const session = new ImportSession()
     const file = opened(session, sample('anz.csv'))
-    previewAndCommit(session, {
+    previewAndCommit(db, session, {
       ...request(file, everyday),
       selected: everything(session, file, everyday),
     })

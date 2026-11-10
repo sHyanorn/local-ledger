@@ -1,5 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createAccount } from '../../src/main/ledger/accounts'
@@ -12,11 +11,13 @@ import { openDatabase } from '../../src/main/vault/database'
 import { deriveHere, encodePassword } from '../../src/main/vault/kdf'
 import { Vault } from '../../src/main/vault/vault'
 import { FAST, PASSWORD } from '../support/vault'
+import { tempDirs } from '../support/temp-dir'
 
+const newDir = tempDirs('ledger-backup-')
 let root: string
 let vault: Vault
 beforeEach(async () => {
-  root = mkdtempSync(join(tmpdir(), 'ledger-backup-'))
+  root = newDir()
   vault = new Vault(root, { derive: deriveHere, kdf: FAST })
   expect(await vault.create(PASSWORD)).toEqual({ ok: true })
   createAccount(vault.database(), {
@@ -28,7 +29,6 @@ beforeEach(async () => {
 })
 afterEach(() => {
   vault.lock()
-  rmSync(root, { recursive: true, force: true })
 })
 
 async function backup(): Promise<Buffer> {
