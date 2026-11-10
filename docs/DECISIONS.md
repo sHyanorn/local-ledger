@@ -239,7 +239,7 @@
 
 ## D043 Saying that a changed password does not reach old backups
 - Date: 2026-11-10
-- Decision: after the master password changes, the page that replaces the changing one says once, in a bar the user can dismiss, that backups made before still open only with the old password. The main process holds the note until a page takes it over `vault:take-notice`, and drops it when the vault locks. The change replaces the page, so the page that made it cannot say so itself
+- Decision: after the master password changes, the page that replaces the changing one says once, in a bar the user can dismiss, that backups made before still open only with the old password. The main process holds the note until a page takes it over `vault:take-notice`, and drops it when the vault locks. A change that stands but could not reopen the database leaves the vault locked and sets no note. The change replaces the page, so the page that made it cannot say so itself
 - Alternatives: a line in the change-password dialog before the change (read past, and shown to everyone who only opens the dialog); nothing in the interface (the user learns it when an old backup refuses the new password)
 
 ## D044 Contrast, and axe-core in the end-to-end tests

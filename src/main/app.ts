@@ -9,13 +9,13 @@ import { handleImport } from './import/handlers'
 import { ipcHandlers } from './ipc'
 import { handleLedger } from './ledger/handlers'
 import { RELEASES_URL, setMenu } from './menu'
+import { handlePasswordChange } from './password-notice'
 import { registerAppScheme, serveAppScheme } from './protocol'
 import { APP_ORIGIN, windowWebPreferences } from './security'
 import { runSelfTest, SELF_TEST_SWITCH } from './self-test'
 import { deriveInWorker } from './vault/derive-in-worker'
 import { Vault } from './vault/vault'
 import { AppWindow } from './window'
-import type { Notice } from '../shared/ipc'
 
 export function startApp(): void {
   const devUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL
@@ -35,19 +35,7 @@ export function startApp(): void {
     handle('vault:status', () => vault.state)
     handle('vault:create', ({ password }) => vault.create(password))
     handle('vault:unlock', ({ password }) => vault.unlock(password))
-    // Shown once by the page that replaces the one that changed the
-    // password; gone when the vault locks.
-    let notice: Notice | null = null
-    handle('vault:change-password', async ({ current, next }) => {
-      const result = await vault.changePassword(current, next)
-      if (result.ok) notice = 'password-changed'
-      return result
-    })
-    handle('vault:take-notice', () => {
-      const taken = notice
-      notice = null
-      return taken
-    })
+    handlePasswordChange(vault, handle)
     handleLedger(vault, handle)
 
     const webPreferences = windowWebPreferences(
@@ -68,10 +56,7 @@ export function startApp(): void {
     handleImport(vault, () => window?.window ?? null, handle)
     handleExport(vault, () => window?.window ?? null, handle)
     const backups = handleBackup(vault, () => window?.window ?? null, handle)
-    vault.onChange(() => {
-      if (!vault.unlocked) notice = null
-      window?.replaceView()
-    })
+    vault.onChange(() => window?.replaceView())
     // Also replaces a page that was already locked, so a password typed
     // but not submitted does not survive a lock.
     const lock = () => {
