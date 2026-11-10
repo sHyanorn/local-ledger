@@ -44,12 +44,12 @@ import type { NewKey } from './keys'
 import { NewerSchemaError } from './migrations'
 import {
   associatedData,
-  lacksChecksum,
   parseVaultFile,
+  readVaultFile,
   serializeVaultFile,
   VAULT_FILE,
 } from './vault-file'
-import type { VaultFile } from './vault-file'
+import type { Check, VaultFile } from './vault-file'
 
 export const VAULT_DIR = 'vault'
 const STAGING_PREFIX = 'vault.creating-'
@@ -145,7 +145,7 @@ export class Vault {
   get state(): VaultState {
     if (this.#db) return 'unlocked'
     if (!existsSync(this.dir)) return 'new'
-    const file = this.#readFile()
+    const file = this.#readFile()?.file
     if (!file || !existsSync(join(this.dir, databaseName(file.generation))))
       return 'damaged'
     return 'locked'
@@ -220,14 +220,16 @@ export class Vault {
       }
       const state = this.state
       if (state === 'new') return { ok: false, reason: 'no-vault' }
-      const file = this.#readFile()
-      if (state === 'damaged' || !file) return { ok: false, reason: 'damaged' }
+      const read = this.#readFile()
+      if (state === 'damaged' || !read) return { ok: false, reason: 'damaged' }
+      const { file, check } = read
       const dataKey = await openKey(file, password, this.derive)
-      if (!dataKey) return { ok: false, reason: 'wrong-password' }
+      if (!dataKey) return { ok: false, reason: unsealFailure(check) }
       try {
         if (cancelled()) return { ok: false, reason: 'locked' }
         const opened = this.#openWithKey(file, dataKey)
-        if (opened.ok) this.#addChecksum(file)
+        // The key unsealed, so the file is whole whatever its checksum says.
+        if (opened.ok && check !== 'matches') this.#writeChecksum(file)
         return opened
       } finally {
         dataKey.fill(0)
@@ -261,13 +263,14 @@ export class Vault {
   ): Promise<Outcome<'wrong-password' | 'locked' | 'damaged'>> {
     return this.#run(async (cancelled) => {
       if (!this.#db) return { ok: false, reason: 'locked' }
-      const file = this.#readFile()
-      if (!file) return { ok: false, reason: 'damaged' }
+      const read = this.#readFile()
+      if (!read) return { ok: false, reason: 'damaged' }
+      const { file, check } = read
       let oldKey: Buffer | null = null
       let created: NewKey | null = null
       try {
         oldKey = await openKey(file, current, this.derive)
-        if (!oldKey) return { ok: false, reason: 'wrong-password' }
+        if (!oldKey) return { ok: false, reason: unsealFailure(check) }
         if (cancelled()) return { ok: false, reason: 'locked' }
         created = await createKey(
           next,
@@ -296,8 +299,9 @@ export class Vault {
   > {
     return this.#run(async (cancelled) => {
       if (!this.#db) return { ok: false, reason: 'locked' }
-      const file = this.#readFile()
-      if (!file) return { ok: false, reason: 'damaged' }
+      const read = this.#readFile()
+      if (!read) return { ok: false, reason: 'damaged' }
+      const { file, check } = read
       const sealingKey = await this.derive(
         encodePassword(password),
         file.kdf.salt,
@@ -306,7 +310,7 @@ export class Vault {
       let dataKey: Buffer | null = null
       try {
         dataKey = open(sealingKey, file.key, associatedData(file))
-        if (!dataKey) return { ok: false, reason: 'wrong-password' }
+        if (!dataKey) return { ok: false, reason: unsealFailure(check) }
         if (cancelled() || !this.#db) return { ok: false, reason: 'locked' }
         const schema = this.#db.pragma('user_version', {
           simple: true,
@@ -452,10 +456,12 @@ export class Vault {
           if (this.#db) return { ok: false, reason: 'exists' }
         } else {
           if (!this.#db) return { ok: false, reason: 'locked' }
-          current = this.#readFile()
-          if (!current) return { ok: false, reason: 'damaged' }
+          const read = this.#readFile()
+          if (!read) return { ok: false, reason: 'damaged' }
+          current = read.file
           currentKey = await openKey(current, currentPassword, this.derive)
-          if (!currentKey) return { ok: false, reason: 'wrong-password' }
+          if (!currentKey)
+            return { ok: false, reason: unsealFailure(read.check) }
           file = await sealDataKey(
             currentPassword,
             dataKey,
@@ -599,7 +605,7 @@ export class Vault {
     oldKey: Buffer,
     created: NewKey,
   ): Outcome<'damaged'> {
-    const named = this.#readFile()?.generation
+    const named = this.#readFile()?.file.generation
     if (named === created.file.generation) {
       console.error(
         `password change committed, then failed: ${errorCode(error)}`,
@@ -641,25 +647,25 @@ export class Vault {
     return { ok: true }
   }
 
-  #readFile(): VaultFile | null {
+  #readFile(): { file: VaultFile; check: Check } | null {
     try {
-      return parseVaultFile(readFileSync(join(this.dir, VAULT_FILE), 'utf8'))
+      return readVaultFile(readFileSync(join(this.dir, VAULT_FILE), 'utf8'))
     } catch {
       return null
     }
   }
 
   /**
-   * Rewrites a vault.json from before the checksum existed, now that its
-   * key has opened the database. The vault is open either way.
+   * Rewrites a vault.json that has no checksum, being from before it
+   * existed, or one that does not match, now that its key has opened the
+   * database. The vault is open either way.
    */
-  #addChecksum(file: VaultFile): void {
+  #writeChecksum(file: VaultFile): void {
     const path = join(this.dir, VAULT_FILE)
     try {
-      if (!lacksChecksum(readFileSync(path, 'utf8'))) return
       writeFileAtomic(path, serializeVaultFile(file), this.checkpoint)
     } catch (error) {
-      console.error(`adding the vault checksum failed: ${errorCode(error)}`)
+      console.error(`writing the vault checksum failed: ${errorCode(error)}`)
     }
   }
 
@@ -789,6 +795,14 @@ export function signalUntilChange(vault: Vault): () => AbortSignal {
   })
   return () => controller.signal
 }
+
+/**
+ * Why a password did not unseal the key. A file that matches its checksum
+ * is whole, so the password is wrong, and one without a checksum cannot
+ * tell and is taken the same way. One that does not match is damaged.
+ */
+const unsealFailure = (check: Check): 'damaged' | 'wrong-password' =>
+  check === 'differs' ? 'damaged' : 'wrong-password'
 
 /** Why a database did not open, when it is damaged or newer than this app. */
 function openFailure(error: unknown): 'newer' | 'damaged' | null {

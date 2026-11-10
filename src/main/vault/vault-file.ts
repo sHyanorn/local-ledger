@@ -52,7 +52,7 @@ const schema = z.strictObject({
   generation: z.int().min(1).max(Number.MAX_SAFE_INTEGER),
   kdf: kdfSchema,
   key: sealedSchema,
-  check: base64Bytes(32).optional(),
+  check: z.string().optional(),
 })
 
 /**
@@ -89,7 +89,21 @@ function checksum(file: VaultFile): Buffer {
     .digest()
 }
 
-function read(text: string): { file: VaultFile; checked: boolean } | null {
+/**
+ * How a file stands with its checksum: 'none' in a file from before the
+ * checksum existed. The field is read as any text, so that damage to it
+ * alone leaves a file that parses and differs.
+ */
+export type Check = 'matches' | 'differs' | 'none'
+
+/**
+ * The parsed file and how it stands with its checksum, or null when it is
+ * not a valid vault file. One that differs may still hold a whole key:
+ * only unsealing tells.
+ */
+export function readVaultFile(
+  text: string,
+): { file: VaultFile; check: Check } | null {
   let json: unknown
   try {
     json = JSON.parse(text)
@@ -100,21 +114,14 @@ function read(text: string): { file: VaultFile; checked: boolean } | null {
   if (!parsed.success) return null
   const { generation, kdf, key, check } = parsed.data
   const file = { generation, kdf, key }
-  if (check && !check.equals(checksum(file))) return null
-  return { file, checked: check !== undefined }
+  if (check === undefined) return { file, check: 'none' }
+  const matches = check === checksum(file).toString('base64')
+  return { file, check: matches ? 'matches' : 'differs' }
 }
 
-/**
- * The parsed file, or null when it is not a valid vault file or does not
- * match its checksum.
- */
+/** The parsed file, whatever its checksum says, or null when it is not valid. */
 export function parseVaultFile(text: string): VaultFile | null {
-  return read(text)?.file ?? null
-}
-
-/** True for a valid file written before the checksum existed. */
-export function lacksChecksum(text: string): boolean {
-  return read(text)?.checked === false
+  return readVaultFile(text)?.file ?? null
 }
 
 export function serializeVaultFile({
