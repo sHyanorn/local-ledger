@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import {
   cpSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -232,6 +233,33 @@ describe('a migration', () => {
     ).toThrow('refer to missing')
     expect(sha256(file)).toBe(before)
     expect(existsSync(`${file}${BEFORE_MIGRATION}`)).toBe(false)
+  })
+
+  it('still opens the ledger when its copy cannot be removed, and logs it', () => {
+    ledgerAt(migrations.length)
+    const copy = `${file}${BEFORE_MIGRATION}`
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const db = openDatabase(file, KEY, {
+        migrations: [
+          ...migrations,
+          (db) => {
+            // A directory in the copy's place is not removed as a file is.
+            rmSync(copy)
+            mkdirSync(copy)
+            db.exec('CREATE TABLE fake_added (id INTEGER PRIMARY KEY) STRICT')
+          },
+        ],
+      })
+      expect(count(db, 'fake_added')).toBe(0)
+      db.close()
+      expect(log).toHaveBeenCalledTimes(1)
+      expect(log.mock.calls[0]?.[0]).toBe(
+        'removing the copy kept for the migration failed: ERR_FS_EISDIR',
+      )
+    } finally {
+      log.mockRestore()
+    }
   })
 
   it('of a new ledger keeps no copy', () => {

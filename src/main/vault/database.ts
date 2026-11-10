@@ -4,6 +4,7 @@
 import { copyFileSync, renameSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
 import Database from 'better-sqlite3-multiple-ciphers'
+import { errorCode } from '../error-code'
 import { flushDirectory, syncFile } from './files'
 import { brokenReferences, migrate, migrations } from './migrations'
 import type { Migration } from './migrations'
@@ -125,7 +126,15 @@ function migrateKeepingCopy(
     flushDirectory(dirname(file))
     throw error
   }
-  rmSync(copy, { force: true })
+  // The ledger is migrated and checked. A copy that stays is removed with
+  // the other leftovers at the next unlock.
+  try {
+    rmSync(copy, { force: true })
+  } catch (error) {
+    console.error(
+      `removing the copy kept for the migration failed: ${errorCode(error)}`,
+    )
+  }
 }
 
 export interface OpenDatabaseOptions {
