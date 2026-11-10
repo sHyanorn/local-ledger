@@ -15,14 +15,14 @@
 }
 
 .chart .axis {
-  stroke: var(--muted, #6e6e73);
+  stroke: var(--muted, #636366);
   stroke-width: 1;
 }
 
 .chart .tick,
 .chart .label,
 .chart .value {
-  fill: var(--muted, #6e6e73);
+  fill: var(--muted, #636366);
   font-size: 11px;
 }
 

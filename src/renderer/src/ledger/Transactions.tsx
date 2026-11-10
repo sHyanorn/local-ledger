@@ -466,14 +466,16 @@ function CategoryCell({
     const other = accounts.find(
       (account) => account.id === row.transferAccountId,
     )
+    // The name starts with the text shown, as speech input expects.
+    const shown = `Transfer · ${other?.name ?? 'another account'}`
     return (
       <button
         type="button"
         className="inline muted"
-        aria-label={`${row.description} is a transfer with ${other?.name ?? 'another account'}`}
+        aria-label={`${shown}: ${row.description}`}
         onClick={() => onTransfer(row)}
       >
-        Transfer · {other?.name}
+        {shown}
       </button>
     )
   }

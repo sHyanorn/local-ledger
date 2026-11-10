@@ -16,7 +16,7 @@ ledgerTest(
       .getByRole('row')
       .filter({ hasText: 'Transfer to Savings' })
       .first()
-    const cell = row.getByRole('button', { name: /is a transfer with Savings/ })
+    const cell = row.getByRole('button', { name: /^Transfer · Savings: / })
     await expect(cell).toHaveText('Transfer · Savings')
 
     await cell.click()
@@ -33,7 +33,7 @@ ledgerTest(
     await dialog.getByRole('button', { name: 'Pair as Transfer…' }).click()
     await dialog.getByRole('button', { name: 'Pair', exact: true }).click()
     await expect(
-      row.getByRole('button', { name: /is a transfer with Savings/ }),
+      row.getByRole('button', { name: /^Transfer · Savings: / }),
     ).toBeVisible()
   },
 )

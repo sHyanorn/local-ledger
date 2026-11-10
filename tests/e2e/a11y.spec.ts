@@ -27,6 +27,14 @@ async function violations(page: Page, screen: string): Promise<string[]> {
   // Transitions between views and into dialogs end first.
   await page.waitForTimeout(400)
   await page.evaluate(AXE)
+  // On macOS the page is transparent over the window's material (D037),
+  // which axe cannot see and takes for white. The panel colour, the
+  // sidebar's background on the other systems, stands in for it.
+  await page.evaluate(() => {
+    const root = document.documentElement
+    if (root.dataset.platform === 'darwin')
+      root.style.background = 'var(--panel)'
+  })
   const found = await page.evaluate(async (tags) => {
     const { axe } = globalThis as unknown as {
       axe: {
@@ -79,6 +87,9 @@ for (const scheme of ['light', 'dark'] as const) {
       const scan = async (page: Page, screen: string) => {
         found.push(...(await violations(page, screen)))
       }
+      // A selected account, with the pointer resting on it.
+      await nav.getByRole('button', { name: /^Everyday/ }).click()
+      await scan(home, 'account')
 
       for (const view of ['Overview', 'Budgets', 'Reports', 'Transfers']) {
         await nav.getByRole('button', { name: view }).first().click()
