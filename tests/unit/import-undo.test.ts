@@ -6,6 +6,7 @@ import { createAccount } from '../../src/main/ledger/accounts'
 import {
   createTransaction,
   deleteTransaction,
+  updateTransaction,
 } from '../../src/main/ledger/transactions'
 import type { Db } from '../../src/main/vault/database'
 import type { RowStatus } from '../../src/shared/imports'
@@ -183,6 +184,29 @@ describe('undoing an import', () => {
     deleteTransaction(db, id)
     expect(skips()).toBe(0)
     expect(batch(first.id)).toMatchObject({ count: 1, kept: 0 })
+  })
+
+  it('forgets a kept row the user moves to another account', () => {
+    const first = importFile('first.csv', days(1, 2, 3))
+    importFile('second.csv', days(3, 4))
+    const kept = db
+      .prepare(
+        `SELECT id, account_id AS accountId, date, amount_cents AS amountCents,
+           description, category_id AS categoryId
+         FROM transactions WHERE date = '2026-02-03'`,
+      )
+      .get() as Parameters<typeof updateTransaction>[1]
+    // Another edit leaves it held.
+    updateTransaction(db, { ...kept, notes: 'fake note' })
+    expect(skips()).toBe(1)
+
+    const savings = account('Fake Savings')
+    updateTransaction(db, { ...kept, notes: '', accountId: savings })
+    expect(skips()).toBe(0)
+    // It is no longer second.csv's row, which is new again.
+    expect(importFile('second.csv', days(3, 4)).count).toBe(1)
+    expect(undoBatch(db, first.id)).toEqual({ ok: true, count: 3, kept: 0 })
+    expect(daysLeft()).toEqual([3, 4])
   })
 
   it('leaves a kept row paired as a transfer, and counts only what it deletes', () => {

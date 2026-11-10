@@ -155,6 +155,13 @@ export function updateTransaction(
              AND (amount_cents IS NOT @amountCents
                OR account_id IS NOT @accountId))`,
     )
+    // Nor is it the row a later import of its old account left out.
+    const unhold = db.prepare(
+      `DELETE FROM import_skips
+       WHERE transaction_id = @id AND EXISTS (
+         SELECT 1 FROM transactions WHERE id = @id
+           AND account_id IS NOT @accountId)`,
+    )
     const update = db.prepare(
       `UPDATE transactions SET account_id = @accountId, date = @date,
            amount_cents = @amountCents, description = @description,
@@ -169,6 +176,7 @@ export function updateTransaction(
     )
     const { changes } = db.transaction(() => {
       unpair.run(values)
+      unhold.run(values)
       return update.run(values)
     })()
     return found(changes)
