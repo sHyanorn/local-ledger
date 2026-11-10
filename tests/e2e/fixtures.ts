@@ -54,7 +54,10 @@ export const failNext = (app: ElectronApplication, channel: Channel) =>
   app.evaluate(({ webContents }, channel) => {
     const page = webContents
       .getAllWebContents()
-      .find((contents) => contents.getURL().startsWith('app://'))
+      .find(
+        (contents) =>
+          !contents.isDestroyed() && contents.getURL().startsWith('app://'),
+      )
     if (!page) throw new Error('no app page')
     page.ipc.handleOnce(channel, () => {
       throw new Error('failed')

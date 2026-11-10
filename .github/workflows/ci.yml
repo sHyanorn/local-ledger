@@ -8,7 +8,9 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.ref }}
+  # Called by the release workflow, github.workflow names the caller, so a
+  # dry run on main does not share a group with the CI of main.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   # Every commit on main keeps a complete result.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
