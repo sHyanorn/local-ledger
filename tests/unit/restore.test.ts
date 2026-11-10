@@ -100,7 +100,7 @@ describe('checking a backup', () => {
     // A backup from a later version of the app.
     vault.database().pragma('user_version = 99')
     const made = await vault.backup(NOW)
-    vault.database().pragma('user_version = 7')
+    vault.database().pragma('user_version = 8')
     if (!made.ok) throw new Error(made.reason)
     expect(await vault.checkBackup(made.file, NOW)).toEqual({
       ok: false,

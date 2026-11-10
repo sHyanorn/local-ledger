@@ -140,16 +140,25 @@ describe('migrating from each earlier schema version', () => {
     expect(await vault.unlock(PASSWORD)).toEqual({ ok: true })
     const db = vault.database()
     expect(db.pragma('user_version', { simple: true })).toBe(migrations.length)
-    expect(count(db, 'accounts')).toBeGreaterThan(0)
-    expect(count(db, 'transactions')).toBeGreaterThan(0)
+    const counts = (of: Db) =>
+      ['accounts', 'categories', 'transactions'].map((table) =>
+        count(of, table),
+      )
+    const rows = counts(db)
+    expect(rows).toEqual([1, 1, 1])
     vault.lock()
     expect(readdirSync(join(root, 'vault')).sort()).toEqual([
       'ledger-1.db',
       'vault.json',
     ])
-    // Until a later schema version exists, nothing is rewritten.
-    if (migrations.length === 7)
-      expect(readFileSync(join(root, 'vault', 'ledger-1.db'))).toEqual(before)
+    // Migrated from schema 7, with its rows.
+    expect(migrations.length).toBe(8)
+    expect(readFileSync(join(root, 'vault', 'ledger-1.db'))).not.toEqual(before)
+    const again = new Vault(root, { derive: deriveHere })
+    expect(await again.unlock(PASSWORD)).toEqual({ ok: true })
+    expect(counts(again.database())).toEqual(rows)
+    expect(count(again.database(), 'import_skips')).toBe(0)
+    again.lock()
   })
 })
 

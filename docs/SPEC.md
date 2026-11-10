@@ -80,13 +80,14 @@ rules(id, pattern, match_type, category_id, priority)
 rule_dismissals(key)
 budgets(id, category_id, month, amount_cents)
 import_batches(id, file_name, row_count, imported_at)
+import_skips(batch_id, transaction_id)
 import_mappings(signature, mapping)
 transfer_links(out_id, in_id, status)
 settings(key, value)
 report_transactions: transactions minus both sides of confirmed transfers
 ```
 
-All amounts are stored as integers (cents). An imported transaction's `hash` is its fingerprint (D025); `edited` marks a change by the user. Rules match by "contains", "starts with" or "is" (D026). Transfers are pairs of transactions (D027). Preferences are rows of `settings`, read with defaults for missing keys (D032).
+All amounts are stored as integers (cents). An imported transaction's `hash` is its fingerprint (D025); `edited` marks a change by the user. Rules match by "contains", "starts with" or "is" (D026). Transfers are pairs of transactions (D027). `import_skips` names the transactions an import left out because an earlier import had brought them in (D042). Preferences are rows of `settings`, read with defaults for missing keys (D032).
 
 ## 6. Interface
 

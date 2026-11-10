@@ -640,7 +640,7 @@ describe('import history', () => {
     expect(listBatches(db)).toMatchObject([
       { id: 1, fileName: 'anz.csv', count: 3, edited: 2 },
     ])
-    expect(undoBatch(db, 1)).toEqual({ ok: true, count: 3 })
+    expect(undoBatch(db, 1)).toEqual({ ok: true, count: 3, kept: 0 })
     expect(rows()).toMatchObject([{ description: 'Fake Kept' }])
     expect(kept).toBeGreaterThan(0)
     expect(listBatches(db)).toEqual([])

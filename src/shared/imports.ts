@@ -104,8 +104,10 @@ export interface ImportBatch {
   importedAt: string
   /** Transactions of the import still in the ledger. */
   count: number
-  /** Of those, how many the user has changed since. */
+  /** Of those, how many an undo keeps, since a later import also held them. */
+  kept: number
+  /** Of those an undo deletes, how many the user has changed since. */
   edited: number
-  /** Of those, how many are paired as transfers; undoing unpairs them. */
+  /** Of those an undo deletes, how many are paired as transfers; undoing unpairs them. */
   paired: number
 }

@@ -297,6 +297,24 @@ export class ImportSession {
         count,
         batchId,
       )
+      // Rows left out because an earlier import already brought them in:
+      // undoing that import keeps them, for this one (D042).
+      const skipExact = db.prepare(
+        `INSERT OR IGNORE INTO import_skips (batch_id, transaction_id)
+         SELECT ?, id FROM transactions
+         WHERE account_id = ? AND hash = ? AND import_batch_id IS NOT NULL`,
+      )
+      const skipMatch = db.prepare(
+        `INSERT OR IGNORE INTO import_skips (batch_id, transaction_id)
+         SELECT ?, id FROM transactions
+         WHERE id = ? AND import_batch_id IS NOT NULL`,
+      )
+      preview.rows.forEach((row, position) => {
+        if (row.status === 'duplicate')
+          skipExact.run(batchId, row.accountId, prints[position])
+        else if (row.match && !selected.has(row.index))
+          skipMatch.run(batchId, row.match.id)
+      })
       rememberMapping(db, pending, request.mapping)
       const paired = pairTransfers(db, batchId)
       // A transfer needs no category; one a rule gave on import goes.

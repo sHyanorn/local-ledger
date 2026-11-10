@@ -16,7 +16,7 @@ The screenshots show made-up data from `npm run seed`.
 ## What it does
 
 - **Encrypted vault.** One master password protects everything. It derives a key with Argon2id that unlocks the data key; the database is encrypted with SQLCipher. The vault locks after a set idle time (1 to 30 minutes), when the screen locks, and when the computer sleeps. There is no password recovery.
-- **Import.** CSV files from any bank, through a column wizard; CommBank, NAB, ANZ and Westpac files are recognized without it. Choose a file or drop it on the window. Duplicates are skipped, likely duplicates are left unselected, and an import can be undone.
+- **Import.** CSV files from any bank, through a column wizard; CommBank, NAB, ANZ and Westpac files are recognized without it. Choose a file or drop it on the window. Duplicates are skipped, likely duplicates are left unselected, and an import can be undone; undoing one keeps the transactions a later import also contained.
 - **Categories and rules.** Rules categorize imported rows by their description. Transfers between your own accounts are paired and left out of income and spending.
 - **Budgets and reports.** A monthly budget per category in your home currency, twelve months of income and spending, spending by category, and a category's trend.
 - **Exports.** A month's statement as an Excel workbook or a PDF. **Exported files are not encrypted.**
@@ -57,6 +57,7 @@ If a bank file is not read correctly, `npm run csv:shape -- <file.csv>` prints a
 - The macOS translucent sidebar has not been seen on a real Mac.
 - Budgets count one home currency; amounts in other currencies are listed, never converted.
 - Exported files, and the CSV files you import, stay unencrypted wherever you keep them.
+- Imports made before version 0.2.0 kept no record of the rows they skipped as duplicates: undoing an earlier import still removes the transactions such an import also contained.
 
 ## Development
 

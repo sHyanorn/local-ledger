@@ -157,7 +157,8 @@ export interface Results {
   'import:discard': void
   'import:batches': ImportBatch[]
   'import:undo':
-    { ok: true; count: number } | { ok: false; reason: 'not-found' }
+    | { ok: true; count: number; kept: number }
+    | { ok: false; reason: 'not-found' }
   'rules:list': Rule[]
   'rules:create':
     | { ok: true; id: number; applied: number }

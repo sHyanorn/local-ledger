@@ -328,7 +328,7 @@ describe('imports and transfers', () => {
     })
     expect(committed).toMatchObject({ ok: true, count: 2, paired: 1 })
     expect(listBatches(db)).toMatchObject([{ count: 2, edited: 0, paired: 1 }])
-    expect(undoBatch(db, 1)).toEqual({ ok: true, count: 2 })
+    expect(undoBatch(db, 1)).toEqual({ ok: true, count: 2, kept: 0 })
     expect(links()).toEqual([])
   })
 })

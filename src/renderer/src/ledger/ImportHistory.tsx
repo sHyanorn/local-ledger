@@ -68,7 +68,7 @@ export function ImportHistory() {
   )
 }
 
-/** What undoing removes, including the transactions changed since. */
+/** What undoing removes, including the transactions changed since, and what it keeps. */
 function undoMessage(batch: ImportBatch): string {
   const changed =
     batch.edited > 0
@@ -80,5 +80,11 @@ function undoMessage(batch: ImportBatch): string {
       : batch.paired > 1
         ? ` ${batch.paired.toLocaleString('en-AU')} of them are paired as transfers, which will be unpaired.`
         : ''
-  return `${count(batch.count, 'transaction')} from “${batch.fileName}” will be deleted${changed}.${paired}`
+  const kept =
+    batch.kept === 1
+      ? ' 1 other stays, because a later import also contained it.'
+      : batch.kept > 1
+        ? ` ${batch.kept.toLocaleString('en-AU')} others stay, because a later import also contained them.`
+        : ''
+  return `${count(batch.count - batch.kept, 'transaction')} from “${batch.fileName}” will be deleted${changed}.${paired}${kept}`
 }

@@ -69,7 +69,7 @@ ledgerTest(
       statuses: ['new', 'new', 'new'],
       committed: { ok: true, id: expect.any(Number), count: 3, paired: 0 },
       batches: [{ fileName: 'anz.csv', count: 3, edited: 0 }],
-      undone: { ok: true, count: 3 },
+      undone: { ok: true, count: 3, kept: 0 },
       after: [],
     })
   },
@@ -318,5 +318,79 @@ ledgerTest(
     await expect(
       home.getByRole('button', { name: 'Import 2,999 Transactions' }),
     ).toBeVisible()
+  },
+)
+
+ledgerTest(
+  'undoing an import keeps the rows a later import also held, and says so',
+  async ({ home }) => {
+    // Two overlapping files, imported as the import view would.
+    const counts = await home.evaluate(async () => {
+      const { accounts, imports } = window.ledger
+      const everyday = (await accounts.list()).find(
+        (account) => account.name === 'Everyday',
+      )!
+      const bring = async (name: string, days: number[]) => {
+        const lines = days.map(
+          (day) => `2031-02-0${day},-${day}.00,FAKE UNDO ${day}`,
+        )
+        const opened = await imports.drop(
+          name,
+          new TextEncoder().encode(
+            ['Date,Amount,Description', ...lines].join('\n'),
+          ),
+        )
+        if (!opened.ok) throw new Error(opened.reason)
+        const request = {
+          id: opened.file.id,
+          encoding: opened.file.encoding,
+          mapping: opened.file.mapping!,
+          targets: [{ key: '', accountId: everyday.id }],
+        }
+        const preview = await imports.preview(request)
+        if (!preview.ok) throw new Error(preview.reason)
+        const done = await imports.commit(
+          request,
+          preview.preview.rows
+            .filter((row) => row.status === 'new')
+            .map((row) => row.index),
+        )
+        if (!done.ok) throw new Error(done.reason)
+        return done.count
+      }
+      return [
+        await bring('first.csv', [1, 2, 3]),
+        await bring('second.csv', [2, 3, 4]),
+      ]
+    })
+    expect(counts).toEqual([3, 1])
+
+    const nav = sidebar(home)
+    await nav.getByRole('button', { name: 'Settings' }).click()
+    const imports = home.getByRole('region', { name: 'Imports' })
+    await imports
+      .getByRole('listitem')
+      .filter({ hasText: 'first.csv' })
+      .getByRole('button', { name: 'Undo…' })
+      .click()
+    const confirm = home.getByRole('alertdialog', { name: 'Undo Import?' })
+    await expect(confirm).toContainText(
+      '1 transaction from “first.csv” will be deleted. 2 others stay, because a later import also contained them.',
+    )
+    await confirm.getByRole('button', { name: 'Undo Import' }).click()
+    await expect(
+      imports.getByRole('listitem').filter({ hasText: 'second.csv' }),
+    ).toContainText('3 transactions')
+    await expect(imports.getByRole('listitem')).toHaveCount(1)
+
+    await nav.getByRole('button', { name: /^Everyday/ }).click()
+    await home.getByRole('searchbox', { name: 'Search' }).fill('FAKE UNDO')
+    const list = home.getByRole('table', { name: 'Transactions' })
+    await expect(
+      list.getByRole('row').filter({ hasText: 'FAKE UNDO' }),
+    ).toHaveCount(3)
+    await expect(
+      list.getByRole('row').filter({ hasText: 'FAKE UNDO 1' }),
+    ).toHaveCount(0)
   },
 )

@@ -156,6 +156,18 @@ export const migrations: readonly Migration[] = [
         value TEXT NOT NULL
       ) STRICT;
     `),
+
+  // 8: the transactions an import left out because an earlier import had
+  // brought them in, so undoing the earlier one keeps them.
+  (db) =>
+    db.exec(`
+      CREATE TABLE import_skips (
+        batch_id INTEGER NOT NULL REFERENCES import_batches (id) ON DELETE CASCADE,
+        transaction_id INTEGER NOT NULL REFERENCES transactions (id) ON DELETE CASCADE,
+        PRIMARY KEY (batch_id, transaction_id)
+      ) STRICT;
+      CREATE INDEX import_skips_transaction ON import_skips (transaction_id);
+    `),
 ]
 
 export class NewerSchemaError extends Error {
