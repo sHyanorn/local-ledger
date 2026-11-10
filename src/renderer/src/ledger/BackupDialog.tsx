@@ -7,6 +7,8 @@ const PROBLEMS = {
   'wrong-password': 'Wrong password.',
   damaged: 'The vault could not be read.',
   unwritable: 'The file could not be saved there.',
+  'unwritable-kept':
+    'The file could not be saved there. The file already there was not changed.',
 } as const
 
 /** Seals a backup under the master password, then asks where to save it. */

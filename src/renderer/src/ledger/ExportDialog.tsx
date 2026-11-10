@@ -13,6 +13,8 @@ const FORMATS: { value: ExportFormat; label: string }[] = [
 const PROBLEMS = {
   busy: 'Another export is still running.',
   unwritable: 'The file could not be saved there.',
+  'unwritable-kept':
+    'The file could not be saved there. The file already there was not changed.',
 } as const
 
 /**

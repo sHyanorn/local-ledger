@@ -9,7 +9,7 @@ import type { Outcome } from '../../shared/ipc'
 import type { Currency } from '../../shared/money'
 import { showSave } from '../dialogs'
 import type { Handle } from '../ipc'
-import { writeOwnerOnly } from '../owner-only'
+import { writeFailure, writeOwnerOnly } from '../owner-only'
 import { LockedError, signalUntilChange, type Vault } from '../vault/vault'
 import { printPdf } from './print'
 import reportCss from './report.css?raw'
@@ -46,7 +46,7 @@ export function handleExport(
     currency: Currency,
     format: ExportFormat,
     signal: AbortSignal,
-  ): Promise<Outcome<'cancelled' | 'unwritable'>> {
+  ): Promise<Outcome<'cancelled' | 'unwritable' | 'unwritable-kept'>> {
     const chosen = await showSave(window(), {
       defaultPath: `Statement ${month} ${currency}.${format}`,
       filters: [FILTERS[format]],
@@ -76,7 +76,7 @@ export function handleExport(
       return { ok: true }
     } catch (error) {
       if (error instanceof LockedError) throw error
-      return { ok: false, reason: 'unwritable' }
+      return { ok: false, reason: writeFailure(chosen.filePath) }
     } finally {
       bytes.fill(0)
     }

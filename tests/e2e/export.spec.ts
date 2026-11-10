@@ -1,5 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import { chmodSync, existsSync, readFileSync, statSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import type { Page } from '@playwright/test'
 import { strFromU8, unzipSync } from 'fflate'
 import {
@@ -231,5 +238,23 @@ ledgerTest(
     expect(snapshot.includes(marker), 'the exported text is reachable').toBe(
       false,
     )
+  },
+)
+
+ledgerTest(
+  'an export that cannot be saved leaves the file already there as it was, and says so',
+  async ({ app, home }, testInfo) => {
+    const path = testInfo.outputPath('kept.xlsx')
+    writeFileSync(path, 'a fake earlier export')
+    mkdirSync(`${path}.tmp`)
+    await saveTo(app, path)
+    await sidebar(home).getByRole('button', { name: 'Reports' }).click()
+    await home.getByRole('button', { name: 'Export…' }).click()
+    const dialog = home.getByRole('alertdialog', { name: /^Export / })
+    await dialog.getByRole('button', { name: 'Export…' }).click()
+    await expect(dialog.getByRole('alert')).toHaveText(
+      'The file could not be saved there. The file already there was not changed.',
+    )
+    expect(readFileSync(path, 'utf8')).toBe('a fake earlier export')
   },
 )

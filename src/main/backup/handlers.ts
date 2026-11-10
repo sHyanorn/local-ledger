@@ -7,7 +7,7 @@ import { isoDate } from '../../shared/dates'
 import { fileLabel, showOpen, showSave } from '../dialogs'
 import { readChosen } from '../import/read-file'
 import type { Handle } from '../ipc'
-import { writeOwnerOnly } from '../owner-only'
+import { writeFailure, writeOwnerOnly } from '../owner-only'
 import { readBackup } from '../vault/backup'
 import {
   LockedError,
@@ -66,7 +66,7 @@ export function handleBackup(
       await writeOwnerOnly(chosen.filePath, made.file)
       return { ok: true }
     } catch {
-      return { ok: false, reason: 'unwritable' }
+      return { ok: false, reason: writeFailure(chosen.filePath) }
     }
   })
 

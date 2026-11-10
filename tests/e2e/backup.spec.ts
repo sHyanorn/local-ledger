@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { dirname } from 'node:path'
 import type { ElectronApplication, Page } from '@playwright/test'
 import { DEMO_PASSWORD } from '../../scripts/seed/demo'
 import {
@@ -55,6 +56,61 @@ async function makeBackup(app: ElectronApplication, page: Page, path: string) {
     ),
   ).toEqual({ ok: true })
 }
+
+ledgerTest(
+  'a backup that cannot be saved leaves the backup already there as it was, and says so',
+  async ({ app, home }, testInfo) => {
+    const path = testInfo.outputPath('kept.llbackup')
+    await makeBackup(app, home, path)
+    const first = readFileSync(path)
+    await home.evaluate(() =>
+      window.ledger.accounts.create({
+        name: 'Fake Added Since',
+        type: 'bank',
+        currency: 'AUD',
+        openingBalanceCents: 0,
+      }),
+    )
+
+    // Something in the way of the temporary file: the save cannot begin.
+    mkdirSync(`${path}.tmp`)
+    await saveTo(app, path)
+    const dialog = await openBackup(home)
+    await dialog.getByLabel('Master password').fill(DEMO_PASSWORD)
+    await dialog.getByRole('button', { name: 'Back Up…' }).click()
+    await expect(dialog.getByRole('alert')).toHaveText(
+      'The file could not be saved there. The file already there was not changed.',
+    )
+    expect(readFileSync(path).equals(first)).toBe(true)
+
+    // With nothing there, the message promises nothing.
+    const fresh = testInfo.outputPath('fresh.llbackup')
+    mkdirSync(`${fresh}.tmp`)
+    await saveTo(app, fresh)
+    await dialog.getByLabel('Master password').fill(DEMO_PASSWORD)
+    await dialog.getByRole('button', { name: 'Back Up…' }).click()
+    await expect(dialog.getByRole('alert')).toHaveText(
+      'The file could not be saved there.',
+    )
+
+    // Once it can be saved, the new backup replaces the old one whole.
+    rmSync(`${path}.tmp`, { recursive: true })
+    rmSync(`${fresh}.tmp`, { recursive: true })
+    await saveTo(app, path)
+    await dialog.getByLabel('Master password').fill(DEMO_PASSWORD)
+    await dialog.getByRole('button', { name: 'Back Up…' }).click()
+    await expect(dialog).toBeHidden()
+    expect(readFileSync(path).equals(first)).toBe(false)
+    expect(
+      readdirSync(dirname(path)).filter((name) => /llbackup/.test(name)),
+    ).toEqual(['kept.llbackup'])
+    await chooseFile(app, path)
+    expect(await home.evaluate(() => window.ledger.restore.open())).toEqual({
+      ok: true,
+      name: 'kept.llbackup',
+    })
+  },
+)
 
 ledgerTest(
   'restoring from Settings replaces the data, keeps the current password, and moves the old vault aside',

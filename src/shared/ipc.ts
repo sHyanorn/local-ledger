@@ -178,7 +178,9 @@ export interface Results {
   'budgets:set': Outcome<'not-found'>
   'reports:month': ReportData
   'reports:trend': TrendPoint[]
-  'export:save': Outcome<'cancelled' | 'busy' | 'unwritable'>
+  'export:save': Outcome<
+    'cancelled' | 'busy' | 'unwritable' | 'unwritable-kept'
+  >
   'settings:get': Settings
   'restore:open':
     | { ok: true; name: string }
@@ -197,7 +199,11 @@ export interface Results {
   >
   'restore:discard': void
   'backup:save': Outcome<
-    'wrong-password' | 'damaged' | 'cancelled' | 'unwritable'
+    | 'wrong-password'
+    | 'damaged'
+    | 'cancelled'
+    | 'unwritable'
+    | 'unwritable-kept'
   >
   'settings:update': Settings
 }
