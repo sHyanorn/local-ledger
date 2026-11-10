@@ -2,10 +2,11 @@
 // file comes from the system's open dialog, shown here.
 import type { BaseWindow } from 'electron'
 import { fileLabel, showOpen } from '../dialogs'
+import { readChosen } from '../read-file'
 import type { Handle } from '../ipc'
 import type { Vault } from '../vault/vault'
 import { undoBatch, listBatches } from './batches'
-import { readChosen } from './read-file'
+import { MAX_FILE_BYTES } from './csv'
 import { ImportSession } from './session'
 
 export function handleImport(
@@ -30,7 +31,7 @@ export function handleImport(
     }
     // The vault may have locked while the dialog was open.
     db()
-    const bytes = await readChosen(path)
+    const bytes = await readChosen(path, MAX_FILE_BYTES)
     if (typeof bytes === 'string') return { ok: false, reason: bytes } as const
     const name = fileLabel(path, 'file.csv')
     try {

@@ -3,13 +3,12 @@
 // is dropped when imported, when another file is chosen, and whenever the
 // vault locks or unlocks.
 import { randomUUID } from 'node:crypto'
+import type { ImportRequest } from '../../shared/api'
 import {
   SAMPLE_ROWS,
-  type Encoding,
   type FileProblem,
   type ImportFile,
   type ImportPreview,
-  type ImportTarget,
   type Mapping,
   type PreviewRow,
 } from '../../shared/imports'
@@ -19,15 +18,9 @@ import { pairTransfers } from '../ledger/transfers'
 import type { Db } from '../vault/database'
 import { FileError, joinOverflow, readTable, type Table } from './csv'
 import { classify, type IncomingRow } from './dedup'
-import { applyMapping, cleanText } from './mapping'
+import { cleanText } from '../clean-text'
+import { applyMapping } from './mapping'
 import { detectLayout, type Layout } from './templates'
-
-export interface ImportRequest {
-  id: string
-  encoding: Encoding
-  mapping: Mapping
-  targets: ImportTarget[]
-}
 
 type Failure<Reason> = { ok: false; reason: Reason }
 

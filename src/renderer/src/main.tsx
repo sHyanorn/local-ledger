@@ -1,5 +1,5 @@
 import './index.css'
-import './charts.css'
+import '../../shared/charts.css'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'

@@ -1,6 +1,5 @@
 import { constants } from 'node:fs'
 import { open, stat, type FileHandle } from 'node:fs/promises'
-import { MAX_FILE_BYTES } from './csv'
 
 /**
  * The bytes of the file the user chose: only a regular file, opened without
@@ -10,7 +9,7 @@ import { MAX_FILE_BYTES } from './csv'
  */
 export async function readChosen(
   path: string,
-  limit = MAX_FILE_BYTES,
+  limit: number,
 ): Promise<Uint8Array | 'too-large' | 'unreadable'> {
   let handle: FileHandle | undefined
   try {

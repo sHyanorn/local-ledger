@@ -58,9 +58,9 @@ vi.mock('electron', () => ({
     },
   },
 }))
-vi.mock('../../src/main/import/read-file', async (importOriginal) => {
+vi.mock('../../src/main/read-file', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('../../src/main/import/read-file')>()
+    await importOriginal<typeof import('../../src/main/read-file')>()
   return {
     ...actual,
     readChosen: async (...args: Parameters<typeof actual.readChosen>) => {

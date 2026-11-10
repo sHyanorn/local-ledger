@@ -3,7 +3,7 @@
 // writes it there. The file is not encrypted (SECURITY_DESIGN). A lock or
 // unlock while this runs cancels it, and nothing is written.
 import type { BaseWindow, FileFilter } from 'electron'
-import chartCss from '../../renderer/src/charts.css?raw'
+import chartCss from '../../shared/charts.css?raw'
 import type { ExportFormat } from '../../shared/export'
 import type { Outcome } from '../../shared/ipc'
 import type { Currency } from '../../shared/money'

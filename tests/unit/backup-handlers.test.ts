@@ -178,3 +178,22 @@ describe('a backup chosen at the locked page', () => {
     vault.lock()
   })
 })
+
+describe('a restore that is running', () => {
+  it('keeps its backup: the other restore channels answer busy', async () => {
+    const { vault } = await vaultIn('new')
+    const call = channelsOf(vault)
+    await call('restore:open', undefined)
+    await call('restore:check', { password: OLD })
+    const committing = call('restore:commit', { currentPassword: null })
+    const busy = { ok: false, reason: 'busy' }
+    expect(await call('restore:open', undefined)).toEqual(busy)
+    expect(await call('restore:check', { password: OLD })).toEqual(busy)
+    expect(await call('restore:commit', { currentPassword: null })).toEqual(
+      busy,
+    )
+    expect(await committing).toEqual({ ok: true })
+    expect(names(vault)).toEqual(['Fake Backed Up'])
+    vault.lock()
+  })
+})

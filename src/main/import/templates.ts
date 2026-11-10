@@ -60,7 +60,10 @@ const WESTPAC_HEADER = [
   'serial',
 ]
 
-/** Strips empty trailing cells, which some exports add. */
+/**
+ * Strips empty trailing cells, which some exports add; unlike the width
+ * that reading uses, a cell of spaces in quotes counts as empty here too.
+ */
 const width = (cells: readonly string[]) => {
   let end = cells.length
   while (end > 0 && cells[end - 1]?.trim() === '') end--

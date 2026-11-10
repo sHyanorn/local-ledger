@@ -5,9 +5,9 @@
 import type { BaseWindow } from 'electron'
 import { isoDate } from '../../shared/dates'
 import { fileLabel, showOpen, showSave } from '../dialogs'
-import { readChosen } from '../import/read-file'
 import type { Handle } from '../ipc'
 import { writeFailure, writeOwnerOnly } from '../owner-only'
+import { readChosen } from '../read-file'
 import { readBackup } from '../vault/backup'
 import type { StagedBackup } from '../vault/stage-backup'
 import { LockedError, signalUntilChange, type Vault } from '../vault/vault'
@@ -31,9 +31,7 @@ export function handleBackup(
   vault.onChange(() => forget())
   /** While a restore runs, the backup it uses stays where it is. */
   let committing = false
-  const idle = () => {
-    if (committing) throw new Error('busy')
-  }
+  const busy = { ok: false, reason: 'busy' } as const
 
   handle('backup:save', async ({ password }) => {
     const signal = currentSignal()
@@ -61,7 +59,7 @@ export function handleBackup(
   })
 
   handle('restore:open', async () => {
-    idle()
+    if (committing) return busy
     const signal = currentSignal()
     const picked = await showOpen(window(), {
       properties: ['openFile'],
@@ -85,7 +83,7 @@ export function handleBackup(
     return { ok: true, name } as const
   })
   handle('restore:check', async ({ password }) => {
-    idle()
+    if (committing) return busy
     const signal = currentSignal()
     const pending = chosen
     if (!pending) return { ok: false, reason: 'no-file' } as const
@@ -101,7 +99,7 @@ export function handleBackup(
     return { ok: true, summary: checked.staged.summary } as const
   })
   handle('restore:commit', async ({ currentPassword }) => {
-    idle()
+    if (committing) return busy
     const staged = chosen?.staged
     if (!staged) return { ok: false, reason: 'not-checked' } as const
     // From an open vault the current password is needed; otherwise none.

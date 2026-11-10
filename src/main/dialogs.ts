@@ -7,7 +7,7 @@ import {
   type OpenDialogOptions,
   type SaveDialogOptions,
 } from 'electron'
-import { cleanText } from './import/mapping'
+import { cleanText } from './clean-text'
 
 /** The open dialog, attached to the window when there is one. */
 export const showOpen = (

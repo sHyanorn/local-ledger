@@ -192,16 +192,22 @@ export interface Results {
     | { ok: true; name: string }
     | {
         ok: false
-        reason: 'cancelled' | 'too-large' | 'unreadable' | 'invalid'
+        reason: 'cancelled' | 'busy' | 'too-large' | 'unreadable' | 'invalid'
       }
   'restore:check':
     | { ok: true; summary: BackupSummary }
     | {
         ok: false
-        reason: 'no-file' | 'invalid' | 'wrong-password' | 'newer' | 'damaged'
+        reason:
+          | 'no-file'
+          | 'busy'
+          | 'invalid'
+          | 'wrong-password'
+          | 'newer'
+          | 'damaged'
       }
   'restore:commit': Outcome<
-    'not-checked' | 'wrong-password' | 'exists' | 'damaged'
+    'not-checked' | 'busy' | 'wrong-password' | 'exists' | 'damaged'
   >
   'restore:discard': void
   'backup:save': Outcome<

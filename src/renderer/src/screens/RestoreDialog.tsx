@@ -6,7 +6,10 @@ import { ErrorText } from '../components/ErrorText'
 import { formatDate } from '../ledger/format'
 import { count } from '../ledger/format'
 
+const BUSY = 'Another restore is still running.'
+
 const OPEN_PROBLEMS = {
+  busy: BUSY,
   'too-large': 'The file is too large to be a backup.',
   unreadable: 'The file could not be read.',
   invalid: 'The file is not a Local Ledger backup, or it is damaged.',
@@ -14,6 +17,7 @@ const OPEN_PROBLEMS = {
 
 const CHECK_PROBLEMS = {
   'no-file': 'Choose the backup again.',
+  busy: BUSY,
   invalid: OPEN_PROBLEMS.invalid,
   'wrong-password': 'Wrong password for this backup.',
   newer: 'This backup was made by a newer version of Local Ledger.',
@@ -22,6 +26,7 @@ const CHECK_PROBLEMS = {
 
 const COMMIT_PROBLEMS = {
   'not-checked': 'Choose the backup again.',
+  busy: BUSY,
   'wrong-password': 'Wrong current password.',
   exists: 'A vault already exists here.',
   damaged: 'The vault could not be replaced.',

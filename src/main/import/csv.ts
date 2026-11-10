@@ -84,7 +84,10 @@ function usualWidth(widths: readonly number[]): {
   return { width, share: widths.length === 0 ? 0 : count / widths.length }
 }
 
-/** Row widths without trailing empty cells, which a trailing delimiter adds. */
+/**
+ * Row widths without trailing empty cells, which a trailing delimiter adds.
+ * Only an empty cell counts: one of spaces held in quotes is a value.
+ */
 const width = (cells: readonly string[]) => {
   let end = cells.length
   while (end > 0 && cells[end - 1] === '') end--
