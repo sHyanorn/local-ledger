@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { Results, VaultState } from '../../shared/ipc'
 import { PASSWORD_MAX, passwordLength } from '../../shared/password'
 
-type Reason<C extends 'vault:create' | 'vault:unlock'> = Extract<
+export type Reason<C extends 'vault:create' | 'vault:unlock'> = Extract<
   Results[C],
   { ok: false }
 >['reason']

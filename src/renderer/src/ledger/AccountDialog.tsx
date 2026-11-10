@@ -16,14 +16,14 @@ const TYPE_LABELS: Record<AccountType, string> = {
   cash: 'Cash',
 }
 
-const PROBLEMS: Record<string, string> = {
+const PROBLEMS = {
   duplicate: 'An account with this name already exists.',
   'currency-in-use': 'An account with transactions keeps its currency.',
   'not-found': 'This account no longer exists.',
   'in-use':
     'This account has transactions. Delete or move them before deleting the account.',
   failed: 'The account could not be saved.',
-}
+} as const
 
 /** Creates an account, or with `account`, edits or deletes it. */
 export function AccountDialog({
@@ -62,11 +62,11 @@ export function AccountDialog({
           id: account.id,
           ...fields,
         })
-        if (!result.ok) return setProblem(PROBLEMS[result.reason] ?? null)
+        if (!result.ok) return setProblem(PROBLEMS[result.reason])
         await refresh()
       } else {
         const result = await window.ledger.accounts.create(fields)
-        if (!result.ok) return setProblem(PROBLEMS[result.reason] ?? null)
+        if (!result.ok) return setProblem(PROBLEMS[result.reason])
         await refresh()
         // A new account opens, to add its transactions.
         show({ name: 'transactions', accountId: result.id })
@@ -83,7 +83,7 @@ export function AccountDialog({
     if (!account) return
     try {
       const result = await window.ledger.accounts.delete(account.id)
-      if (!result.ok) return setProblem(PROBLEMS[result.reason] ?? null)
+      if (!result.ok) return setProblem(PROBLEMS[result.reason])
       await refresh()
       onClose()
     } catch {

@@ -7,12 +7,12 @@ import type { Category } from '../../../shared/ledger'
 import { useLedger } from './store'
 import { count } from './format'
 
-const PROBLEMS: Record<string, string> = {
+const PROBLEMS = {
   duplicate: 'A category with this name already exists here.',
   'too-deep': 'Subcategories cannot have subcategories of their own.',
   'not-found': 'This category no longer exists.',
   failed: 'The category could not be saved.',
-}
+} as const
 
 /** Creates a category, or with `category`, edits or deletes it. */
 export function CategoryDialog({
@@ -51,7 +51,7 @@ export function CategoryDialog({
             parentId,
           })
         : await window.ledger.categories.create({ name, parentId })
-      if (!result.ok) return setProblem(PROBLEMS[result.reason] ?? null)
+      if (!result.ok) return setProblem(PROBLEMS[result.reason])
       await refresh()
       onClose()
     } catch {
@@ -65,7 +65,7 @@ export function CategoryDialog({
     if (!category) return
     try {
       const result = await window.ledger.categories.delete(category.id)
-      if (!result.ok) return setProblem(PROBLEMS[result.reason] ?? null)
+      if (!result.ok) return setProblem(PROBLEMS[result.reason])
       await refresh()
       onClose()
     } catch {

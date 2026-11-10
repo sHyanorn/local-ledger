@@ -1,26 +1,30 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { newPasswordProblem } from '../password-rules'
-import { useVault } from '../store'
+import { useVault, type Reason } from '../store'
 import { RestoreDialog } from './RestoreDialog'
 import { ErrorText } from '../components/ErrorText'
+
+const MESSAGES: Record<Reason<'vault:create'> | 'failed', string | null> = {
+  exists: 'A vault already exists here.',
+  failed: 'The vault could not be created. Try again.',
+  // A lock replaces this page.
+  locked: null,
+}
 
 export function Setup() {
   const create = useVault((store) => store.create)
   const busy = useVault((store) => store.busy)
-  const notice = useVault((store) => store.notice)
+  // This page only creates, so its notices are create's.
+  const notice = useVault((store) => store.notice) as
+    keyof typeof MESSAGES | null
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [restoring, setRestoring] = useState(false)
 
   const problem = newPasswordProblem(password, confirm)
-  const message =
-    submitted && problem
-      ? problem
-      : notice === 'failed'
-        ? 'The vault could not be created. Try again.'
-        : null
+  const message = submitted && problem ? problem : notice && MESSAGES[notice]
 
   const submit = (event: FormEvent) => {
     event.preventDefault()

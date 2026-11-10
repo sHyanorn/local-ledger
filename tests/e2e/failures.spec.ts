@@ -1,5 +1,9 @@
 // What the page says when a call to the main process fails.
-import { resolve } from 'node:path'
+import { rmSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { deriveHere } from '../../src/main/vault/kdf'
+import { Vault } from '../../src/main/vault/vault'
+import { FAST } from '../support/vault'
 import {
   chooseFile,
   createVault,
@@ -85,4 +89,38 @@ test('a wrong password, then a new password too short, shows only the second', a
   await expect(alert).toHaveText('Wrong password.')
   await change(PASSWORD, 'too short')
   await expect(alert).toHaveText(/^Use at least \d+ characters\.$/)
+})
+
+test('unlocking a vault that has gone says so', async ({
+  app,
+  page,
+  userData,
+}) => {
+  await createVault(app, page)
+  const locked = await lockScreen(app)
+  const unlockButton = locked.getByRole('button', { name: 'Unlock' })
+  await expect(unlockButton).toBeVisible()
+  rmSync(join(userData, 'vault'), { recursive: true })
+  await locked.getByLabel('Master password').fill(PASSWORD)
+  await unlockButton.click()
+  await expect(locked.getByRole('alert')).toHaveText(
+    'There is no vault to unlock.',
+  )
+})
+
+test('creating a vault where one has appeared says so', async ({
+  page,
+  userData,
+}) => {
+  const createButton = page.getByRole('button', { name: 'Create Vault' })
+  await expect(createButton).toBeVisible()
+  const other = new Vault(userData, { derive: deriveHere, kdf: FAST })
+  expect(await other.create(PASSWORD)).toEqual({ ok: true })
+  other.lock()
+  await page.getByLabel('Master password').fill(PASSWORD)
+  await page.getByLabel('Confirm password').fill(PASSWORD)
+  await createButton.click()
+  await expect(page.getByRole('alert')).toHaveText(
+    'A vault already exists here.',
+  )
 })

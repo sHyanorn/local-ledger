@@ -1,19 +1,25 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { useVault } from '../store'
+import { useVault, type Reason } from '../store'
 import { ErrorText } from '../components/ErrorText'
 import { RestoreDialog } from './RestoreDialog'
 
-const MESSAGES: Record<string, string> = {
+const MESSAGES: Record<Reason<'vault:unlock'> | 'failed', string | null> = {
   'wrong-password': 'Wrong password.',
+  'no-vault': 'There is no vault to unlock.',
   newer: 'This vault needs a newer version of Local Ledger.',
   failed: 'The vault could not be opened. Try again.',
+  // A damaged vault has a page of its own, and a lock replaces this one.
+  damaged: null,
+  locked: null,
 }
 
 export function Unlock() {
   const unlock = useVault((store) => store.unlock)
   const busy = useVault((store) => store.busy)
-  const notice = useVault((store) => store.notice)
+  // This page only unlocks, so its notices are unlock's.
+  const notice = useVault((store) => store.notice) as
+    keyof typeof MESSAGES | null
   const [password, setPassword] = useState('')
   const [restoring, setRestoring] = useState(false)
 

@@ -104,7 +104,7 @@ async function checkFuses(executable) {
     const option =
       FuseV1Options[
         /** @type {keyof typeof FuseV1Options} */ (
-          name[0].toUpperCase() + name.slice(1)
+          name.charAt(0).toUpperCase() + name.slice(1)
         )
       ]
     const state = wire[option]
