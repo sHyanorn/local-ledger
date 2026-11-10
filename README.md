@@ -24,11 +24,11 @@ The screenshots show made-up data from `npm run seed`.
 
 ## Install
 
-Download the installer for your system from [Releases](https://github.com/shyanorn/local-ledger/releases): `mac-arm64.dmg` for Apple silicon, `mac-x64.dmg` for Intel Macs, `windows-x64-setup.exe` for Windows.
+Download the installer for your system from [Releases](https://github.com/shyanorn/local-ledger/releases): `mac-arm64.dmg` for Macs with an M-series chip, `mac-x64.dmg` for Intel Macs, `windows-x64-setup.exe` for Windows.
 
 The builds are not signed with a paid developer certificate ([D006](docs/DECISIONS.md#d006-unsigned-releases-without-auto-update)), so each system warns the first time you open the app.
 
-**macOS.** Opening the app the first time shows "Local Ledger" cannot be opened, or "Apple could not verify" it, with no option to open it. Close the message, then go to System Settings → Privacy & Security, scroll to Security, and click **Open Anyway** next to the message about Local Ledger. Confirm with your login password. After that, the app opens normally.
+**macOS.** Opening the app the first time shows "Local Ledger" cannot be opened, or that it could not be verified, with no option to open it. Close the message, then go to System Settings → Privacy & Security, scroll to Security, and click **Open Anyway** next to the message about Local Ledger. Confirm with your login password. After that, the app opens normally.
 
 **Windows.** The installer shows "Windows protected your PC" (Microsoft Defender SmartScreen). Click **More info**, check that the app is `local-ledger-…-setup.exe`, then **Run anyway**. If Smart App Control is on, Windows blocks unsigned apps entirely and offers no way to allow just this one.
 
@@ -57,6 +57,7 @@ If a bank file is not read correctly, `npm run csv:shape -- <file.csv>` prints a
 - The macOS translucent sidebar has not been seen on a real Mac.
 - Budgets count one home currency; amounts in other currencies are listed, never converted.
 - Exported files, and the CSV files you import, stay unencrypted wherever you keep them.
+- A vault opened by version 0.2.0 no longer opens in 0.1.0: its database moves to schema version 8 and `vault.json` gains a checksum the older version refuses. Make a backup with 0.1.0 before upgrading.
 - Imports made before version 0.2.0 kept no record of the rows they skipped as duplicates: undoing an earlier import still removes the transactions such an import also contained.
 
 ## Development

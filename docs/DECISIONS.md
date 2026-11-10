@@ -25,9 +25,9 @@
 
 ## D006 Unsigned releases without auto-update
 - Date: 2026-11-08
-- Decision: releases are not code signed or notarized. The macOS app is ad-hoc signed so it runs on Apple Silicon; the Windows NSIS installer is unsigned. There is no auto-update: a "Check for Updates…" menu item opens the GitHub Releases page in the browser, so the app makes no network requests. Each release ships SHA-256 checksums and a GitHub build provenance attestation
+- Decision: releases are not code signed or notarized. The macOS app is ad-hoc signed so it runs on arm64 Macs; the Windows NSIS installer is unsigned. There is no auto-update: a "Check for Updates…" menu item opens the GitHub Releases page in the browser, so the app makes no network requests. Each release ships SHA-256 checksums and a GitHub build provenance attestation
 - First launch: macOS blocks the app until the user allows it under System Settings → Privacy & Security → Open Anyway; Windows SmartScreen needs More info → Run anyway, and Smart App Control, when on, blocks unsigned apps with no per-app override. The README documents both
-- Rationale: notarization needs a paid Apple Developer Program membership, and Squirrel.Mac only updates signed apps; an updater without a verified publisher would run whatever the release feed points to
+- Rationale: notarization needs a paid developer program membership, and Squirrel.Mac only updates signed apps; an updater without a verified publisher would run whatever the release feed points to
 - Revisit: with a Developer ID certificate or a free open-source signing service, sign both platforms and reconsider electron-updater
 
 ## D007 Toolchain and dependencies
@@ -209,8 +209,8 @@
 
 ## D038 Release workflow
 - Date: 2026-11-08
-- Decision: a `v*` tag runs `release.yml`: macOS 15 on Apple silicon and on Intel each build a DMG, Windows 2025 builds an x64 NSIS installer, and each runner first runs the self-test of the unpackaged app and then the package checks against what it built. A final job writes `SHA256SUMS`, records a build provenance attestation for every file in it, and creates a draft release; publishing the draft is a manual step. The tag must equal `v` plus the package version. Run by hand (`workflow_dispatch`), the workflow builds and checksums the same files and keeps them as workflow artifacts, with no attestation (attestations go to a public log) and no release. File names carry no spaces: `local-ledger-<version>-mac-<arch>.dmg`, `local-ledger-<version>-windows-x64-setup.exe`
-- Alternatives: building the Intel DMG on Apple silicon (its self-test would then run under Rosetta, if at all); a third-party release action (the `gh` CLI on the runner does the same)
+- Decision: a `v*` tag runs `release.yml`: macOS 15 on arm64 and on Intel each build a DMG, Windows 2025 builds an x64 NSIS installer, and each runner first runs the self-test of the unpackaged app and then the package checks against what it built. A final job writes `SHA256SUMS`, records a build provenance attestation for every file in it, and creates a draft release; publishing the draft is a manual step. The tag must equal `v` plus the package version. Run by hand (`workflow_dispatch`), the workflow builds and checksums the same files and keeps them as workflow artifacts, with no attestation (attestations go to a public log) and no release. File names carry no spaces: `local-ledger-<version>-mac-<arch>.dmg`, `local-ledger-<version>-windows-x64-setup.exe`
+- Alternatives: building the Intel DMG on an arm64 runner (its self-test would then run under Rosetta, if at all); a third-party release action (the `gh` CLI on the runner does the same)
 
 ## D039 Migrating an existing ledger
 - Date: 2026-11-10

@@ -37,7 +37,7 @@
 - [x] Excel and PDF export, preferring options with few dependencies; text cells written as text, and any CSV export escaping cells that start with `=`, `+`, `-`, `@`, a tab or a line break, full-width forms included (SECURITY_DESIGN)
 
 ## M5 Polish and release
-- [x] Apple-style UI polish, dark mode, keyboard shortcuts; a setting for the auto-lock time; dropping a CSV file on the window to import it (D032, D036, D037)
+- [x] UI polish in a restrained, native-feeling style, dark mode, keyboard shortcuts; a setting for the auto-lock time; dropping a CSV file on the window to import it (D032, D036, D037)
 - [x] Import preview at the 50,000-row limit: it took about 4 s to show and up to 1 s per checkbox; now about 0.2 s and 15 ms (D035)
 - [x] Delimiter detection: a two-line tab-separated file with comma thousands separators was read as comma-separated, and a semicolon file with unquoted semicolons in descriptions split wrongly
 - [x] A home-currency setting for budgets (D028, D032)
@@ -46,6 +46,14 @@
 - [x] Playwright end-to-end tests, including the whole flow from setting a password to exporting
 - [x] Complete `docs/SECURITY_DESIGN.md`
 - [x] English README, screenshots and GIFs; publish the first release
+
+## 0.2.0 Hardening
+- [x] Migrations run beside a copy of the database, with foreign keys off (D039)
+- [x] Backups and exports are saved through a temporary file (D040)
+- [x] Restore from the locked page; a checksum in `vault.json` tells damage from a wrong password (D034, D041)
+- [x] Undoing an import keeps the rows a later import also held (D042)
+- [x] A note after a password change; AA contrast; axe-core in the end-to-end tests (D043, D044)
+- [x] Docs: what is and is not encrypted, the sealed layouts, the limits of upgrading
 
 ## Nice to have
 - [ ] Open an exported workbook in Excel and Numbers, which have not been tried (D030); and see the sidebar vibrancy on a real Mac (D037)

@@ -35,6 +35,40 @@ data key (32 random bytes)
 
 A wrong password fails the GCM check without touching the database. A `vault.json` that does not match its checksum is a damaged vault, so damage to the salt, the nonce or the sealed key is not reported as a wrong password; the checksum is not keyed and adds nothing against someone who can write the file. Files from before 0.2.0 have no checksum and gain one after their first unlock. A sealing key that opens `vault.json` but a database that does not decrypt, is empty, or fails `quick_check` means a damaged vault. These checks run before migrations, so nothing is written to a damaged file. A migration runs beside a copy of the encrypted database file, with foreign keys off and `foreign_key_check` before each commit; the copy is removed once the migrated database passes `integrity_check` and `foreign_key_check`, and is put back if anything fails (D039).
 
+### What the sealing covers
+
+AES-256-GCM seals the data key with a 12-byte random nonce; the stored value is the ciphertext followed by the 16-byte tag. The associated data is the lines below, joined by a line feed, numbers in decimal and bytes in base64.
+
+`vault.json`:
+
+```
+local-ledger vault v1
+<generation>
+argon2id
+<memory in KiB>
+<iterations>
+<parallelism>
+<salt>
+```
+
+Its `check` field is SHA-256 over these bytes, then the nonce, then the sealed key.
+
+A backup's header:
+
+```
+local-ledger backup v1
+<schema version>
+<database length in bytes>
+<SHA-256 of the database>
+argon2id
+<memory in KiB>
+<iterations>
+<parallelism>
+<salt>
+```
+
+A backup file is the 8 bytes `LLBACKUP`, the header's length as a 4-byte big-endian integer, the header as JSON (format, version, schema, size, sha256, kdf, key), then the encrypted database.
+
 ## Lifecycle
 
 - **Create**: the vault is built in a staging directory and renamed into place, so a crash leaves no vault or a whole one. If the rename was lost (a power cut after a failed directory flush), the app finds the whole vault in its staging directory at startup and puts it back.

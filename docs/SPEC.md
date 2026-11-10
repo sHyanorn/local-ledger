@@ -2,7 +2,7 @@
 
 ## 1. One-line summary
 
-A personal finance desktop app whose data stays on the local machine in a fully encrypted database: import bank CSVs, categorize automatically, set budgets, view monthly charts, and export to Excel and PDF.
+A personal finance desktop app whose data stays on the local machine in a database encrypted as a whole, beside a plaintext header that holds the key derivation settings and the sealed key: import bank CSVs, categorize automatically, set budgets, view monthly charts, and export to Excel and PDF.
 
 ## 2. Components
 

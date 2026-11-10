@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This repository is a personal finance desktop app that keeps all data on the local machine in a fully encrypted database. It covers Electron security practices, encrypted storage, packaging and distribution, and an Apple-style interface.
+This repository is a personal finance desktop app that keeps its data on the local machine in a database encrypted as a whole. Beside it sits a plaintext header, `vault.json`, with the key derivation settings and the sealed key; CSV files it imports and files it exports are not encrypted. It covers Electron security practices, encrypted storage, packaging and distribution, and a restrained, native-feeling interface.
 
 ## Read before starting
 

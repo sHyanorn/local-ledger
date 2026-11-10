@@ -31,7 +31,7 @@ const config: Configuration = {
   mac: {
     target: ['dmg'],
     category: 'public.app-category.finance',
-    // Ad-hoc signature: unsigned apps do not run on Apple Silicon (D006).
+    // Ad-hoc signature: unsigned apps do not run on arm64 Macs (D006).
     identity: '-',
     hardenedRuntime: true,
     // No spaces, so release file names need no quoting.
