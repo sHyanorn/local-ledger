@@ -68,7 +68,8 @@ export interface StagedBackup {
   summary: BackupSummary
 }
 /** Files an interrupted change can leave behind. */
-const LEFTOVER = /^(ledger-\d+\.db(\.tmp)?(-journal)?|vault\.json\.tmp)$/
+const LEFTOVER =
+  /^(ledger-\d+\.db(\.tmp|\.before-migration)?(-journal)?|vault\.json\.tmp)$/
 /** Operations waiting or running at once; the page sends one at a time. */
 const MAX_PENDING = 4
 

@@ -1,8 +1,12 @@
 // The SQLCipher-compatible database (SQLite3 Multiple Ciphers, sqlcipher v4
 // scheme) under the data key. The key reaches SQLite as a raw key, so no
 // second KDF runs, and only through buffers that are wiped afterwards.
+import { copyFileSync, renameSync, rmSync } from 'node:fs'
+import { dirname } from 'node:path'
 import Database from 'better-sqlite3-multiple-ciphers'
-import { migrate } from './migrations'
+import { flushDirectory, syncFile } from './files'
+import { hasBrokenReferences, migrate, migrations } from './migrations'
+import type { Migration } from './migrations'
 
 export type Db = Database.Database
 
@@ -13,6 +17,9 @@ export class DamagedError extends Error {
     this.name = 'DamagedError'
   }
 }
+
+/** Added to a database's name for the copy kept while its schema is migrated. */
+export const BEFORE_MIGRATION = '.before-migration'
 
 const HEX = '0123456789abcdef'
 
@@ -75,6 +82,43 @@ function isLedger(db: Db): boolean {
 }
 
 /**
+ * Migrates an existing ledger with a copy of its file kept beside it. The
+ * copy goes once the migrated database passes integrity_check and has every
+ * reference whole. If anything fails, the copy is put back, so the file is
+ * what it was, and the error is thrown.
+ */
+function migrateKeepingCopy(
+  db: Db,
+  file: string,
+  list: readonly Migration[],
+): void {
+  const version = db.pragma('user_version', { simple: true }) as number
+  if (version === 0 || version >= list.length) return migrate(db, list)
+  // No transaction is open and the journal is gone, so the file is the
+  // whole database, still encrypted.
+  const copy = `${file}${BEFORE_MIGRATION}`
+  copyFileSync(file, copy)
+  syncFile(copy)
+  try {
+    migrate(db, list)
+    if (!passesIntegrityCheck(db) || hasBrokenReferences(db))
+      throw new Error('the migrated database failed its checks')
+  } catch (error) {
+    db.close()
+    renameSync(copy, file)
+    flushDirectory(dirname(file))
+    throw error
+  }
+  rmSync(copy, { force: true })
+}
+
+export interface OpenDatabaseOptions {
+  create?: boolean
+  /** The schema changes to apply; tests pass their own. */
+  migrations?: readonly Migration[]
+}
+
+/**
  * Opens (or with `create`, creates) the database under the key and brings
  * its schema up to date. Throws DamagedError, before anything is written,
  * when an existing file is not a whole ledger under this key.
@@ -82,7 +126,7 @@ function isLedger(db: Db): boolean {
 export function openDatabase(
   file: string,
   key: Uint8Array,
-  { create = false }: { create?: boolean } = {},
+  { create = false, migrations: list = migrations }: OpenDatabaseOptions = {},
 ): Db {
   const db = new Database(file, { fileMustExist: !create })
   try {
@@ -97,7 +141,7 @@ export function openDatabase(
     db.pragma('foreign_keys = ON')
     // Sorts and temporary tables stay in memory, never in plaintext files.
     db.pragma('temp_store = MEMORY')
-    migrate(db)
+    migrateKeepingCopy(db, file, list)
     return db
   } catch (error) {
     db.close()

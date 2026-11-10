@@ -2,7 +2,7 @@
 // have run. Never edit a migration that has shipped: add a new one.
 import type Database from 'better-sqlite3-multiple-ciphers'
 
-type Migration = (db: Database.Database) => void
+export type Migration = (db: Database.Database) => void
 
 const ISO_DATE = "GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'"
 const ISO_MONTH = "GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]'"
@@ -165,13 +165,36 @@ export class NewerSchemaError extends Error {
   }
 }
 
-export function migrate(db: Database.Database): void {
+/**
+ * Runs the migrations the database has not had, each in a transaction of its
+ * own with its version number. Foreign keys are off meanwhile, as SQLite's
+ * steps for changing a table's schema require: with them on, dropping a
+ * table to rebuild it deletes or clears the rows that refer to it. Each
+ * migration must leave every reference whole, or it is rolled back.
+ */
+export function migrate(
+  db: Database.Database,
+  list: readonly Migration[] = migrations,
+): void {
   const current = db.pragma('user_version', { simple: true }) as number
-  if (current > migrations.length) throw new NewerSchemaError(current)
-  migrations.slice(current).forEach((migration, index) => {
-    db.transaction(() => {
-      migration(db)
-      db.pragma(`user_version = ${current + index + 1}`)
-    })()
-  })
+  if (current > list.length) throw new NewerSchemaError(current)
+  if (current === list.length) return
+  // No effect inside a transaction, so set around them.
+  db.pragma('foreign_keys = OFF')
+  try {
+    list.slice(current).forEach((migration, index) => {
+      db.transaction(() => {
+        migration(db)
+        if (hasBrokenReferences(db))
+          throw new Error('a migration left rows that refer to missing ones')
+        db.pragma(`user_version = ${current + index + 1}`)
+      })()
+    })
+  } finally {
+    db.pragma('foreign_keys = ON')
+  }
 }
+
+/** Whether any row refers to one that is not there. */
+export const hasBrokenReferences = (db: Database.Database): boolean =>
+  (db.pragma('foreign_key_check') as unknown[]).length > 0

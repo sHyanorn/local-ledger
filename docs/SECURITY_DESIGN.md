@@ -33,7 +33,7 @@ data key (32 random bytes)
 - `vault/ledger-<generation>.db`: the database, every page encrypted with the data key (SQLite3 Multiple Ciphers, `cipher=sqlcipher`, `legacy=4`). The rollback journal is encrypted the same way. Temporary storage stays in memory.
 - The vault directory is created owner-only (0700 on macOS and Linux); `vault.json` is written 0600.
 
-A wrong password fails the GCM check without touching the database. A sealing key that opens `vault.json` but a database that does not decrypt, is empty, or fails `quick_check` means a damaged vault. These checks run before migrations, so nothing is written to a damaged file.
+A wrong password fails the GCM check without touching the database. A sealing key that opens `vault.json` but a database that does not decrypt, is empty, or fails `quick_check` means a damaged vault. These checks run before migrations, so nothing is written to a damaged file. A migration runs beside a copy of the encrypted database file, with foreign keys off and `foreign_key_check` before each commit; the copy is removed once the migrated database passes `integrity_check` and `foreign_key_check`, and is put back if anything fails (D039).
 
 ## Lifecycle
 

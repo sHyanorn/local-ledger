@@ -343,6 +343,7 @@ describe('leftovers', () => {
       'ledger-2.db',
       'ledger-2.db.tmp',
       'ledger-2.db-journal',
+      'ledger-1.db.before-migration',
       'vault.json.tmp',
       'notes.txt',
     ]) {
@@ -352,7 +353,7 @@ describe('leftovers', () => {
 
   it('are kept after a failed unlock', async () => {
     await vault.unlock('not the fake passphrase')
-    expect(files()).toHaveLength(7)
+    expect(files()).toHaveLength(8)
   })
 
   it('are removed once the current database opens and passes quick_check, except unknown files', async () => {
