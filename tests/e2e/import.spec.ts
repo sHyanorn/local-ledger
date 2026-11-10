@@ -211,10 +211,18 @@ ledgerTest(
       }, accountId)
     }
     const request = await open(file('imported.csv', imported))
-    await home.evaluate(
-      (request) => window.ledger.imports.commit(request, [0]),
-      request,
-    )
+    const committed = await home.evaluate(async (request) => {
+      const { imports } = window.ledger
+      await imports.preview(request)
+      return {
+        result: await imports.commit(request, [0]),
+        batches: (await imports.batches()).length,
+      }
+    }, request)
+    expect(committed).toMatchObject({
+      result: { ok: true, count: 1 },
+      batches: 1,
+    })
     await open(file('waiting.csv', waiting))
 
     const shown = await rendererPid(app)
