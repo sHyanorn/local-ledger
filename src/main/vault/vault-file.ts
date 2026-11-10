@@ -91,8 +91,9 @@ function checksum(file: VaultFile): Buffer {
 
 /**
  * How a file stands with its checksum: 'none' in a file from before the
- * checksum existed. The field is read as any text, so that damage to it
- * alone leaves a file that parses and differs.
+ * checksum existed. The field is read as any text, so that damage to its
+ * value that leaves the file valid JSON gives a file that parses and
+ * differs.
  */
 export type Check = 'matches' | 'differs' | 'none'
 
