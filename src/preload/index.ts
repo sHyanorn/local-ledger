@@ -33,6 +33,7 @@ const api: LedgerApi = {
     lock: () => invoke('vault:lock', undefined),
     changePassword: (current, next) =>
       invoke('vault:change-password', { current, next }),
+    takeNotice: () => invoke('vault:take-notice', undefined),
   },
   accounts: {
     list: () => invoke('accounts:list', undefined),

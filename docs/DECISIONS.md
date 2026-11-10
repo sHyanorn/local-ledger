@@ -236,3 +236,14 @@
 - Limits: imports made before 0.2.0 have no record, and undoing an import they overlap behaves as before. A transaction entered by hand is never part of an import, so nothing is recorded for it
 - Alternatives: importing duplicates again as hidden rows (two rows for one transaction in every sum); refusing to undo an import that a later one overlaps (the user cannot take a wrong file back)
 
+
+## D043 Saying that a changed password does not reach old backups
+- Date: 2026-11-10
+- Decision: after the master password changes, the page that replaces the changing one says once, in a bar the user can dismiss, that backups made before still open only with the old password. The main process holds the note until a page takes it over `vault:take-notice`, and drops it when the vault locks. The change replaces the page, so the page that made it cannot say so itself
+- Alternatives: a line in the change-password dialog before the change (read past, and shown to everyone who only opens the dialog); nothing in the interface (the user learns it when an old backup refuses the new password)
+
+## D044 Contrast, and axe-core in the end-to-end tests
+- Date: 2026-11-10
+- Decision: `tests/e2e/a11y.spec.ts` runs axe-core 4.14.0 on every screen and dialog, in the light and the dark scheme, against its WCAG 2.0, 2.1 and 2.2 A and AA rules, and fails on any violation. It is a new development dependency, read from `node_modules` and run in the page by the test; nothing of it is packaged. It found white button text on the accent at 4.0:1 in the light scheme and 3.6:1 in the dark one, white on the dark scheme's red at 2.8:1, and the light scheme's green on white at 4.4:1, all under the 4.5:1 that AA asks of text. Buttons and badges now sit on `--button` (#0071e3, 4.7:1) and `--button-danger` (#d70015, 5.4:1) in both schemes, and the light `--positive` is #1f7a36. `--accent` itself stays, for focus rings, selection and charts
+- Limits: axe checks what a program can: contrast, names, roles, structure. Keyboard order and what a screen reader says are outside it. The exported HTML report has its own stylesheet and is not scanned
+- Alternatives: `@axe-core/playwright` (a wrapper that adds a second package for one `evaluate` call); checking contrast by hand (the dark scheme's buttons had been missed that way)

@@ -65,6 +65,13 @@ export function Ledger() {
     void refresh()
   }, [refresh])
 
+  const [passwordChanged, setPasswordChanged] = useState(false)
+  useEffect(() => {
+    void window.ledger.vault.takeNotice().then((notice) => {
+      if (notice === 'password-changed') setPasswordChanged(true)
+    })
+  }, [])
+
   const ask = useLedger((store) => store.ask)
   // The menu's commands and their shortcuts.
   useEffect(
@@ -124,6 +131,15 @@ export function Ledger() {
           )}
         </div>
         <div aria-live="polite">
+          <NoticeBar
+            label="Password notice"
+            message={
+              passwordChanged
+                ? 'Master password changed. Backups made before now still open only with the old password.'
+                : null
+            }
+            onDismiss={() => setPasswordChanged(false)}
+          />
           <NoticeBar
             label="Budget notice"
             message={budgetNotice}

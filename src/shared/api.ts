@@ -33,6 +33,8 @@ export interface LedgerApi {
       current: string,
       next: string,
     ): Promise<Results['vault:change-password']>
+    /** What the page should say once after it loads; taking it clears it. */
+    takeNotice(): Promise<Results['vault:take-notice']>
   }
   readonly accounts: {
     list(): Promise<Results['accounts:list']>

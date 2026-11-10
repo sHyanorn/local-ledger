@@ -6,6 +6,7 @@ import {
   rmSync,
 } from 'node:fs'
 import { join } from 'node:path'
+import type { Page } from '@playwright/test'
 import {
   createVault,
   expect,
@@ -347,4 +348,41 @@ test('changing the password re-keys the vault in a new page process', async ({
   expect(await unlocked.evaluate(() => window.ledger.vault.status())).toBe(
     'unlocked',
   )
+})
+
+test('a changed password is pointed out once, on the page that follows', async ({
+  app,
+  page,
+}) => {
+  const NEW = 'a new fake passphrase for tests'
+  const home = await createVault(app, page)
+  const notice = (on: Page) =>
+    on.getByRole('region', { name: 'Password notice' })
+  await expect(home.getByRole('button', { name: 'Settings' })).toBeVisible()
+  expect(await home.evaluate(() => window.ledger.vault.takeNotice())).toBeNull()
+  await expect(notice(home)).toHaveCount(0)
+
+  await home.getByRole('button', { name: 'Settings' }).click()
+  await home.getByRole('button', { name: 'Change Master Password…' }).click()
+  await home.getByLabel('Current password').fill(PASSWORD)
+  await home.getByLabel('New password', { exact: true }).fill(NEW)
+  await home.getByLabel('Confirm new password').fill(NEW)
+  const changed = await replacedBy(app, () =>
+    home.getByRole('button', { name: 'Change Password' }).click(),
+  )
+  await expect(notice(changed).getByRole('paragraph')).toHaveText(
+    'Master password changed. Backups made before now still open only with the old password.',
+  )
+  expect(
+    await changed.evaluate(() => window.ledger.vault.takeNotice()),
+  ).toBeNull()
+  await notice(changed).getByRole('button', { name: 'Dismiss' }).click()
+  await expect(notice(changed)).toHaveCount(0)
+
+  const locked = await replacedBy(app, () =>
+    changed.getByRole('button', { name: 'Lock' }).click(),
+  )
+  const unlocked = await unlock(app, locked, NEW)
+  await expect(unlocked.getByRole('button', { name: 'Settings' })).toBeVisible()
+  await expect(notice(unlocked)).toHaveCount(0)
 })

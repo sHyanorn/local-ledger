@@ -53,6 +53,7 @@ export const channels = {
     current: givenPassword,
     next: newPassword,
   }),
+  'vault:take-notice': z.undefined(),
   'accounts:list': z.undefined(),
   'accounts:create': accountFields,
   'accounts:update': schemas.accountUpdate,
@@ -114,6 +115,9 @@ export type Payload<C extends Channel> = z.infer<(typeof channels)[C]>
 
 export type VaultState = 'new' | 'locked' | 'unlocked' | 'damaged'
 
+/** Something the main process has the next page say once. */
+export type Notice = 'password-changed'
+
 export type Outcome<Reason extends string> =
   { ok: true } | { ok: false; reason: Reason }
 
@@ -129,6 +133,7 @@ export interface Results {
   >
   'vault:lock': void
   'vault:change-password': Outcome<'wrong-password' | 'locked' | 'damaged'>
+  'vault:take-notice': Notice | null
   'accounts:list': Account[]
   'accounts:create': Created<'duplicate'>
   'accounts:update': Outcome<'duplicate' | 'not-found' | 'currency-in-use'>

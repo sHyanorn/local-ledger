@@ -188,7 +188,14 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
     ],
     version: pkg.version,
     commands: ['on'],
-    vault: ['changePassword', 'create', 'lock', 'status', 'unlock'],
+    vault: [
+      'changePassword',
+      'create',
+      'lock',
+      'status',
+      'takeNotice',
+      'unlock',
+    ],
     accounts: ['create', 'delete', 'list', 'update'],
     categories: ['create', 'delete', 'list', 'update'],
     transactions: [

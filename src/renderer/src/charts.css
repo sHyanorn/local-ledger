@@ -35,7 +35,7 @@
 }
 
 .chart .bar.income {
-  fill: var(--positive, #248a3d);
+  fill: var(--positive, #1f7a36);
 }
 
 .chart .bar.spending {
