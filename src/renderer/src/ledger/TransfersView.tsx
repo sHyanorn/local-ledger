@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { formatAmount } from '../../../shared/money'
-import type { PossibleTransfer, TransferSide } from '../../../shared/transfers'
+import type { TransferSide } from '../../../shared/transfers'
 import { formatDate } from './format'
 import { useLedger } from './store'
+import { useLoaded } from './useLoaded'
 import { ErrorText } from '../components/ErrorText'
 
 /**
@@ -12,20 +13,11 @@ import { ErrorText } from '../components/ErrorText'
 export function TransfersView() {
   const accounts = useLedger((store) => store.accounts)
   const refresh = useLedger((store) => store.refresh)
-  const [pairs, setPairs] = useState<PossibleTransfer[] | null>(null)
-  const [generation, setGeneration] = useState(0)
+  const { value: pairs, failed } = useLoaded(
+    () => window.ledger.transfers.possible(),
+    [],
+  )
   const [problem, setProblem] = useState('')
-
-  useEffect(() => {
-    let current = true
-    window.ledger.transfers.possible().then(
-      (found) => current && setPairs(found),
-      () => current && setPairs([]),
-    )
-    return () => {
-      current = false
-    }
-  }, [generation])
 
   const decide = async (action: () => Promise<{ ok: boolean }>) => {
     try {
@@ -34,7 +26,7 @@ export function TransfersView() {
     } catch {
       setProblem('The transfer could not be changed.')
     } finally {
-      setGeneration(generation + 1)
+      // Reloading the ledger loads the pairs again.
       void refresh()
     }
   }
@@ -61,6 +53,7 @@ export function TransfersView() {
       </header>
       <ErrorText message={problem} className="import-problem" />
       <div className="scroll">
+        {failed && <p className="empty">The transfers could not be loaded.</p>}
         {pairs && pairs.length === 0 && (
           <p className="empty">No transfers to review</p>
         )}

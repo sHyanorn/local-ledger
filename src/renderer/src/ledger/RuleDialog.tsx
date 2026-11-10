@@ -25,7 +25,7 @@ export function RuleDialog({
 }: {
   rule?: Rule
   start?: Partial<Omit<Rule, 'id'>>
-  onSaved: () => void
+  onSaved?: () => void
   onClose: () => void
 }) {
   const categories = useLedger((store) => store.categories)
@@ -76,7 +76,7 @@ export function RuleDialog({
           })
       if (!result.ok) return setProblem('The category no longer exists.')
       await refresh()
-      onSaved()
+      onSaved?.()
       onClose()
     } catch {
       setProblem('The rule could not be saved.')
@@ -90,7 +90,7 @@ export function RuleDialog({
     try {
       await window.ledger.rules.delete(rule.id)
       await refresh()
-      onSaved()
+      onSaved?.()
       onClose()
     } catch {
       setProblem('The rule could not be deleted.')

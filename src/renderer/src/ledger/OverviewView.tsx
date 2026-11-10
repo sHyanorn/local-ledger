@@ -1,12 +1,10 @@
-import { useEffect, useState } from 'react'
-import { budgetState, type MonthBudgets } from '../../../shared/budgets'
-import type { Transaction } from '../../../shared/ledger'
+import { budgetState } from '../../../shared/budgets'
 import { formatAmount, type Currency } from '../../../shared/money'
-import type { ReportData } from '../../../shared/reports'
 import { BudgetBar } from './BudgetBar'
 import { budgetFigure, budgetShare } from './budget-figures'
 import { formatDate, formatMonth, monthOf } from './format'
 import { categoryName, useLedger } from './store'
+import { useLoaded } from './useLoaded'
 
 /** This month at a glance: income and spending, budgets, the latest transactions. */
 export function OverviewView() {
@@ -18,37 +16,25 @@ export function OverviewView() {
   const currencies = [
     ...new Set(accounts.map((account) => account.currency)),
   ].sort((a, b) => (a === home ? -1 : b === home ? 1 : a.localeCompare(b)))
-  const [reports, setReports] = useState<ReportData[]>([])
-  const [budgets, setBudgets] = useState<MonthBudgets | null>(null)
-  const [recent, setRecent] = useState<Transaction[]>([])
   const key = currencies.join(',')
-
-  useEffect(() => {
-    let current = true
-    Promise.all([
-      Promise.all(
-        key
-          .split(',')
-          .filter(Boolean)
-          .map((currency) =>
-            window.ledger.reports.month(month, currency as Currency),
-          ),
-      ),
-      window.ledger.budgets.month(month),
-      window.ledger.transactions.page({}, 5),
-    ]).then(
-      ([reportList, monthBudgets, page]) => {
-        if (!current) return
-        setReports(reportList)
-        setBudgets(monthBudgets)
-        setRecent(page.rows)
-      },
-      () => undefined,
-    )
-    return () => {
-      current = false
-    }
-  }, [key, month, categories])
+  const { value: loaded, failed } = useLoaded(
+    () =>
+      Promise.all([
+        Promise.all(
+          key
+            .split(',')
+            .filter(Boolean)
+            .map((currency) =>
+              window.ledger.reports.month(month, currency as Currency),
+            ),
+        ),
+        window.ledger.budgets.month(month),
+        window.ledger.transactions.page({}, 5),
+      ]),
+    [key, month],
+  )
+  const [reports, budgets, page] = loaded ?? [[], null, null]
+  const recent = page?.rows ?? []
 
   const budgeted =
     budgets?.categories.filter((budget) => budget.budgetCents !== null) ?? []
@@ -60,6 +46,7 @@ export function OverviewView() {
       </header>
       <div className="scroll">
         <div className="overview">
+          {failed && <p className="empty">The overview could not be loaded.</p>}
           <div className="cards">
             {reports
               .filter(

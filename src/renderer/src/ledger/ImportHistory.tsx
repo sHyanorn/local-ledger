@@ -1,44 +1,39 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { isoDate } from '../../../shared/dates'
 import type { ImportBatch } from '../../../shared/imports'
 import { Confirm } from '../components/Dialog'
 import { count, formatDate } from './format'
 import { useLedger } from './store'
+import { useLoaded } from './useLoaded'
 
 /** Past imports, newest first, each of which can be undone. */
 export function ImportHistory() {
   const refreshLedger = useLedger((store) => store.refresh)
-  const [batches, setBatches] = useState<ImportBatch[] | null>(null)
+  const { value: batches, failed } = useLoaded(
+    () => window.ledger.imports.batches(),
+    [],
+  )
   const [undoing, setUndoing] = useState<ImportBatch | null>(null)
-  const [generation, setGeneration] = useState(0)
-
-  useEffect(() => {
-    let current = true
-    window.ledger.imports.batches().then(
-      (list) => current && setBatches(list),
-      () => current && setBatches([]),
-    )
-    return () => {
-      current = false
-    }
-  }, [generation])
 
   const undo = async (batch: ImportBatch) => {
     setUndoing(null)
     try {
       await window.ledger.imports.undo(batch.id)
     } finally {
-      setGeneration(generation + 1)
+      // Reloading the ledger loads the list again.
       void refreshLedger()
     }
   }
 
-  if (!batches || batches.length === 0) return null
+  if (!failed && (!batches || batches.length === 0)) return null
   return (
     <section aria-labelledby="imports-heading">
       <h2 id="imports-heading">Imports</h2>
+      {failed && (
+        <p className="empty">The import history could not be loaded.</p>
+      )}
       <ul className="list">
-        {batches.map((batch) => (
+        {batches?.map((batch) => (
           <li key={batch.id} className="list-row">
             <span className="name">{batch.fileName}</span>
             <span className="muted">

@@ -1,30 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { Rule } from '../../../shared/rules'
 import { RuleDialog } from './RuleDialog'
 import { MATCH_NAMES } from './rule-names'
 import { categoryName, useLedger } from './store'
+import { useLoaded } from './useLoaded'
 
 type Editing = { rule?: Rule } | null
 
 /** The rules in the order they run; the first that matches decides. */
 export function RulesSection() {
   const categories = useLedger((store) => store.categories)
-  const [rules, setRules] = useState<Rule[]>([])
+  const {
+    value: rules,
+    failed,
+    reload,
+  } = useLoaded(() => window.ledger.rules.list(), [])
   const [editing, setEditing] = useState<Editing>(null)
-  const [generation, setGeneration] = useState(0)
 
-  useEffect(() => {
-    let current = true
-    window.ledger.rules.list().then(
-      (list) => current && setRules(list),
-      () => current && setRules([]),
-    )
-    return () => {
-      current = false
-    }
-  }, [generation, categories])
-
-  const reload = () => setGeneration(generation + 1)
   const move = async (rule: Rule, offset: -1 | 1) => {
     try {
       await window.ledger.rules.move(rule.id, offset)
@@ -46,7 +38,8 @@ export function RulesSection() {
           Add Rule…
         </button>
       </div>
-      {rules.length > 0 && (
+      {failed && <p className="empty">The rules could not be loaded.</p>}
+      {rules && rules.length > 0 && (
         <ol className="list">
           {rules.map((rule, index) => (
             <li key={rule.id} className="list-row rule">
@@ -86,13 +79,7 @@ export function RulesSection() {
           ))}
         </ol>
       )}
-      {editing && (
-        <RuleDialog
-          {...editing}
-          onSaved={reload}
-          onClose={() => setEditing(null)}
-        />
-      )}
+      {editing && <RuleDialog {...editing} onClose={() => setEditing(null)} />}
     </section>
   )
 }

@@ -124,3 +124,17 @@ test('creating a vault where one has appeared says so', async ({
     'A vault already exists here.',
   )
 })
+
+ledgerTest(
+  'a list that fails to load says so instead of showing as empty',
+  async ({ app, home }) => {
+    await failNext(app, 'transfers:possible')
+    await sidebar(home)
+      .getByRole('button', { name: /^Transfers/ })
+      .click()
+    await expect(
+      home.getByText('The transfers could not be loaded.'),
+    ).toBeVisible()
+    await expect(home.getByText('No transfers to review')).toHaveCount(0)
+  },
+)

@@ -1,9 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import {
-  budgetState,
-  type CategoryBudget,
-  type MonthBudgets,
-} from '../../../shared/budgets'
+import { useState, type FormEvent } from 'react'
+import { budgetState, type CategoryBudget } from '../../../shared/budgets'
 import type { Category } from '../../../shared/ledger'
 import {
   centsToDecimal,
@@ -16,6 +12,7 @@ import { MonthStepper } from './MonthStepper'
 import { BudgetBar } from './BudgetBar'
 import { budgetFigure, budgetShare } from './budget-figures'
 import { categoryTree, useLedger } from './store'
+import { useLoaded } from './useLoaded'
 
 /** Each category's spending this month against its budget, which the user sets here. */
 export function BudgetsView() {
@@ -23,26 +20,14 @@ export function BudgetsView() {
   const refresh = useLedger((store) => store.refresh)
   const home = useLedger((store) => store.settings.homeCurrency)
   const [month, setMonth] = useState(monthOf)
-  const [answer, setBudgets] = useState<MonthBudgets | null>(null)
+  const { value: answer, failed } = useLoaded(
+    () => window.ledger.budgets.month(month),
+    [month],
+  )
   // An answer for another month is not shown under this one.
   const budgets = answer?.month === month ? answer : null
-  const [generation, setGeneration] = useState(0)
-
-  useEffect(() => {
-    let current = true
-    window.ledger.budgets.month(month).then(
-      (answer) => current && setBudgets(answer),
-      () => current && setBudgets(null),
-    )
-    return () => {
-      current = false
-    }
-  }, [month, generation, categories])
-
-  const saved = () => {
-    setGeneration(generation + 1)
-    void refresh()
-  }
+  // Reloading the ledger loads the budgets again.
+  const saved = () => void refresh()
   const byId = new Map(budgets?.categories.map((b) => [b.categoryId, b]))
   const row = (category: Category, child = false) => {
     const budget = byId.get(category.id)
@@ -68,6 +53,7 @@ export function BudgetsView() {
         </div>
       </header>
       <div className="scroll">
+        {failed && <p className="empty">The budgets could not be loaded.</p>}
         {budgets && (
           <div className="budgets">
             <ul

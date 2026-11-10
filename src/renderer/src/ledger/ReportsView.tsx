@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { NoticeBar } from '../components/NoticeBar'
 import { groupedBars, horizontalBars, trendLine } from '../../../shared/charts'
 import type { Currency } from '../../../shared/money'
-import type { ReportData, TrendPoint } from '../../../shared/reports'
 import { ChartView } from '../components/ChartView'
 import { ExportDialog } from './ExportDialog'
 import {
@@ -13,6 +12,7 @@ import {
 import { formatMonth, monthOf } from './format'
 import { MonthStepper } from './MonthStepper'
 import { categoryName, useLedger } from './store'
+import { useLoaded } from './useLoaded'
 
 export function ReportsView() {
   const accounts = useLedger((store) => store.accounts)
@@ -24,7 +24,10 @@ export function ReportsView() {
   const [chosen, setCurrency] = useState<Currency | null>(null)
   const currency = chosen ?? currencies[0] ?? 'AUD'
   const [month, setMonth] = useState(monthOf)
-  const [answer, setData] = useState<ReportData | null>(null)
+  const { value: answer, failed } = useLoaded(
+    () => window.ledger.reports.month(month, currency),
+    [month, currency],
+  )
   // An answer for another month or currency is not shown under this one.
   const data =
     answer?.report.month === month && answer.report.currency === currency
@@ -33,37 +36,20 @@ export function ReportsView() {
   const topLevel = categories.filter((category) => category.parentId === null)
   const [trendCategory, setTrendCategory] = useState<number | null>(null)
   const trendId = trendCategory ?? topLevel[0]?.id ?? null
-  const [trendAnswer, setTrend] = useState<{
-    key: string
-    points: TrendPoint[]
-  } | null>(null)
   const trendKey = `${trendId}:${month}:${currency}`
+  const { value: trendAnswer, failed: trendFailed } = useLoaded(
+    async () =>
+      trendId === null
+        ? null
+        : {
+            key: trendKey,
+            points: await window.ledger.reports.trend(trendId, month, currency),
+          },
+    [trendKey],
+  )
   const trend = trendAnswer?.key === trendKey ? trendAnswer.points : null
   const [exporting, setExporting] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
-
-  useEffect(() => {
-    let current = true
-    window.ledger.reports.month(month, currency).then(
-      (answer) => current && setData(answer),
-      () => current && setData(null),
-    )
-    return () => {
-      current = false
-    }
-  }, [month, currency, categories])
-
-  useEffect(() => {
-    if (trendId === null) return
-    let current = true
-    window.ledger.reports.trend(trendId, month, currency).then(
-      (points) => current && setTrend({ key: trendKey, points }),
-      () => current && setTrend(null),
-    )
-    return () => {
-      current = false
-    }
-  }, [trendId, month, currency, categories, trendKey])
 
   const axis = compactAmount(currency)
   const exact = exactAmount(currency)
@@ -100,6 +86,7 @@ export function ReportsView() {
         </div>
       </header>
       <div className="scroll">
+        {failed && <p className="empty">The report could not be loaded.</p>}
         {data && (
           <div className="reports">
             <section aria-labelledby="months-heading">
@@ -141,7 +128,7 @@ export function ReportsView() {
                 <p className="empty">No spending</p>
               )}
             </section>
-            {trendId !== null && trend && (
+            {trendId !== null && (trend || trendFailed) && (
               <section aria-labelledby="trend-heading">
                 <div className="section-heading">
                   <h2 id="trend-heading">Trend</h2>
@@ -159,16 +146,20 @@ export function ReportsView() {
                     ))}
                   </select>
                 </div>
-                <ChartView
-                  chart={trendLine({
-                    points: trend.map((point) => ({
-                      label: shortMonth(point.month),
-                      value: point.spentCents,
-                    })),
-                    format: axis,
-                    label: `Spending on ${name(trendId)} by month`,
-                  })}
-                />
+                {trend ? (
+                  <ChartView
+                    chart={trendLine({
+                      points: trend.map((point) => ({
+                        label: shortMonth(point.month),
+                        value: point.spentCents,
+                      })),
+                      format: axis,
+                      label: `Spending on ${name(trendId)} by month`,
+                    })}
+                  />
+                ) : (
+                  <p className="empty">The trend could not be loaded.</p>
+                )}
               </section>
             )}
           </div>

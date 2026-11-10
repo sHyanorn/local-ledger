@@ -39,6 +39,8 @@ interface LedgerStore {
   done(): void
   /** Whether the last reload failed, leaving what was loaded before. */
   reloadFailed: boolean
+  /** Counts the reloads, so views load their own data again after each. */
+  revision: number
   setReloadFailed(failed: boolean): void
   /** Reloads accounts and categories after a change; never fails. */
   refresh(): Promise<void>
@@ -65,6 +67,7 @@ export const useLedger = create<LedgerStore>((set, get) => ({
     })),
   done: () => set({ request: null }),
   reloadFailed: false,
+  revision: 0,
   setReloadFailed: (reloadFailed) => set({ reloadFailed }),
   refresh: async () => {
     // Answers can arrive out of order; only the latest request's counts.
@@ -81,7 +84,8 @@ export const useLedger = create<LedgerStore>((set, get) => ({
       ])
     } catch {
       // The change itself was made; only the figures shown are behind.
-      if (ticket === refreshes) set({ reloadFailed: true })
+      if (ticket === refreshes)
+        set(({ revision }) => ({ reloadFailed: true, revision: revision + 1 }))
       return
     }
     if (ticket !== refreshes) return
@@ -105,15 +109,16 @@ export const useLedger = create<LedgerStore>((set, get) => ({
       view.name === 'transactions' &&
       view.accountId !== null &&
       !accounts.some((account) => account.id === view.accountId)
-    set({
+    set(({ revision }) => ({
       reloadFailed: false,
+      revision: revision + 1,
       accounts,
       categories,
       transfersToReview,
       settings,
       overBudget: over.map((budget) => budget.categoryId),
       ...(gone ? { view: { name: 'transactions', accountId: null } } : {}),
-    })
+    }))
   },
 }))
 
