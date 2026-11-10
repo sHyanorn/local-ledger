@@ -111,15 +111,15 @@ describe('writeOwnerOnly', () => {
   })
 
   it.skipIf(process.platform === 'win32')(
-    'never writes through a link left where a temporary file would go',
+    'never writes through a link left under its temporary name',
     async () => {
+      faults.suffix = Buffer.from('fake01')
       const other = join(dir, 'fake-other-file')
       writeFileSync(other, OLD)
-      symlinkSync(other, `${path}.tmp`)
-      await writeOwnerOnly(path, NEW)
+      symlinkSync(other, `${path}.${faults.suffix.toString('hex')}.tmp`)
+      await expect(writeOwnerOnly(path, NEW)).rejects.toThrow('EEXIST')
       expect(readFileSync(other, 'utf8')).toBe(OLD)
-      expect(readFileSync(path)).toEqual(NEW)
-      expect(lstatSync(path).isSymbolicLink()).toBe(false)
+      expect(readdirSync(dir)).toHaveLength(2)
     },
   )
 

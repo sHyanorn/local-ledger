@@ -147,12 +147,18 @@ describe('a vault file with a checksum', () => {
   it('is a damaged vault with another generation or KDF setting', async () => {
     const { vault, text } = await locked()
     const json = JSON.parse(text)
+    // The database the edited file names is there, so only unsealing tells.
+    copyFileSync(
+      join(root, 'vault', 'ledger-1.db'),
+      join(root, 'vault', 'ledger-2.db'),
+    )
     for (const edit of [
       { ...json, generation: 2 },
-      { ...json, kdf: { ...json.kdf, iterations: 3 } },
+      { ...json, kdf: { ...json.kdf, iterations: json.kdf.iterations + 1 } },
     ]) {
       writeFileSync(path, JSON.stringify(edit))
       expect(check(JSON.stringify(edit))).toBe('differs')
+      expect(vault.state).toBe('locked')
       expect(await vault.unlock(PASSWORD)).toEqual(DAMAGED)
     }
   })
