@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import {
   chmodSync,
   existsSync,
-  mkdirSync,
   readFileSync,
   statSync,
   writeFileSync,
@@ -244,9 +243,9 @@ ledgerTest(
 ledgerTest(
   'an export that cannot be saved leaves the file already there as it was, and says so',
   async ({ app, home }, testInfo) => {
-    const path = testInfo.outputPath('kept.xlsx')
+    // No temporary file fits beside a name this long.
+    const path = testInfo.outputPath(`${'k'.repeat(245)}.xlsx`)
     writeFileSync(path, 'a fake earlier export')
-    mkdirSync(`${path}.tmp`)
     await saveTo(app, path)
     await sidebar(home).getByRole('button', { name: 'Reports' }).click()
     await home.getByRole('button', { name: 'Export…' }).click()

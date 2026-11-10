@@ -220,8 +220,8 @@
 
 ## D040 Saving backups and exports
 - Date: 2026-11-10
-- Decision: a backup or an export is written to `<name>.tmp` beside the chosen path, owner-only, flushed, and renamed over the path; the directory is then flushed, as for the vault's files (D013). A failure at any step removes the temporary file, so a file that was already there stays as it was, and the dialog says so. Until 0.2.0 the file was opened for writing in place, and a write that failed midway left neither the old file nor the new one. On Windows a rename that fails because another program holds the target open (`EPERM`, `EACCES`, `EBUSY`) is tried again for about a second and a half. A symbolic link is followed, not replaced
-- Limits: a folder where the user may change a file but not create one refuses the save; a save killed midway leaves the `.tmp` file, which the next save to that path replaces
+- Decision: a backup or an export is written to `<name>.<random>.tmp` beside the chosen path, a file that must not exist yet, owner-only, flushed, and renamed over the path; the directory is then flushed, as for the vault's files (D013). A failure at any step removes the temporary file, so a file that was already there stays as it was, and the dialog says so. Until 0.2.0 the file was opened for writing in place, and a write that failed midway left neither the old file nor the new one. On Windows a rename that fails because another program holds the target open (`EPERM`, `EACCES`, `EBUSY`) is tried again for about a second and a half. A symbolic link is followed, not replaced
+- Limits: a folder where the user may change a file but not create one refuses the save; a save killed midway leaves its `.tmp` file beside the path, and nothing removes it: a later save draws another name, since a fixed one could be a link someone left there to be written through
 - Alternatives: writing in place and keeping the old file as `.bak` (two files for the user to tell apart); a dependency such as `write-file-atomic` (the vault already has the same few lines)
 
 ## D041 A checksum in vault.json

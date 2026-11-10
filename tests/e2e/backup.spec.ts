@@ -1,4 +1,10 @@
-import { mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import {
+  copyFileSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+} from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { ElectronApplication, Page } from '@playwright/test'
 import { DEMO_PASSWORD } from '../../scripts/seed/demo'
@@ -72,21 +78,21 @@ ledgerTest(
       }),
     )
 
-    // Something in the way of the temporary file: the save cannot begin.
-    mkdirSync(`${path}.tmp`)
-    await saveTo(app, path)
+    // No temporary file fits beside a name this long: the save cannot begin.
+    const crowded = testInfo.outputPath(`${'k'.repeat(241)}.llbackup`)
+    copyFileSync(path, crowded)
+    await saveTo(app, crowded)
     const dialog = await openBackup(home)
     await dialog.getByLabel('Master password').fill(DEMO_PASSWORD)
     await dialog.getByRole('button', { name: 'Back Up…' }).click()
     await expect(dialog.getByRole('alert')).toHaveText(
       'The file could not be saved there. The file already there was not changed.',
     )
-    expect(readFileSync(path).equals(first)).toBe(true)
+    expect(readFileSync(crowded).equals(first)).toBe(true)
+    rmSync(crowded)
 
     // With nothing there, the message promises nothing.
-    const fresh = testInfo.outputPath('fresh.llbackup')
-    mkdirSync(`${fresh}.tmp`)
-    await saveTo(app, fresh)
+    await saveTo(app, crowded)
     await dialog.getByLabel('Master password').fill(DEMO_PASSWORD)
     await dialog.getByRole('button', { name: 'Back Up…' }).click()
     await expect(dialog.getByRole('alert')).toHaveText(
@@ -94,8 +100,6 @@ ledgerTest(
     )
 
     // Once it can be saved, the new backup replaces the old one whole.
-    rmSync(`${path}.tmp`, { recursive: true })
-    rmSync(`${fresh}.tmp`, { recursive: true })
     await saveTo(app, path)
     await dialog.getByLabel('Master password').fill(DEMO_PASSWORD)
     await dialog.getByRole('button', { name: 'Back Up…' }).click()

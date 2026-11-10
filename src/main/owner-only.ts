@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { open, realpath, rename, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
@@ -31,8 +32,10 @@ async function renameOver(from: string, to: string): Promise<void> {
  * Writes the file readable by the user only, as the vault is, and so that a
  * failure or a crash leaves a file that was already there as it was: the
  * bytes go to a temporary file beside it, which is flushed and renamed over
- * it, as the vault's own files are written. Throws when the file could not
- * be written; nothing of the attempt stays then.
+ * it, as the vault's own files are written. The temporary file has a random
+ * name and must be new, so nothing already there, a link least of all, is
+ * written to. Throws when the file could not be written; nothing of the
+ * attempt stays then.
  */
 export async function writeOwnerOnly(
   path: string,
@@ -40,10 +43,10 @@ export async function writeOwnerOnly(
 ): Promise<void> {
   // A link is followed, not replaced.
   const target = await realpath(path).catch(() => path)
-  const temporary = `${target}.tmp`
+  const temporary = `${target}.${randomBytes(6).toString('hex')}.tmp`
   let created = false
   try {
-    const file = await open(temporary, 'w', 0o600)
+    const file = await open(temporary, 'wx', 0o600)
     created = true
     try {
       if (process.platform !== 'win32') await file.chmod(0o600)

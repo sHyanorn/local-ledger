@@ -2,7 +2,6 @@
 // already there as it was.
 import {
   lstatSync,
-  mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
@@ -21,7 +20,16 @@ const faults = vi.hoisted(() => ({
   /** Error codes the next renames fail with, in order. */
   renames: [] as string[],
   renamed: 0,
+  /** What the next temporary name is drawn from, in place of random bytes. */
+  suffix: null as Buffer | null,
 }))
+vi.mock('node:crypto', async (original) => {
+  const real = await original<typeof import('node:crypto')>()
+  return {
+    ...real,
+    randomBytes: (size: number) => faults.suffix ?? real.randomBytes(size),
+  }
+})
 vi.mock('node:fs/promises', async (original) => {
   const real = await original<typeof import('node:fs/promises')>()
   const failing = (code: string) => Object.assign(new Error(code), { code })
@@ -59,6 +67,7 @@ beforeEach(() => {
   faults.failWrite = false
   faults.renames = []
   faults.renamed = 0
+  faults.suffix = null
 })
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -101,23 +110,36 @@ describe('writeOwnerOnly', () => {
     expect(writeFailure(path)).toBe('unwritable')
   })
 
-  it('writes over what an interrupted save left behind', async () => {
+  it.skipIf(process.platform === 'win32')(
+    'never writes through a link left where a temporary file would go',
+    async () => {
+      const other = join(dir, 'fake-other-file')
+      writeFileSync(other, OLD)
+      symlinkSync(other, `${path}.tmp`)
+      await writeOwnerOnly(path, NEW)
+      expect(readFileSync(other, 'utf8')).toBe(OLD)
+      expect(readFileSync(path)).toEqual(NEW)
+      expect(lstatSync(path).isSymbolicLink()).toBe(false)
+    },
+  )
+
+  it('fails, touching nothing, when its temporary name is taken', async () => {
+    faults.suffix = Buffer.from('fake01')
+    const taken = `${path}.${faults.suffix.toString('hex')}.tmp`
     writeFileSync(path, OLD)
-    writeFileSync(`${path}.tmp`, 'half of a fake backup')
-    await writeOwnerOnly(path, NEW)
-    expect(readFileSync(path)).toEqual(NEW)
-    expect(readdirSync(dir)).toEqual(['fake.llbackup'])
+    writeFileSync(taken, 'not this save’s file')
+    await expect(writeOwnerOnly(path, NEW)).rejects.toThrow('EEXIST')
+    expect(readFileSync(path, 'utf8')).toBe(OLD)
+    expect(readFileSync(taken, 'utf8')).toBe('not this save’s file')
   })
 
   it('fails, touching nothing, when the temporary file cannot be made', async () => {
+    // No longer name fits beside this one.
+    path = join(dir, 'f'.repeat(250))
     writeFileSync(path, OLD)
-    mkdirSync(`${path}.tmp`)
     await expect(writeOwnerOnly(path, NEW)).rejects.toThrow()
     expect(readFileSync(path, 'utf8')).toBe(OLD)
-    expect(readdirSync(dir).sort()).toEqual([
-      'fake.llbackup',
-      'fake.llbackup.tmp',
-    ])
+    expect(readdirSync(dir)).toEqual(['f'.repeat(250)])
   })
 
   it.skipIf(process.platform === 'win32')(
