@@ -13,7 +13,7 @@ import {
 } from './fixtures'
 
 // Every screen, in both colour schemes, against the WCAG 2.2 A and AA rules
-// axe-core can check by itself (D043).
+// axe-core can check by itself (D044).
 const AXE = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8')
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 
@@ -90,6 +90,16 @@ for (const scheme of ['light', 'dark'] as const) {
       // A selected account, with the pointer resting on it.
       await nav.getByRole('button', { name: /^Everyday/ }).click()
       await scan(home, 'account')
+      // Muted text on the hover colour: a balance in the sidebar, a date in
+      // the table.
+      await nav.getByRole('button', { name: /^Savings/ }).hover()
+      await scan(home, 'account, pointer on another account')
+      await home
+        .getByRole('table', { name: 'Transactions' })
+        .getByRole('row')
+        .nth(1)
+        .hover()
+      await scan(home, 'account, pointer on a transaction')
 
       for (const view of ['Overview', 'Budgets', 'Reports', 'Transfers']) {
         await nav.getByRole('button', { name: view }).first().click()

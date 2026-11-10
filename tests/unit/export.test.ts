@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { strFromU8, unzipSync } from 'fflate'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { csvField, startsLikeFormula } from '../../src/main/export/formula'
@@ -327,6 +329,26 @@ describe('statement', () => {
     const empty = statementPage(statement(db, '2027-03', 'AUD'))
     expect(empty).toContain('No transactions')
     expect(empty).toContain('No spending')
+  })
+})
+
+describe('report stylesheet', () => {
+  // The first value of each custom property: the light scheme in the page's
+  // stylesheet, the only one in the report's.
+  const colours = (file: string) => {
+    const css = readFileSync(resolve(__dirname, '../../src', file), 'utf8')
+    return (name: string) =>
+      new RegExp(`--${name}: (#[0-9a-f]{6});`).exec(css)?.[1]
+  }
+  const report = colours('main/export/report.css')
+  const page = colours('renderer/src/index.css')
+
+  it.each([
+    ['muted', '#636366'],
+    ['positive', '#1f7a36'],
+  ])('prints %s text in the colour the page uses', (name, colour) => {
+    expect(page(name)).toBe(colour)
+    expect(report(name)).toBe(colour)
   })
 })
 

@@ -2,10 +2,10 @@
 
 :root {
   --fg: #1d1d1f;
-  --muted: #6e6e73;
+  --muted: #636366;
   --line: #d2d2d7;
   --accent: #007aff;
-  --positive: #248a3d;
+  --positive: #1f7a36;
 }
 
 @page {
