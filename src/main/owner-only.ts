@@ -44,10 +44,9 @@ export async function writeOwnerOnly(
   // A link is followed, not replaced.
   const target = await realpath(path).catch(() => path)
   const temporary = `${target}.${randomBytes(6).toString('hex')}.tmp`
-  let created = false
+  // Outside the try: a name that was taken is not this save's file to remove.
+  const file = await open(temporary, 'wx', 0o600)
   try {
-    const file = await open(temporary, 'wx', 0o600)
-    created = true
     try {
       if (process.platform !== 'win32') await file.chmod(0o600)
       await file.writeFile(bytes)
@@ -57,7 +56,7 @@ export async function writeOwnerOnly(
     }
     await renameOver(temporary, target)
   } catch (error) {
-    if (created) await rm(temporary, { force: true }).catch(() => {})
+    await rm(temporary, { force: true }).catch(() => {})
     throw error
   }
   // The file is in place; a flush that fails does not undo it.

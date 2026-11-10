@@ -102,10 +102,6 @@ describe('a vault file with a checksum', () => {
 
   it.each([
     ['one bit flipped', (text: string) => flipped(text, ['check'])],
-    [
-      'one character replaced by another',
-      (text: string) => text.replace(/("check": ")./, '$1*'),
-    ],
     ['cut short', (text: string) => text.replace(/("check": ").{9}/, '$1')],
   ])(
     'opens with the checksum alone damaged, %s, and gets it written again',

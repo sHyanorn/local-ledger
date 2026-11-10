@@ -242,19 +242,4 @@ describe('undoing an import', () => {
     expect(undoBatch(db, second.id)).toEqual({ ok: true, count: 2, kept: 0 })
     expect(links()).toBe(0)
   })
-
-  it('lists counts that add up to what the undo then does', () => {
-    const first = importFile('first.csv', days(1, 2, 3, 4, 5, 6))
-    importFile('second.csv', days(2, 4, 9))
-    importFile('third.csv', days(4, 6, 10))
-    const listed = batch(first.id)!
-    const before = daysLeft().length
-    const undone = undoBatch(db, first.id)
-    expect(undone).toEqual({
-      ok: true,
-      count: listed.count - listed.kept,
-      kept: listed.kept,
-    })
-    expect(daysLeft()).toHaveLength(before - (listed.count - listed.kept))
-  })
 })

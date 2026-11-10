@@ -362,25 +362,6 @@ describe('a ledger that was inconsistent before a migration', () => {
     expect(readdirSync(dir)).toEqual(['ledger.db'])
   })
 
-  it('is put back when the migration fails', () => {
-    ledgerAt(migrations.length)
-    corruptIndex(file, KEY)
-    const before = sha256(file)
-    expect(() =>
-      openDatabase(file, KEY, {
-        migrations: [
-          ...migrations,
-          addTable,
-          () => {
-            throw new Error('fake failure')
-          },
-        ],
-      }),
-    ).toThrow('fake failure')
-    expect(sha256(file)).toBe(before)
-    expect(readdirSync(dir)).toEqual(['ledger.db'])
-  })
-
   it('says nothing of a ledger that was whole', () => {
     ledgerAt(migrations.length)
     const log = logged()

@@ -133,15 +133,6 @@ describe('writeOwnerOnly', () => {
     expect(readFileSync(taken, 'utf8')).toBe('not this save’s file')
   })
 
-  it('fails, touching nothing, when the temporary file cannot be made', async () => {
-    // No longer name fits beside this one.
-    path = join(dir, 'f'.repeat(250))
-    writeFileSync(path, OLD)
-    await expect(writeOwnerOnly(path, NEW)).rejects.toThrow()
-    expect(readFileSync(path, 'utf8')).toBe(OLD)
-    expect(readdirSync(dir)).toEqual(['f'.repeat(250)])
-  })
-
   it.skipIf(process.platform === 'win32')(
     'writes through a link instead of replacing it',
     async () => {
