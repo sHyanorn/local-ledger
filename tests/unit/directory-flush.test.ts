@@ -70,8 +70,9 @@ const handles = (name: string) =>
 it.skipIf(process.platform === 'win32')(
   'unflushed commit: the new password works, and the old generation stays until a flush succeeds',
   async () => {
+    // Every directory flush fails from here until the test lets them work.
     const vault = vaultFailingAt('temporary file written', () => {
-      failing.flushes = 3
+      failing.flushes = Infinity
     })
     await vault.create(OLD)
     expect(await vault.changePassword(OLD, NEW)).toEqual({ ok: true })
@@ -86,13 +87,14 @@ it.skipIf(process.platform === 'win32')(
       ok: false,
       reason: 'wrong-password',
     })
-    // The third failing flush, at this unlock: still nothing is deleted.
+    // A flush still fails at this unlock: still nothing is deleted.
     expect(await vault.unlock(NEW)).toEqual({ ok: true })
     expect(files(vault.dir)).toEqual([
       'ledger-1.db',
       'ledger-2.db',
       'vault.json',
     ])
+    failing.flushes = 0
     vault.lock()
     expect(await vault.unlock(NEW)).toEqual({ ok: true })
     expect(files(vault.dir)).toEqual(['ledger-2.db', 'vault.json'])

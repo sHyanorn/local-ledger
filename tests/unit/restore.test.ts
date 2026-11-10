@@ -15,6 +15,7 @@ import { openDatabase } from '../../src/main/vault/database'
 import { openBackupKey, readBackup } from '../../src/main/vault/backup'
 import { deriveHere, encodePassword } from '../../src/main/vault/kdf'
 import { openKey } from '../../src/main/vault/keys'
+import { migrations } from '../../src/main/vault/migrations'
 import { REPLACED_PREFIX } from '../../src/main/vault/layout'
 import type { StagedBackup } from '../../src/main/vault/stage-backup'
 import { parseVaultFile } from '../../src/main/vault/vault-file'
@@ -112,7 +113,7 @@ describe('checking a backup', () => {
     // A backup from a later version of the app.
     vault.database().pragma('user_version = 99')
     const made = await vault.backup(NOW)
-    vault.database().pragma('user_version = 8')
+    vault.database().pragma(`user_version = ${migrations.length}`)
     if (!made.ok) throw new Error(made.reason)
     expect(await vault.checkBackup(made.file, NOW)).toEqual({
       ok: false,
