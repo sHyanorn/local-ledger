@@ -9,12 +9,8 @@ import { readChosen } from '../import/read-file'
 import type { Handle } from '../ipc'
 import { writeFailure, writeOwnerOnly } from '../owner-only'
 import { readBackup } from '../vault/backup'
-import {
-  LockedError,
-  signalUntilChange,
-  type StagedBackup,
-  type Vault,
-} from '../vault/vault'
+import type { StagedBackup } from '../vault/stage-backup'
+import { LockedError, signalUntilChange, type Vault } from '../vault/vault'
 
 export const BACKUP_EXTENSION = 'llbackup'
 /** Larger than any ledger this app is made for. */

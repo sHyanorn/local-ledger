@@ -6,7 +6,12 @@ import { dirname } from 'node:path'
 import Database from 'better-sqlite3-multiple-ciphers'
 import { errorCode } from '../error-code'
 import { flushDirectory, syncFile } from './files'
-import { brokenReferences, migrate, migrations } from './migrations'
+import {
+  brokenReferences,
+  migrate,
+  migrations,
+  NewerSchemaError,
+} from './migrations'
 import type { Migration } from './migrations'
 
 export type Db = Database.Database
@@ -17,6 +22,13 @@ export class DamagedError extends Error {
     super('the database does not open with this key or is damaged')
     this.name = 'DamagedError'
   }
+}
+
+/** Why a database did not open, when it is damaged or newer than this app. */
+export function openFailure(error: unknown): 'newer' | 'damaged' | null {
+  if (error instanceof NewerSchemaError) return 'newer'
+  if (error instanceof DamagedError) return 'damaged'
+  return null
 }
 
 /** Added to a database's name for the copy kept while its schema is migrated. */

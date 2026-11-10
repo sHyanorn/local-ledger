@@ -8,7 +8,8 @@ import { join } from 'node:path'
 import Database from 'better-sqlite3-multiple-ciphers'
 import { app } from 'electron'
 import type { WebContents } from 'electron'
-import { databaseName, Vault } from './vault/vault'
+import { databaseName } from './vault/layout'
+import { Vault } from './vault/vault'
 
 export const SELF_TEST_SWITCH = 'self-test'
 

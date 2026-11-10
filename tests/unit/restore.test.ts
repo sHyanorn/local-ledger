@@ -15,12 +15,10 @@ import { openDatabase } from '../../src/main/vault/database'
 import { openBackupKey, readBackup } from '../../src/main/vault/backup'
 import { deriveHere, encodePassword } from '../../src/main/vault/kdf'
 import { openKey } from '../../src/main/vault/keys'
+import { REPLACED_PREFIX } from '../../src/main/vault/layout'
+import type { StagedBackup } from '../../src/main/vault/stage-backup'
 import { parseVaultFile } from '../../src/main/vault/vault-file'
-import {
-  REPLACED_PREFIX,
-  Vault,
-  type StagedBackup,
-} from '../../src/main/vault/vault'
+import { Vault } from '../../src/main/vault/vault'
 import { corruptVaultIndex } from '../support/corrupt'
 import { FAST } from '../support/vault'
 
