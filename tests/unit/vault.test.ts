@@ -83,7 +83,7 @@ describe('create', () => {
     expect(await vault.unlock(PASSWORD)).toEqual({ ok: true })
   })
 
-  it('leaves no vault when interrupted before the final rename', async () => {
+  it('leaves no vault in place when it fails before the final rename', async () => {
     const crashing = new Vault(root, {
       derive: deriveHere,
       kdf: FAST,

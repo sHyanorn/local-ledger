@@ -1,7 +1,7 @@
 // The vault: vault.json and the current database generation, in one
 // directory under the user data directory. Holds the open database while
 // unlocked. Operations run one at a time; a lock takes effect at once and
-// cancels the operations already called.
+// cancels the operations already called, except a backup check (D034).
 import {
   copyFileSync,
   existsSync,
@@ -221,8 +221,9 @@ export class Vault {
 
   /**
    * Closes the database now, without waiting for queued operations, and
-   * cancels those already called: each stops at its next step. Returns
-   * whether anything was open or waiting, in which case listeners were told.
+   * cancels those already called: each stops at its next step. A backup
+   * check runs on, and its caller drops what it staged. Returns whether
+   * anything was open or waiting, in which case listeners were told.
    */
   lock(): boolean {
     this.#locks++
