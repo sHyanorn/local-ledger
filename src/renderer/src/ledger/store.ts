@@ -37,7 +37,10 @@ interface LedgerStore {
   request: { command: 'new-transaction' | 'find'; id: number } | null
   ask(command: 'new-transaction' | 'find'): void
   done(): void
-  /** Reloads accounts and categories after a change. */
+  /** Whether the last reload failed, leaving what was loaded before. */
+  reloadFailed: boolean
+  setReloadFailed(failed: boolean): void
+  /** Reloads accounts and categories after a change; never fails. */
   refresh(): Promise<void>
 }
 
@@ -61,19 +64,28 @@ export const useLedger = create<LedgerStore>((set, get) => ({
       request: { command, id: (request?.id ?? 0) + 1 },
     })),
   done: () => set({ request: null }),
+  reloadFailed: false,
+  setReloadFailed: (reloadFailed) => set({ reloadFailed }),
   refresh: async () => {
     // Answers can arrive out of order; only the latest request's counts.
     const ticket = ++refreshes
     const month = monthOf()
-    const [accounts, categories, transfersToReview, budgets, settings] =
-      await Promise.all([
+    let answers
+    try {
+      answers = await Promise.all([
         window.ledger.accounts.list(),
         window.ledger.categories.list(),
         window.ledger.transfers.count(),
         window.ledger.budgets.month(month),
         window.ledger.settings.get(),
       ])
+    } catch {
+      // The change itself was made; only the figures shown are behind.
+      if (ticket === refreshes) set({ reloadFailed: true })
+      return
+    }
     if (ticket !== refreshes) return
+    const [accounts, categories, transfersToReview, budgets, settings] = answers
     const { view, overBudget: before } = get()
     const over = budgets.categories.filter(
       (budget) => budgetState(budget) === 'over',
@@ -94,6 +106,7 @@ export const useLedger = create<LedgerStore>((set, get) => ({
       view.accountId !== null &&
       !accounts.some((account) => account.id === view.accountId)
     set({
+      reloadFailed: false,
       accounts,
       categories,
       transfersToReview,

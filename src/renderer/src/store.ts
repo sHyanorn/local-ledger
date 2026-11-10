@@ -10,7 +10,8 @@ type Reason<C extends 'vault:create' | 'vault:unlock'> = Extract<
 type Notice = Reason<'vault:create'> | Reason<'vault:unlock'> | 'failed' | null
 
 interface VaultStore {
-  state: VaultState | 'loading'
+  /** 'unreadable' when the main process could not say which state it is in. */
+  state: VaultState | 'loading' | 'unreadable'
   busy: boolean
   notice: Notice
   load(): Promise<void>
@@ -27,7 +28,13 @@ export const useVault = create<VaultStore>((set) => ({
   state: 'loading',
   busy: false,
   notice: null,
-  load: async () => set({ state: await window.ledger.vault.status() }),
+  load: async () => {
+    try {
+      set({ state: await window.ledger.vault.status() })
+    } catch {
+      set({ state: 'unreadable' })
+    }
+  },
   create: async (password) => {
     set({ busy: true, notice: null })
     try {

@@ -7,6 +7,7 @@ import type { SeedLedger } from '../../scripts/seed/generate'
 import { insertLedger } from '../../scripts/seed/insert'
 import { deriveHere } from '../../src/main/vault/kdf'
 import { Vault } from '../../src/main/vault/vault'
+import type { Channel } from '../../src/shared/ipc'
 import { FAST, PASSWORD } from '../support/vault'
 
 export { expect } from '@playwright/test'
@@ -47,6 +48,28 @@ export function rendererPid(app: ElectronApplication): Promise<number> {
     return page.getOSProcessId()
   })
 }
+
+/** The page's next call on this channel fails, as one the main process cannot answer. */
+export const failNext = (app: ElectronApplication, channel: Channel) =>
+  app.evaluate(({ webContents }, channel) => {
+    const page = webContents
+      .getAllWebContents()
+      .find((contents) => contents.getURL().startsWith('app://'))
+    if (!page) throw new Error('no app page')
+    page.ipc.handleOnce(channel, () => {
+      throw new Error('failed')
+    })
+  }, channel)
+
+/** The first call on this channel from the next page the app opens fails. */
+export const failOnNextPage = (app: ElectronApplication, channel: Channel) =>
+  app.evaluate(({ app }, channel) => {
+    app.once('web-contents-created', (_event, contents) => {
+      contents.ipc.handleOnce(channel, () => {
+        throw new Error('failed')
+      })
+    })
+  }, channel)
 
 /** Resolves once the process is gone, or fails after a few seconds. */
 export async function expectExited(pid: number): Promise<void> {

@@ -19,6 +19,8 @@ export function Ledger() {
   const setNotice = useLedger((store) => store.setNotice)
   const budgetNotice = useLedger((store) => store.budgetNotice)
   const setBudgetNotice = useLedger((store) => store.setBudgetNotice)
+  const reloadFailed = useLedger((store) => store.reloadFailed)
+  const setReloadFailed = useLedger((store) => store.setReloadFailed)
   const [dragging, setDragging] = useState(false)
   // Enter and leave fire for every child; count them to know when it left.
   const depth = useRef(0)
@@ -139,6 +141,15 @@ export function Ledger() {
                 : null
             }
             onDismiss={() => setPasswordChanged(false)}
+          />
+          <NoticeBar
+            label="Reload notice"
+            message={
+              reloadFailed
+                ? 'The ledger could not be reloaded. Some figures may be out of date.'
+                : null
+            }
+            onDismiss={() => setReloadFailed(false)}
           />
           <NoticeBar
             label="Budget notice"

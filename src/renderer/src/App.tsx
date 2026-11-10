@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { ErrorText } from './components/ErrorText'
 import { Damaged } from './screens/Damaged'
 import { Ledger } from './ledger/Ledger'
 import { Setup } from './screens/Setup'
@@ -24,5 +25,14 @@ export function App() {
       return <Ledger />
     case 'damaged':
       return <Damaged />
+    case 'unreadable':
+      return (
+        <main className="gate">
+          <section className="panel">
+            <h1>Local Ledger</h1>
+            <ErrorText message="The vault could not be read. Quit Local Ledger and open it again." />
+          </section>
+        </main>
+      )
   }
 }
