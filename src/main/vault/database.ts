@@ -94,10 +94,10 @@ function isLedger(db: Db): boolean {
  * reference whole. If anything fails, the copy is put back, so the file is
  * what it was, and the error is thrown.
  *
- * A ledger that failed those checks before the migration opened all the
- * same, on quick_check, and must go on opening: it is migrated as it is,
- * and held only to quick_check and to no more broken references than it
- * came with.
+ * A ledger that failed either check before the migration opened all the
+ * same, on quick_check, and must go on opening: it is migrated as it is.
+ * One that failed integrity_check is then held only to quick_check, and
+ * one with broken references to no more of them than it came with.
  */
 function migrateKeepingCopy(
   db: Db,
@@ -109,15 +109,15 @@ function migrateKeepingCopy(
   // No transaction is open and the journal is gone, so the file is the
   // whole database, still encrypted.
   const broken = brokenReferences(db)
-  const whole = broken === 0 && passesIntegrityCheck(db)
-  if (!whole)
+  const sound = passesIntegrityCheck(db)
+  if (broken > 0 || !sound)
     console.error('the database was inconsistent before its migration')
   const copy = `${file}${BEFORE_MIGRATION}`
   copyFileSync(file, copy)
   syncFile(copy)
   try {
     migrate(db, list)
-    const passes = whole ? passesIntegrityCheck(db) : passesQuickCheck(db)
+    const passes = sound ? passesIntegrityCheck(db) : passesQuickCheck(db)
     if (!passes || brokenReferences(db) > broken)
       throw new Error('the migrated database failed its checks')
   } catch (error) {

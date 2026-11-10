@@ -327,6 +327,41 @@ describe('a ledger that was inconsistent before a migration', () => {
     expect(readdirSync(dir)).toEqual(['ledger.db'])
   })
 
+  it('that passed integrity_check is put back when the migration breaks an index', () => {
+    ledgerAt(migrations.length)
+    breakReferences(file, KEY)
+    const before = sha256(file)
+    logged()
+    // An index dropped from the schema while its rows change, as
+    // corruptIndex does, here by the migration itself.
+    const breakIndex: Migration = (db) => {
+      db.unsafeMode(true)
+      db.pragma('writable_schema = ON')
+      db.exec(
+        'CREATE TABLE fake (n INTEGER); CREATE INDEX fake_n ON fake (n); INSERT INTO fake VALUES (1), (2), (3)',
+      )
+      const index = db
+        .prepare(
+          "SELECT rootpage, sql FROM sqlite_schema WHERE name = 'fake_n'",
+        )
+        .get()
+      db.prepare("DELETE FROM sqlite_schema WHERE name = 'fake_n'").run()
+      db.pragma('writable_schema = RESET')
+      db.pragma('writable_schema = ON')
+      db.exec('UPDATE fake SET n = n + 10')
+      db.prepare(
+        "INSERT INTO sqlite_schema VALUES ('index', 'fake_n', 'fake', @rootpage, @sql)",
+      ).run(index)
+      db.pragma('writable_schema = RESET')
+      db.unsafeMode(false)
+    }
+    expect(() =>
+      openDatabase(file, KEY, { migrations: [...migrations, breakIndex] }),
+    ).toThrow('failed its checks')
+    expect(sha256(file)).toBe(before)
+    expect(readdirSync(dir)).toEqual(['ledger.db'])
+  })
+
   it('is put back when the migration fails', () => {
     ledgerAt(migrations.length)
     corruptIndex(file, KEY)
