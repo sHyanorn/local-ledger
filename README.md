@@ -20,7 +20,7 @@ The screenshots show made-up data from `npm run seed`.
 - **Categories and rules.** Rules categorize imported rows by their description. Transfers between your own accounts are paired and left out of income and spending.
 - **Budgets and reports.** A monthly budget per category in your home currency, twelve months of income and spending, spending by category, and a category's trend.
 - **Exports.** A month's statement as an Excel workbook or a PDF. **Exported files are not encrypted.**
-- **Backups.** An encrypted `.llbackup` file of the whole vault, which opens only with the master password it was made under. Restoring one keeps the replaced vault beside it, and a vault that no longer opens can be replaced from a backup.
+- **Backups.** An encrypted `.llbackup` file of the whole vault, which opens only with the master password it was made under. Restoring one keeps the replaced vault beside it. A locked vault, or one that no longer opens, can be replaced from a backup with the backup's password.
 
 ## Install
 

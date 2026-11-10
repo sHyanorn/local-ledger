@@ -1,5 +1,5 @@
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { dirname, join } from 'node:path'
 import type { ElectronApplication, Page } from '@playwright/test'
 import { DEMO_PASSWORD } from '../../scripts/seed/demo'
 import {
@@ -268,5 +268,40 @@ ledgerTest(
     } finally {
       await fresh.close()
     }
+  },
+)
+
+ledgerTest(
+  'restoring from the locked page moves the vault aside and uses the backup password',
+  async ({ app, home, userData }, testInfo) => {
+    const path = testInfo.outputPath('locked.llbackup')
+    await makeBackup(app, home, path)
+    const locked = await lockScreen(app)
+    await chooseFile(app, path)
+    await locked.getByRole('button', { name: 'Restore from Backup…' }).click()
+    const dialog = locked.getByRole('dialog', { name: 'Restore from Backup' })
+    await dialog.getByRole('button', { name: 'Choose Backup…' }).click()
+    await dialog.getByLabel('Backup password').fill(DEMO_PASSWORD)
+    await dialog.getByRole('button', { name: 'Open Backup' }).click()
+    await expect(dialog).toContainText(
+      'moved to a folder named vault-before-restore beside it, and not deleted',
+    )
+    await expect(dialog).toContainText(
+      "opens with the backup's master password",
+    )
+    await expect(dialog.getByLabel('Current master password')).toHaveCount(0)
+    const restored = await replacedBy(app, () =>
+      dialog.getByRole('button', { name: 'Restore' }).click(),
+    )
+    await expect(sidebar(restored)).toBeVisible()
+    const aside = readdirSync(userData).filter((name) =>
+      name.startsWith('vault-before-restore-'),
+    )
+    expect(aside).toHaveLength(1)
+    expect(readdirSync(join(userData, aside[0]!)).sort()).toEqual([
+      'ledger-1.db',
+      'vault.json',
+    ])
+    await unlock(app, await lockScreen(app))
   },
 )

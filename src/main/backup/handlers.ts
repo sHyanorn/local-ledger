@@ -33,12 +33,6 @@ export function handleBackup(
     chosen = null
   }
   vault.onChange(() => forget())
-  /** A restore runs from setup, from a vault that does not open, or from an open one. */
-  const restoring = () => {
-    const now = vault.state
-    if (now === 'locked') throw new LockedError()
-    return now
-  }
   /** While a restore runs, the backup it uses stays where it is. */
   let committing = false
   const idle = () => {
@@ -71,7 +65,6 @@ export function handleBackup(
   })
 
   handle('restore:open', async () => {
-    restoring()
     idle()
     const signal = currentSignal()
     const picked = await showOpen(window(), {
@@ -96,7 +89,6 @@ export function handleBackup(
     return { ok: true, name } as const
   })
   handle('restore:check', async ({ password }) => {
-    restoring()
     idle()
     const signal = currentSignal()
     const pending = chosen
@@ -113,12 +105,11 @@ export function handleBackup(
     return { ok: true, summary: checked.staged.summary } as const
   })
   handle('restore:commit', async ({ currentPassword }) => {
-    const now = restoring()
     idle()
     const staged = chosen?.staged
     if (!staged) return { ok: false, reason: 'not-checked' } as const
     // From an open vault the current password is needed; otherwise none.
-    if ((now === 'unlocked') !== (currentPassword !== null))
+    if (vault.unlocked !== (currentPassword !== null))
       return { ok: false, reason: 'exists' } as const
     committing = true
     let result: Awaited<ReturnType<Vault['restore']>>
@@ -133,7 +124,6 @@ export function handleBackup(
     return { ok: false, reason: result.reason }
   })
   handle('restore:discard', () => {
-    restoring()
     if (!committing) forget()
   })
   return { forget }

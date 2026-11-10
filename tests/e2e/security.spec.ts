@@ -478,10 +478,6 @@ ledgerTest(
         () => window.ledger.export.save('2026-05', 'AUD', 'pdf'),
         () => window.ledger.settings.get(),
         () => window.ledger.backup.save('fake password'),
-        () => window.ledger.restore.open(),
-        () => window.ledger.restore.check('fake password'),
-        () => window.ledger.restore.commit('fake password'),
-        () => window.ledger.restore.discard(),
         () => window.ledger.settings.update({ idleLockMinutes: 1 }),
       ]
       return Promise.all(
@@ -493,7 +489,7 @@ ledgerTest(
         ),
       )
     })
-    expect(results).toHaveLength(39)
+    expect(results).toHaveLength(35)
     for (const result of results) expect(result).toMatch(/Error: locked$/)
   },
 )

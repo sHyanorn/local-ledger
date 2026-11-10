@@ -30,14 +30,17 @@ const COMMIT_PROBLEMS = {
 /**
  * Restores a backup: choose the file, open it with its password, then
  * confirm. From Settings (`replacing`) the current password is asked for
- * and kept; at setup the backup's password becomes the vault's. On success
- * the main process shows the restored vault in a new page.
+ * and kept; otherwise the backup's password becomes the vault's, also from
+ * the locked page (`locked`), where the vault moved aside is not opened. On
+ * success the main process shows the restored vault in a new page.
  */
 export function RestoreDialog({
   replacing,
+  locked = false,
   onClose,
 }: {
   replacing: boolean
+  locked?: boolean
   onClose: () => void
 }) {
   const [name, setName] = useState<string | null>(null)
@@ -167,6 +170,12 @@ export function RestoreDialog({
               beside it, and not deleted. The restored vault keeps your current
               master password.
             </p>
+          ) : locked ? (
+            <p className="consequence">
+              The current vault is moved to a folder named vault-before-restore
+              beside it, and not deleted. The restored vault opens with the
+              backup&apos;s master password.
+            </p>
           ) : (
             <p className="consequence">
               The restored vault opens with the backup&apos;s master password.
@@ -198,7 +207,7 @@ export function RestoreDialog({
             </button>
             <button
               type="submit"
-              className={replacing ? 'danger' : undefined}
+              className={replacing || locked ? 'danger' : undefined}
               disabled={working || (replacing && !current)}
             >
               {working ? 'Restoring…' : 'Restore'}

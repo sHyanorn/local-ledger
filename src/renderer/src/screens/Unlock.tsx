@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useVault } from '../store'
 import { ErrorText } from '../components/ErrorText'
+import { RestoreDialog } from './RestoreDialog'
 
 const MESSAGES: Record<string, string> = {
   'wrong-password': 'Wrong password.',
@@ -14,6 +15,7 @@ export function Unlock() {
   const busy = useVault((store) => store.busy)
   const notice = useVault((store) => store.notice)
   const [password, setPassword] = useState('')
+  const [restoring, setRestoring] = useState(false)
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -39,7 +41,22 @@ export function Unlock() {
         <button type="submit" disabled={busy || !password}>
           {busy ? 'Unlocking…' : 'Unlock'}
         </button>
+        <button
+          type="button"
+          className="link"
+          onClick={() => setRestoring(true)}
+          disabled={busy}
+        >
+          Restore from Backup…
+        </button>
       </form>
+      {restoring && (
+        <RestoreDialog
+          replacing={false}
+          locked
+          onClose={() => setRestoring(false)}
+        />
+      )}
     </main>
   )
 }

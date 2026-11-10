@@ -43,6 +43,7 @@ import type { NewKey } from './keys'
 import { NewerSchemaError } from './migrations'
 import {
   associatedData,
+  lacksChecksum,
   parseVaultFile,
   serializeVaultFile,
   VAULT_FILE,
@@ -224,7 +225,9 @@ export class Vault {
       if (!dataKey) return { ok: false, reason: 'wrong-password' }
       try {
         if (cancelled()) return { ok: false, reason: 'locked' }
-        return this.#openWithKey(file, dataKey)
+        const opened = this.#openWithKey(file, dataKey)
+        if (opened.ok) this.#addChecksum(file)
+        return opened
       } finally {
         dataKey.fill(0)
       }
@@ -422,7 +425,7 @@ export class Vault {
   /**
    * Puts a staged backup in place of the vault. With the current password,
    * from an open vault, the data key is sealed under that password, so it
-   * stays the one to use; without one, only when there is no vault, under
+   * stays the one to use; without one, only while no vault is open, under
    * the backup's. The vault it replaces is renamed, never deleted. A crash
    * before that rename leaves the old vault; after it, startup finishes the
    * restore from the staged vault.
@@ -443,9 +446,8 @@ export class Vault {
       try {
         let file = staged.file
         if (currentPassword === null) {
-          // Only with no vault, or one that does not open, as at setup.
-          if (existsSync(this.dir) && this.state !== 'damaged')
-            return { ok: false, reason: 'exists' }
+          // An open vault is replaced only with its password.
+          if (this.#db) return { ok: false, reason: 'exists' }
         } else {
           if (!this.#db) return { ok: false, reason: 'locked' }
           current = this.#readFile()
@@ -642,6 +644,20 @@ export class Vault {
       return parseVaultFile(readFileSync(join(this.dir, VAULT_FILE), 'utf8'))
     } catch {
       return null
+    }
+  }
+
+  /**
+   * Rewrites a vault.json from before the checksum existed, now that its
+   * key has opened the database. The vault is open either way.
+   */
+  #addChecksum(file: VaultFile): void {
+    const path = join(this.dir, VAULT_FILE)
+    try {
+      if (!lacksChecksum(readFileSync(path, 'utf8'))) return
+      writeFileAtomic(path, serializeVaultFile(file), this.checkpoint)
+    } catch (error) {
+      console.error(`adding the vault checksum failed: ${errorCode(error)}`)
     }
   }
 

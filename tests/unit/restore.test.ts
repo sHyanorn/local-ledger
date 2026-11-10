@@ -158,12 +158,17 @@ describe('restoring from Settings', () => {
   })
 })
 
-describe('restoring at setup', () => {
-  it('uses the backup password, and only where there is no vault', async () => {
+describe('restoring with the backup password', () => {
+  it('needs no vault open: an open one is replaced only with its password', async () => {
     expect(await vault.restore(await check(vault), null)).toEqual({
       ok: false,
       reason: 'exists',
     })
+    expect(names(vault)).toEqual(['Fake Added Later', 'Fake Backed Up'])
+    expect(replaced(root)).toEqual([])
+  })
+
+  it('makes the vault where there is none', async () => {
     const fresh = open(newRoot())
     expect(fresh.state).toBe('new')
     expect(await fresh.restore(await check(fresh), null)).toEqual({ ok: true })
@@ -171,6 +176,35 @@ describe('restoring at setup', () => {
     fresh.lock()
     expect(await fresh.unlock(OLD)).toEqual({ ok: true })
     fresh.lock()
+  })
+
+  it('replaces a locked vault, which is moved aside and still opens with its password', async () => {
+    vault.lock()
+    expect(vault.state).toBe('locked')
+    const states: string[] = []
+    vault.onChange((state) => states.push(state))
+    expect(await vault.restore(await check(vault), null)).toEqual({ ok: true })
+    expect(states).toEqual(['unlocked'])
+    expect(names(vault)).toEqual(['Fake Backed Up'])
+    vault.lock()
+    expect(await vault.unlock(NOW)).toEqual({
+      ok: false,
+      reason: 'wrong-password',
+    })
+    expect(await vault.unlock(OLD)).toEqual({ ok: true })
+    vault.lock()
+
+    const [aside] = replaced(root)
+    expect(replaced(root)).toHaveLength(1)
+    const old = open(newRoot())
+    cpSync(join(root, aside!), old.dir, { recursive: true })
+    expect(await old.unlock(OLD)).toEqual({
+      ok: false,
+      reason: 'wrong-password',
+    })
+    expect(await old.unlock(NOW)).toEqual({ ok: true })
+    expect(names(old)).toEqual(['Fake Added Later', 'Fake Backed Up'])
+    old.lock()
   })
 })
 

@@ -1,6 +1,7 @@
 // vault.json: the plaintext record of how to derive the key from the master
 // password, and the data key sealed under it. The database is encrypted with
 // the data key; the file names which database generation is current.
+import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { KDF_BOUNDS, SALT_BYTES } from './kdf'
 import type { KdfParams } from './kdf'
@@ -51,6 +52,7 @@ const schema = z.strictObject({
   generation: z.int().min(1).max(Number.MAX_SAFE_INTEGER),
   kdf: kdfSchema,
   key: sealedSchema,
+  check: base64Bytes(32).optional(),
 })
 
 /**
@@ -74,8 +76,20 @@ export function associatedData({
   )
 }
 
-/** The parsed file, or null when it is not a valid vault file. */
-export function parseVaultFile(text: string): VaultFile | null {
+/**
+ * SHA-256 over everything else the file holds. It tells a damaged file from
+ * a wrong password; it is not keyed, so it proves nothing about who wrote
+ * the file. Files written before it existed have none.
+ */
+function checksum(file: VaultFile): Buffer {
+  return createHash('sha256')
+    .update(associatedData(file))
+    .update(file.key.nonce)
+    .update(file.key.sealed)
+    .digest()
+}
+
+function read(text: string): { file: VaultFile; checked: boolean } | null {
   let json: unknown
   try {
     json = JSON.parse(text)
@@ -84,8 +98,23 @@ export function parseVaultFile(text: string): VaultFile | null {
   }
   const parsed = schema.safeParse(json)
   if (!parsed.success) return null
-  const { generation, kdf, key } = parsed.data
-  return { generation, kdf, key }
+  const { generation, kdf, key, check } = parsed.data
+  const file = { generation, kdf, key }
+  if (check && !check.equals(checksum(file))) return null
+  return { file, checked: check !== undefined }
+}
+
+/**
+ * The parsed file, or null when it is not a valid vault file or does not
+ * match its checksum.
+ */
+export function parseVaultFile(text: string): VaultFile | null {
+  return read(text)?.file ?? null
+}
+
+/** True for a valid file written before the checksum existed. */
+export function lacksChecksum(text: string): boolean {
+  return read(text)?.checked === false
 }
 
 export function serializeVaultFile({
@@ -108,6 +137,7 @@ export function serializeVaultFile({
         nonce: key.nonce.toString('base64'),
         sealed: key.sealed.toString('base64'),
       },
+      check: checksum({ generation, kdf, key }).toString('base64'),
     },
     null,
     2,

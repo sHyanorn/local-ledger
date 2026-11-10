@@ -100,6 +100,7 @@ describe('on disk', () => {
     const text = readFileSync(join(vault.dir, 'vault.json'), 'utf8')
     for (const marker of MARKERS) expect(text).not.toContain(marker)
     expect(Object.keys(JSON.parse(text)).sort()).toEqual([
+      'check',
       'generation',
       'kdf',
       'key',
