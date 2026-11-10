@@ -21,6 +21,7 @@ import {
   Vault,
   type StagedBackup,
 } from '../../src/main/vault/vault'
+import { corruptVaultIndex } from '../support/corrupt'
 import { FAST } from '../support/vault'
 
 const OLD = 'fake passphrase when backed up'
@@ -75,6 +76,19 @@ const replaced = (dir: string) =>
   readdirSync(dir).filter((name) => name.startsWith(REPLACED_PREFIX))
 
 describe('checking a backup', () => {
+  it('accepts the backup of a vault that opens with an old inconsistency', async () => {
+    vault.lock()
+    await corruptVaultIndex(vault, NOW)
+    expect(await vault.unlock(NOW)).toEqual({ ok: true })
+    const made = await vault.backup(NOW)
+    if (!made.ok) throw new Error(made.reason)
+    const checked = await vault.checkBackup(made.file, NOW)
+    if (!checked.ok) throw new Error(checked.reason)
+    expect(checked.staged.summary.accounts).toBe(2)
+    expect(await vault.restore(checked.staged, NOW)).toEqual({ ok: true })
+    expect(names(vault)).toEqual(['Fake Added Later', 'Fake Backed Up'])
+  })
+
   it('says what it holds, and changes nothing', async () => {
     const staged = await check(vault)
     expect(staged.summary).toEqual({

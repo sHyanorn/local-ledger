@@ -24,6 +24,7 @@ import {
   DamagedError,
   openDatabase,
   passesIntegrityCheck,
+  passesQuickCheck,
 } from './database'
 import type { Db } from './database'
 import {
@@ -328,9 +329,11 @@ export class Vault {
 
   /**
    * Checks a backup file with its password and stages its database in a
-   * directory of its own: the key opens, the database opens and passes
-   * integrity_check, and its schema is not newer than this app's. Nothing
-   * of the vault changes. The caller discards the result or restores it.
+   * directory of its own: the key opens, the database opens as a vault's
+   * does, its schema is not newer than this app's, and under its new key it
+   * passes integrity_check, or quick_check if it came failing the first, so
+   * a vault that opens makes a backup that restores. Nothing of the vault
+   * changes. The caller discards the result or restores it.
    */
   checkBackup(
     bytes: Buffer,
@@ -366,10 +369,9 @@ export class Vault {
         try {
           const db = openDatabase(path, dataKey)
           try {
-            if (!passesIntegrityCheck(db))
-              return { ok: false, reason: 'damaged' }
+            const whole = passesIntegrityCheck(db)
             changeKey(db, fresh)
-            if (!passesIntegrityCheck(db))
+            if (!(whole ? passesIntegrityCheck(db) : passesQuickCheck(db)))
               return { ok: false, reason: 'damaged' }
             summary = db
               .prepare(

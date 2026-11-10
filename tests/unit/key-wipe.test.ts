@@ -187,26 +187,20 @@ it('after a create whose sealing failed', async () => {
   expectAllWiped(2)
 })
 
-it.each([
-  ['before', [false], 4],
-  ['after', [true, false], 5],
-] as const)(
-  'after a backup check whose integrity check failed %s the rekey',
-  async (_, results, count) => {
-    const vault = new Vault(root, { derive, kdf: FAST })
-    await vault.create(OLD)
-    const made = await vault.backup(OLD)
-    if (!made.ok) throw new Error(made.reason)
-    vault.lock()
-    seen.keys = []
-    seen.randomKeys = true
-    seen.integrity = [...results]
-    expect(await vault.checkBackup(made.file, OLD)).toEqual({
-      ok: false,
-      reason: 'damaged',
-    })
-    // The sealing key, the backup's data key, the literal that opened its
-    // copy and the fresh key, with the rekey literal once it was used.
-    expectAllWiped(count)
-  },
-)
+it('after a backup check whose integrity check failed once the copy was rekeyed', async () => {
+  const vault = new Vault(root, { derive, kdf: FAST })
+  await vault.create(OLD)
+  const made = await vault.backup(OLD)
+  if (!made.ok) throw new Error(made.reason)
+  vault.lock()
+  seen.keys = []
+  seen.randomKeys = true
+  seen.integrity = [true, false]
+  expect(await vault.checkBackup(made.file, OLD)).toEqual({
+    ok: false,
+    reason: 'damaged',
+  })
+  // The sealing key, the backup's data key, the literal that opened its
+  // copy and the fresh key, with the rekey literal once it was used.
+  expectAllWiped(5)
+})

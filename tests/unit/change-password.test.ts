@@ -8,18 +8,14 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import Database from 'better-sqlite3-multiple-ciphers'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import {
-  applyKey,
-  DamagedError,
-  openDatabase,
-} from '../../src/main/vault/database'
+import { DamagedError, openDatabase } from '../../src/main/vault/database'
 import { deriveHere } from '../../src/main/vault/kdf'
 import { openKey } from '../../src/main/vault/keys'
 import { parseVaultFile } from '../../src/main/vault/vault-file'
 import { Vault } from '../../src/main/vault/vault'
 import type { VaultState } from '../../src/shared/ipc'
+import { corruptVaultIndex } from '../support/corrupt'
 import { FAST, OLD, NEW } from '../support/vault'
 
 // Each step of a change, and which password a crash right after it leaves
@@ -73,44 +69,6 @@ async function vaultWithSnapshots(): Promise<Vault> {
     )
     .run()
   return vault
-}
-
-/**
- * Leaves an index whose entries no longer match its table, a corruption
- * that quick_check does not look for and integrity_check does: drop the
- * index from the schema, change the rows, put the index back.
- */
-async function corruptIndex(vault: Vault): Promise<void> {
-  const file = parseVaultFile(
-    readFileSync(join(vault.dir, 'vault.json'), 'utf8'),
-  )
-  if (!file) throw new Error('unreadable vault.json')
-  const key = await openKey(file, OLD, deriveHere)
-  if (!key) throw new Error('wrong password')
-  const connect = () => {
-    const db = new Database(join(vault.dir, 'ledger-1.db'))
-    db.pragma("cipher = 'sqlcipher'")
-    db.pragma('legacy = 4')
-    applyKey(db, key)
-    db.unsafeMode(true)
-    db.pragma('writable_schema = ON')
-    return db
-  }
-  let db = connect()
-  db.exec(
-    'CREATE TABLE fake (n INTEGER); CREATE INDEX fake_n ON fake (n); INSERT INTO fake VALUES (1), (2), (3)',
-  )
-  const index = db
-    .prepare("SELECT rootpage, sql FROM sqlite_schema WHERE name = 'fake_n'")
-    .get()
-  db.prepare("DELETE FROM sqlite_schema WHERE name = 'fake_n'").run()
-  db.close()
-  db = connect()
-  db.exec('UPDATE fake SET n = n + 10')
-  db.prepare(
-    "INSERT INTO sqlite_schema VALUES ('index', 'fake_n', 'fake', @rootpage, @sql)",
-  ).run(index)
-  db.close()
 }
 
 describe('changePassword', () => {
@@ -199,7 +157,7 @@ describe('changePassword', () => {
     const vault = vaultAt(root)
     await vault.create(OLD)
     vault.lock()
-    await corruptIndex(vault)
+    await corruptVaultIndex(vault, OLD)
     expect(await vault.unlock(OLD)).toEqual({ ok: true })
     const seen: VaultState[] = []
     vault.onChange((state) => seen.push(state))

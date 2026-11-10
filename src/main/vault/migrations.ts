@@ -182,7 +182,8 @@ export class NewerSchemaError extends Error {
  * own with its version number. Foreign keys are off meanwhile, as SQLite's
  * steps for changing a table's schema require: with them on, dropping a
  * table to rebuild it deletes or clears the rows that refer to it. Each
- * migration must leave every reference whole, or it is rolled back.
+ * migration must leave no more broken references than the database came
+ * with, none in a whole one, or it is rolled back.
  */
 export function migrate(
   db: Database.Database,
@@ -191,13 +192,14 @@ export function migrate(
   const current = db.pragma('user_version', { simple: true }) as number
   if (current > list.length) throw new NewerSchemaError(current)
   if (current === list.length) return
+  const allowed = brokenReferences(db)
   // No effect inside a transaction, so set around them.
   db.pragma('foreign_keys = OFF')
   try {
     list.slice(current).forEach((migration, index) => {
       db.transaction(() => {
         migration(db)
-        if (hasBrokenReferences(db))
+        if (brokenReferences(db) > allowed)
           throw new Error('a migration left rows that refer to missing ones')
         db.pragma(`user_version = ${current + index + 1}`)
       })()
@@ -207,6 +209,6 @@ export function migrate(
   }
 }
 
-/** Whether any row refers to one that is not there. */
-export const hasBrokenReferences = (db: Database.Database): boolean =>
-  (db.pragma('foreign_key_check') as unknown[]).length > 0
+/** How many rows refer to one that is not there. */
+export const brokenReferences = (db: Database.Database): number =>
+  (db.pragma('foreign_key_check') as unknown[]).length

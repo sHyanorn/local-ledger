@@ -5,7 +5,7 @@ import { copyFileSync, renameSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
 import Database from 'better-sqlite3-multiple-ciphers'
 import { flushDirectory, syncFile } from './files'
-import { hasBrokenReferences, migrate, migrations } from './migrations'
+import { brokenReferences, migrate, migrations } from './migrations'
 import type { Migration } from './migrations'
 
 export type Db = Database.Database
@@ -66,6 +66,13 @@ export const passesIntegrityCheck = (db: Db): boolean =>
   db.pragma('integrity_check', { simple: true }) === 'ok'
 
 /**
+ * Whether every page reads back whole. Indexes are not compared with their
+ * tables, so this is less than integrity_check asks and what opening asks.
+ */
+export const passesQuickCheck = (db: Db): boolean =>
+  db.pragma('quick_check', { simple: true }) === 'ok'
+
+/**
  * An existing ledger: the first read decrypts page 1 and so checks the key,
  * migrations have run at least once, and every page reads back. An empty
  * file decrypts under any key, so the second check matters.
@@ -73,8 +80,7 @@ export const passesIntegrityCheck = (db: Db): boolean =>
 function isLedger(db: Db): boolean {
   try {
     return (
-      db.pragma('user_version', { simple: true }) !== 0 &&
-      db.pragma('quick_check', { simple: true }) === 'ok'
+      db.pragma('user_version', { simple: true }) !== 0 && passesQuickCheck(db)
     )
   } catch {
     return false
@@ -86,6 +92,11 @@ function isLedger(db: Db): boolean {
  * copy goes once the migrated database passes integrity_check and has every
  * reference whole. If anything fails, the copy is put back, so the file is
  * what it was, and the error is thrown.
+ *
+ * A ledger that failed those checks before the migration opened all the
+ * same, on quick_check, and must go on opening: it is migrated as it is,
+ * and held only to quick_check and to no more broken references than it
+ * came with.
  */
 function migrateKeepingCopy(
   db: Db,
@@ -96,12 +107,17 @@ function migrateKeepingCopy(
   if (version === 0 || version >= list.length) return migrate(db, list)
   // No transaction is open and the journal is gone, so the file is the
   // whole database, still encrypted.
+  const broken = brokenReferences(db)
+  const whole = broken === 0 && passesIntegrityCheck(db)
+  if (!whole)
+    console.error('the database was inconsistent before its migration')
   const copy = `${file}${BEFORE_MIGRATION}`
   copyFileSync(file, copy)
   syncFile(copy)
   try {
     migrate(db, list)
-    if (!passesIntegrityCheck(db) || hasBrokenReferences(db))
+    const passes = whole ? passesIntegrityCheck(db) : passesQuickCheck(db)
+    if (!passes || brokenReferences(db) > broken)
       throw new Error('the migrated database failed its checks')
   } catch (error) {
     db.close()

@@ -11,13 +11,14 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { BEFORE_MIGRATION, openDatabase } from '../../src/main/vault/database'
 import type { Db } from '../../src/main/vault/database'
 import { deriveHere } from '../../src/main/vault/kdf'
 import { migrations } from '../../src/main/vault/migrations'
 import type { Migration } from '../../src/main/vault/migrations'
 import { Vault } from '../../src/main/vault/vault'
+import { breakReferences, corruptIndex } from '../support/corrupt'
 import { PASSWORD } from '../support/vault'
 
 const KEY = Buffer.alloc(32, 0xab)
@@ -246,5 +247,81 @@ describe('a migration', () => {
     }).close()
     expect(copied).toBe(false)
     expect(readdirSync(dir)).toEqual(['ledger.db'])
+  })
+})
+
+// A ledger the first release opened must still open: what was wrong before
+// a migration is not held against it, what the migration adds is.
+describe('a ledger that was inconsistent before a migration', () => {
+  const addTable: Migration = (db) =>
+    db.exec('CREATE TABLE fake_added (id INTEGER PRIMARY KEY) STRICT')
+  const version = (db: Db) => db.pragma('user_version', { simple: true })
+  const logged = () => vi.spyOn(console, 'error').mockImplementation(() => {})
+  afterEach(() => vi.restoreAllMocks())
+
+  it('is migrated with an index that does not match its table, and logged', () => {
+    ledgerAt(migrations.length)
+    corruptIndex(file, KEY)
+    const log = logged()
+    const db = openDatabase(file, KEY, {
+      migrations: [...migrations, addTable],
+    })
+    expect(version(db)).toBe(migrations.length + 1)
+    expect(count(db, 'transactions')).toBe(3)
+    expect(db.pragma('integrity_check', { simple: true })).not.toBe('ok')
+    db.close()
+    expect(readdirSync(dir)).toEqual(['ledger.db'])
+    expect(log).toHaveBeenCalledTimes(1)
+  })
+
+  it('is migrated with rows that refer to missing ones', () => {
+    ledgerAt(migrations.length)
+    breakReferences(file, KEY)
+    logged()
+    const db = openDatabase(file, KEY, {
+      migrations: [...migrations, addTable],
+    })
+    expect(version(db)).toBe(migrations.length + 1)
+    db.close()
+    expect(readdirSync(dir)).toEqual(['ledger.db'])
+  })
+
+  it('is put back when the migration leaves more rows referring to missing ones', () => {
+    ledgerAt(migrations.length)
+    breakReferences(file, KEY)
+    const before = sha256(file)
+    expect(() =>
+      openDatabase(file, KEY, {
+        migrations: [...migrations, (db) => db.exec('DELETE FROM accounts')],
+      }),
+    ).toThrow('refer to missing')
+    expect(sha256(file)).toBe(before)
+    expect(readdirSync(dir)).toEqual(['ledger.db'])
+  })
+
+  it('is put back when the migration fails', () => {
+    ledgerAt(migrations.length)
+    corruptIndex(file, KEY)
+    const before = sha256(file)
+    expect(() =>
+      openDatabase(file, KEY, {
+        migrations: [
+          ...migrations,
+          addTable,
+          () => {
+            throw new Error('fake failure')
+          },
+        ],
+      }),
+    ).toThrow('fake failure')
+    expect(sha256(file)).toBe(before)
+    expect(readdirSync(dir)).toEqual(['ledger.db'])
+  })
+
+  it('says nothing of a ledger that was whole', () => {
+    ledgerAt(migrations.length)
+    const log = logged()
+    openDatabase(file, KEY, { migrations: [...migrations, addTable] }).close()
+    expect(log).not.toHaveBeenCalled()
   })
 })
