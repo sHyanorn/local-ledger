@@ -7,7 +7,7 @@ import { centsToDecimal } from '../../shared/money'
 import { startsLikeFormula } from './formula'
 
 /** A cell: text, a date (YYYY-MM-DD), an amount in cents, or empty. */
-export type Cell = string | { date: string } | { cents: number } | null
+type Cell = string | { date: string } | { cents: number } | null
 
 export interface Row {
   cells: Cell[]
@@ -59,7 +59,7 @@ const HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
 const INVALID = /[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g
 
 /** Text without the characters XML cannot hold; a lone surrogate becomes U+FFFD. */
-export const xmlSafe = (text: string): string =>
+const xmlSafe = (text: string): string =>
   text.toWellFormed().replace(INVALID, '')
 
 /**

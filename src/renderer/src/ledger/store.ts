@@ -6,7 +6,7 @@ import { formatAmount } from '../../../shared/money'
 import { formatMonth, monthOf } from './format'
 import type { Account, Category } from '../../../shared/ledger'
 
-export type View =
+type View =
   | { name: 'overview' }
   | { name: 'reports' }
   | { name: 'transactions'; accountId: number | null }

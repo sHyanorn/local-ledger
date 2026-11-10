@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { strFromU8, unzipSync } from 'fflate'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { csvField, startsLikeFormula } from '../../src/main/export/formula'
+import { startsLikeFormula } from '../../src/main/export/formula'
 import { PDF_TITLE, statementPage } from '../../src/main/export/report-page'
 import { statement, statementSheets } from '../../src/main/export/statement'
 import {
@@ -46,13 +46,6 @@ describe('formula starts', () => {
   })
   it.each(SAFE)('%j does not', (text) => {
     expect(startsLikeFormula(text)).toBe(false)
-  })
-  it('CSV fields are quoted, quotes doubled, formula starts prefixed', () => {
-    expect(csvField('=1+1')).toBe(`"'=1+1"`)
-    expect(csvField('＝1')).toBe(`"'＝1"`)
-    expect(csvField('Say "hi", then')).toBe('"Say ""hi"", then"')
-    expect(csvField('=A1&"x"')).toBe(`"'=A1&""x"""`)
-    expect(csvField('Fake')).toBe('"Fake"')
   })
 })
 

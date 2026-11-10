@@ -5,7 +5,7 @@ import { DESCRIPTION_MAX } from '../../shared/ledger'
 import type { Row } from './csv'
 import { parseBankAmount, parseDate } from './values'
 
-export interface ParsedRow {
+interface ParsedRow {
   line: number
   date: string
   cents: number

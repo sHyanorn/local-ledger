@@ -67,7 +67,7 @@ function parseRows(text: string, options: Options): Row[] {
 }
 
 /** The most common row width, the wider on a tie, and the share of rows with it. */
-export function usualWidth(widths: readonly number[]): {
+function usualWidth(widths: readonly number[]): {
   width: number
   share: number
 } {

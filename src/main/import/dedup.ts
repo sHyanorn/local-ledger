@@ -16,7 +16,7 @@ import { matchKey } from '../ledger/match-key'
 import type { Db } from '../vault/database'
 
 /** Days apart that a reworded or hand-entered transaction may be. */
-export const MATCH_DAYS = 4
+const MATCH_DAYS = 4
 /** Unclaimed existing transactions considered for each incoming row, nearest first. */
 const NEAREST = 10
 
@@ -28,7 +28,7 @@ export interface IncomingRow {
   description: string
 }
 
-export interface Classified {
+interface Classified {
   fingerprint: string
   status: RowStatus
   match: ExistingMatch | null

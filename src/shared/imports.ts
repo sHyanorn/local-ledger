@@ -15,7 +15,7 @@ export type Encoding = (typeof ENCODINGS)[number]
 export const DATE_ORDERS = ['dmy', 'mdy', 'ymd'] as const
 export type DateOrder = (typeof DATE_ORDERS)[number]
 
-export const TEMPLATES = ['commbank', 'nab', 'anz', 'westpac'] as const
+const TEMPLATES = ['commbank', 'nab', 'anz', 'westpac'] as const
 export type TemplateId = (typeof TEMPLATES)[number]
 
 /** Why a whole file cannot be imported. */
@@ -29,8 +29,7 @@ export type FileProblem =
   | 'unreadable'
 
 /** Why one row cannot be imported. */
-export type RowProblem =
-  'date' | 'amount' | 'description' | 'description-too-long'
+type RowProblem = 'date' | 'amount' | 'description' | 'description-too-long'
 
 /** A file larger than this is refused before it is read. */
 export const MAX_FILE_BYTES = 10 * 1024 * 1024

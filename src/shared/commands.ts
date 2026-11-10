@@ -1,6 +1,6 @@
 // Commands the app menu sends to the page: its keyboard shortcuts.
 
-export const COMMANDS = [
+const COMMANDS = [
   'overview',
   'transactions',
   'budgets',

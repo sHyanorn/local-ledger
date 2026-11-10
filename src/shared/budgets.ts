@@ -2,7 +2,7 @@
 import type { Currency } from './money'
 
 /** A budget is close to spent from this share of it. */
-export const CLOSE_SHARE = 0.9
+const CLOSE_SHARE = 0.9
 
 export interface CategoryBudget {
   categoryId: number
@@ -23,7 +23,7 @@ export interface MonthBudgets {
   otherCurrencies: { currency: Currency; spentCents: number }[]
 }
 
-export type BudgetState = 'none' | 'under' | 'close' | 'over'
+type BudgetState = 'none' | 'under' | 'close' | 'over'
 
 export function budgetState(budget: CategoryBudget): BudgetState {
   if (budget.budgetCents === null) return 'none'

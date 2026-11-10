@@ -149,7 +149,7 @@ function migrateKeepingCopy(
   }
 }
 
-export interface OpenDatabaseOptions {
+interface OpenDatabaseOptions {
   create?: boolean
   /** The schema changes to apply; tests pass their own. */
   migrations?: readonly Migration[]

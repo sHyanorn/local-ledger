@@ -83,7 +83,7 @@ interface OpenOptions {
   emit?: boolean
 }
 
-export interface VaultOptions {
+interface VaultOptions {
   /** The key derivation; the app runs it in a worker. */
   derive: Derive
   /** Settings for new keys; tests lower them to run faster. */

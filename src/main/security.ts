@@ -5,7 +5,7 @@ import type { WebPreferences } from 'electron'
 import switches from './switches.json'
 
 export const APP_SCHEME = 'app'
-export const APP_HOST = 'local-ledger'
+const APP_HOST = 'local-ledger'
 export const APP_ORIGIN = `${APP_SCHEME}://${APP_HOST}`
 
 export const CONTENT_SECURITY_POLICY = [

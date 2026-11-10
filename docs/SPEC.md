@@ -87,7 +87,7 @@ settings(key, value)
 report_transactions: transactions minus both sides of confirmed transfers
 ```
 
-All amounts are stored as integers (cents). An imported transaction's `hash` is its fingerprint (D025); `edited` marks a change by the user. Rules match by "contains", "starts with" or "is" (D026). Transfers are pairs of transactions (D027). `import_skips` names the transactions an import left out because an earlier import had brought them in (D042). Preferences are rows of `settings`, read with defaults for missing keys (D032).
+All amounts are stored as integers (cents). An imported transaction's `hash` is its fingerprint (D025); `edited` marks a change by the user. Rules match by "contains", "starts with" or "is" (D026). Transfers are pairs of transactions (D027). `import_skips` names the transactions an import left out because an earlier import had brought them in (D042). Preferences are rows of `settings`, read with defaults for missing keys (D032). `categories.color`, `categories.icon` and `import_batches.row_count` are in the schema but unused: an import writes `row_count`, and nothing reads any of them.
 
 ## 6. Interface
 

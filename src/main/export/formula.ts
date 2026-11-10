@@ -6,12 +6,3 @@ const FORMULA_START = /^[=+\-@\t\r\n\uFF1D\uFF0B\uFF0D\uFF20]/
 /** Whether a spreadsheet could take this text, typed into a cell, for a formula. */
 export const startsLikeFormula = (text: string): boolean =>
   FORMULA_START.test(text)
-
-/**
- * A CSV field per OWASP: wrapped in double quotes, inner quotes doubled, and
- * text that starts like a formula prefixed with an apostrophe.
- */
-export function csvField(text: string): string {
-  const safe = startsLikeFormula(text) ? `'${text}` : text
-  return `"${safe.replaceAll('"', '""')}"`
-}

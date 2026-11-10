@@ -13,7 +13,7 @@ import { base64Bytes, kdfSchema, sealedSchema } from './vault-file'
 const MAGIC = Buffer.from('LLBACKUP')
 const HEADER_MAX = 4096
 
-export interface BackupHeader {
+interface BackupHeader {
   /** The database's schema version (PRAGMA user_version). */
   schema: number
   size: number

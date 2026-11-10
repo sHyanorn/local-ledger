@@ -12,9 +12,9 @@ import { readBackup } from '../vault/backup'
 import type { StagedBackup } from '../vault/stage-backup'
 import { LockedError, signalUntilChange, type Vault } from '../vault/vault'
 
-export const BACKUP_EXTENSION = 'llbackup'
+const BACKUP_EXTENSION = 'llbackup'
 /** Larger than any ledger this app is made for. */
-export const MAX_BACKUP_BYTES = 1024 * 1024 * 1024
+const MAX_BACKUP_BYTES = 1024 * 1024 * 1024
 
 export function handleBackup(
   vault: Vault,

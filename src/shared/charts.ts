@@ -3,7 +3,7 @@
 // the PDF export writes them as SVG text, so both look the same. Colors come
 // from the class names in the stylesheets.
 
-export interface Shape {
+interface Shape {
   tag: 'rect' | 'path' | 'line' | 'text'
   className: string
   attrs: Record<string, string | number>
@@ -22,7 +22,7 @@ export interface Chart {
 }
 
 /** Format a value for an axis or a tooltip, such as "$1.2k" or "$1,234.56". */
-export type Format = (value: number) => string
+type Format = (value: number) => string
 
 /**
  * Round axis bounds and a step of 1, 2 or 5 times a power of ten, about

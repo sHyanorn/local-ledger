@@ -12,7 +12,7 @@ import { getSettings } from '../ledger/settings'
 import type { Db } from '../vault/database'
 import type { Sheet } from './xlsx'
 
-export interface StatementRow {
+interface StatementRow {
   date: string
   account: string
   description: string

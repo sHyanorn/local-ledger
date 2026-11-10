@@ -4,7 +4,7 @@
 import { BrowserWindow } from 'electron'
 import { servePrint } from '../protocol'
 
-export class PrintCancelled extends Error {
+class PrintCancelled extends Error {
   constructor() {
     super('printing was cancelled')
     this.name = 'PrintCancelled'

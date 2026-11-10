@@ -16,11 +16,9 @@ export function watchForLock(
   lock: () => void,
   {
     idleLimit = () => IDLE_LIMIT_SECONDS,
-    pollMs = IDLE_POLL_MS,
   }: {
     /** Seconds; read on every poll, so a changed setting applies at once. */
     idleLimit?: () => number
-    pollMs?: number
   } = {},
 ): () => void {
   let idle = false
@@ -28,7 +26,7 @@ export function watchForLock(
     const now = power.getSystemIdleTime() >= idleLimit()
     if (now && !idle) lock()
     idle = now
-  }, pollMs)
+  }, IDLE_POLL_MS)
   power.on('lock-screen', lock)
   power.on('suspend', lock)
   return () => {

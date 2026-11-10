@@ -68,7 +68,7 @@ export const transactionFilter = z.strictObject({
   text: text(SEARCH_MAX).optional(),
 })
 
-export const transactionCursor = z.strictObject({ date, id })
+const transactionCursor = z.strictObject({ date, id })
 
 const column = z
   .number()
@@ -76,7 +76,7 @@ const column = z
   .min(0)
   .max(MAX_COLUMNS - 1)
 
-export const amountColumns = z.discriminatedUnion('kind', [
+const amountColumns = z.discriminatedUnion('kind', [
   /** One column, money out negative; `negate` for files that write it positive. */
   z.strictObject({ kind: z.literal('signed'), column, negate: z.boolean() }),
   /** Money out and money in in separate columns, both written positive. */
@@ -95,7 +95,7 @@ export const mapping = z.strictObject({
 })
 
 /** The account for one group of a file's rows; null skips the group. */
-export const importTarget = z.strictObject({
+const importTarget = z.strictObject({
   /** The bank account the rows name, or '' for a file of one account. */
   key: z.string().max(64),
   accountId: id.nullable(),
@@ -108,7 +108,7 @@ const importRequest = z.strictObject({
   targets: z.array(importTarget).min(1).max(50),
 })
 
-export const ruleFields = z.strictObject({
+const ruleFields = z.strictObject({
   pattern: text(PATTERN_MAX, 1),
   match: z.enum(RULE_MATCHES),
   categoryId: id,
