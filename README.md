@@ -62,6 +62,8 @@ If a bank file is not read correctly, `npm run csv:shape -- <file.csv>` prints a
 
 ## Development
 
+Needs Node 24.12 or later (`.nvmrc` pins 24).
+
 ```bash
 npm ci && npm run setup:electron   # install scripts are off (.npmrc)
 npm run dev
@@ -69,7 +71,7 @@ npm test                           # unit tests
 npm run test:e2e                   # end-to-end, Playwright for Electron
 npm run lint && npm run typecheck && npm run format:check
 npm run seed && npm run demo       # the app on a vault of made-up data
-npm run build                      # installers for this platform
+npm run build                      # installers: dmg on macOS, NSIS on Windows
 npm run screenshots                # the images above, from made-up data
 ```
 
