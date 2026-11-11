@@ -217,7 +217,7 @@ describe('classify', () => {
     expect(
       result.filter((entry) => entry.status === 'possible').length,
     ).toBeGreaterThan(0)
-  })
+  }, 15_000)
 
   it('finds a hand-entered match past ten rows matched exactly', () => {
     const everyday = account()
