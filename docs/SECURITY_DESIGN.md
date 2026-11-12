@@ -6,7 +6,7 @@ Local Ledger keeps personal finance data on one computer, encrypted at rest. Thi
 
 Protected against:
 
-- Someone who obtains the vault files: a copied or stolen disk, a backup, a synced folder. Without the master password the files reveal nothing but their size, the key derivation settings and the generation number, which counts password changes.
+- Someone who obtains the vault files: a copied or stolen disk, a backup, a synced folder. Without the master password the files reveal nothing but their size, the key derivation settings and the generation number, which counts password changes; a backup's header also shows the database's schema version and the SHA-256 of the encrypted database, and the folder a restore sets aside is named with the date and time of the restore.
 - Someone at the computer after the app locked itself (idle, screen lock, sleep).
 - Web content: the app loads none. The renderer is sandboxed, has no Node.js, and reaches the main process only through a fixed, validated IPC API.
 

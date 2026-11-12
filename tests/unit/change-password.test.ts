@@ -58,7 +58,7 @@ afterEach(async () => {
 async function vaultWithSnapshots(): Promise<Vault> {
   const vault = vaultAt(root, (step) => {
     if (step === 'vault staged') return // creating, not changing
-    // The disk as a power cut at this moment would leave it.
+    // The files as a crash of the app at this moment would leave them.
     cpSync(vault.dir, join(snapshots, step, 'vault'), { recursive: true })
   })
   await vault.create(OLD)
