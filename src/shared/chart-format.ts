@@ -1,5 +1,5 @@
 import type { Currency } from './money'
-import { formatAmount } from './money'
+import { centsToDecimal, formatAmount } from './money'
 
 const compact = new Map<Currency, Intl.NumberFormat>()
 
@@ -16,7 +16,7 @@ export function compactAmount(currency: Currency) {
     compact.set(currency, format)
   }
   const chosen = format
-  return (cents: number) => chosen.format(cents / 100)
+  return (cents: number) => chosen.format(centsToDecimal(cents) as `${number}`)
 }
 
 /** The exact amount, for tooltips and labels. */
