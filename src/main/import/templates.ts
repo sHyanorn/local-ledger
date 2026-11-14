@@ -38,7 +38,7 @@ const isAmount = (cell: string | undefined) =>
 const startsWith = (cells: readonly string[], names: readonly string[]) =>
   names.every((name, index) => cells[index]?.trim().toLowerCase() === name)
 
-const NAB_HEADER = [
+export const NAB_HEADER = [
   'date',
   'amount',
   'account number',
@@ -49,7 +49,7 @@ const NAB_HEADER = [
   'category',
   'merchant name',
 ]
-const WESTPAC_HEADER = [
+export const WESTPAC_HEADER = [
   'bank account',
   'date',
   'narrative',

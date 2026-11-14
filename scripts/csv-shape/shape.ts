@@ -3,7 +3,11 @@
 // in each column. It never includes a value, a file name or a path; header
 // names appear only when they are NAB's or Westpac's own.
 import { readTable } from '../../src/main/import/csv'
-import { detectLayout } from '../../src/main/import/templates'
+import {
+  detectLayout,
+  NAB_HEADER,
+  WESTPAC_HEADER,
+} from '../../src/main/import/templates'
 import { dateOrders, parseBankAmount } from '../../src/main/import/values'
 
 /** Each field of a raw line, and whether it was quoted. */
@@ -44,7 +48,10 @@ function kind(cell: string): string {
     if (/(CR|DR)$/i.test(value)) parts.push('CR/DR')
     return parts.join(', ')
   }
-  if (!/[a-z]/i.test(value)) return `digits ${value.replace(/\d/g, '9')}`
+  // A letter in any script makes it text; otherwise only the shape of its
+  // digits and separators is kept.
+  if (!/\p{L}/u.test(value))
+    return `digits ${value.replace(/[^\d\s\-/.,:]/gu, '#').replace(/\d/g, '9')}`
   return 'text'
 }
 
@@ -69,13 +76,19 @@ export function describe(bytes: Buffer, index: number): string[] {
   const header =
     !first.some((cell) => dateOrders([cell]).length > 0) &&
     !first.some((cell) => cell.trim() !== '' && parseBankAmount(cell) !== null)
-  // Only a bank's own header, matched word for word, is safe to print; any
-  // other first row may be data or a preamble with names and numbers.
-  if (
-    header &&
-    (layout?.template === 'nab' || layout?.template === 'westpac')
-  ) {
-    out.push(`  header ${JSON.stringify(first)}`)
+  // Only the names of a bank's own header, matched word for word, are safe
+  // to print; any other cell may be data or a preamble with names and numbers.
+  const names =
+    layout?.template === 'nab'
+      ? NAB_HEADER.length
+      : layout?.template === 'westpac'
+        ? WESTPAC_HEADER.length
+        : 0
+  if (header && names > 0) {
+    const rest = first.slice(names).map(kind)
+    out.push(
+      `  header ${JSON.stringify(first.slice(0, names))}${rest.length > 0 ? `, then ${rest.join('; ')}` : ''}`,
+    )
   } else if (header) {
     out.push(`  first row, not printed: ${first.map(kind).join('; ')}`)
   }

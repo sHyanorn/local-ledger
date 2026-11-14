@@ -48,4 +48,56 @@ suite('csv:shape', () => {
     expect(output).not.toContain('SALARY')
     expect(output).toContain('first row, not printed: text')
   })
+
+  it('prints no value of text in any script', () => {
+    const output = describe(
+      Buffer.from(
+        '01/05/2026,-15.26,北京烤鸭店\n' +
+          '02/05/2026,-20.00,李小明 转账\n' +
+          '03/05/2026,-7.50,Кафе Пушкин\n',
+      ),
+      0,
+    ).join('\n')
+    expect(output).toContain('column 3: text ×3')
+    for (const value of ['北京', '李小明', 'Пушкин']) {
+      expect(output).not.toContain(value)
+    }
+  })
+
+  it('describes a first row with a name in another script by kind', () => {
+    const output = describe(
+      Buffer.from(
+        '账户名：李小明,账号：6222021234567890\n' +
+          '01/05/2026,-15.26,FAKE CAFE,+984.74\n' +
+          '02/05/2026,-20.00,FAKE SHOP,+964.74\n',
+      ),
+      0,
+    ).join('\n')
+    expect(output).toContain('first row, not printed: text; text')
+    expect(output).not.toContain('李小明')
+  })
+
+  it('keeps only digits and separators of a cell without letters', () => {
+    const output = describe(
+      Buffer.from(
+        '01/05/2026,-15.26,FAKE CAFE,☎ 0400-000 000\n' +
+          '02/05/2026,-20.00,FAKE SHOP,☎ 0400-000 001\n',
+      ),
+      0,
+    ).join('\n')
+    expect(output).toContain('column 4: digits # 9999-999 999 ×2')
+    expect(output).not.toContain('☎')
+  })
+
+  it('prints only the names of a bank header it matched', () => {
+    const output = describe(
+      Buffer.from(
+        'Date,Amount,Account Number,,Transaction Type,Transaction Details,Balance,Category,Merchant Name,Fake Person 0400000000\n' +
+          '29 May 26,-15.26,000-000 000000001,,EFTPOS DEBIT,FAKE MARKET,1234.56,Groceries,Fake Market,x\n',
+      ),
+      0,
+    ).join('\n')
+    expect(output).toContain('"Merchant Name"], then text')
+    expect(output).not.toContain('Fake Person')
+  })
 })
