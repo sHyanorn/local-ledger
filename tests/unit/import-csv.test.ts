@@ -329,6 +329,7 @@ describe('applyMapping', () => {
           row(2, '03/03/2026', '+100', 'Fake Pay'),
         ],
         signed,
+        ',',
       ),
     ).toEqual({
       rows: [
@@ -352,6 +353,7 @@ describe('applyMapping', () => {
         row(3, '02/03/2026', '-1', ' ', 'EFTPOS'),
       ],
       { ...signed, header: true, description: [2, 3] },
+      ',',
     )
     expect(result.rows.map((parsed) => parsed.description)).toEqual([
       'Fake Kiosk',
@@ -360,10 +362,11 @@ describe('applyMapping', () => {
   })
 
   it('flips the sign for files that write money out as positive', () => {
-    const result = applyMapping([row(1, '02/03/2026', '4.50', 'Fake Card')], {
-      ...signed,
-      amount: { kind: 'signed', column: 1, negate: true },
-    })
+    const result = applyMapping(
+      [row(1, '02/03/2026', '4.50', 'Fake Card')],
+      { ...signed, amount: { kind: 'signed', column: 1, negate: true } },
+      ',',
+    )
     expect(result.rows[0]?.cents).toBe(-450)
   })
 
@@ -383,6 +386,7 @@ describe('applyMapping', () => {
         row(6, '02/03/2026', 'Fake Negative', '-1.00', ''),
       ],
       split,
+      ',',
     )
     expect(result.rows.map((parsed) => parsed.cents)).toEqual([-450, 900, 900])
     expect(result.errors).toEqual([
@@ -402,6 +406,7 @@ describe('applyMapping', () => {
         row(7, '01/02/2026'),
       ],
       signed,
+      ',',
     )
     expect(result.rows).toEqual([])
     expect(result.errors).toEqual([
@@ -418,7 +423,7 @@ function readFile(...lines: string[]) {
   const table = readTable(bytes(lines.join('\n')))
   const layout = detectLayout(table.rows)
   if (!layout) throw new Error('no layout')
-  return applyMapping(table.rows, layout.mapping)
+  return applyMapping(table.rows, layout.mapping, table.delimiter)
 }
 
 describe("a row with a value past its file's columns", () => {
@@ -537,6 +542,44 @@ describe('an amount split by an unquoted thousands separator', () => {
       { line, problem: 'amount', value },
     ])
   })
+
+  it.each([
+    ['semicolon', ';'],
+    ['tab', '\t'],
+  ])(
+    'is not looked for in a %s-separated file, where a comma splits nothing',
+    (_, delimiter) => {
+      const table = readTable(
+        bytes(
+          [
+            ['Date', 'Description', 'Amount', 'Balance'],
+            ['01/05/2026', 'FAKE CAFE', '15', '984.74'],
+          ]
+            .map((cells) => cells.join(delimiter))
+            .join('\n'),
+        ),
+      )
+      expect(table.delimiter).toBe(delimiter)
+      const mapping: Mapping = {
+        header: true,
+        date: 0,
+        dateOrder: 'dmy',
+        description: [1],
+        amount: { kind: 'signed', column: 2, negate: false },
+      }
+      expect(applyMapping(table.rows, mapping, table.delimiter)).toEqual({
+        rows: [
+          {
+            line: 2,
+            date: '2026-05-01',
+            cents: 1500,
+            description: 'FAKE CAFE',
+          },
+        ],
+        errors: [],
+      })
+    },
+  )
 
   it('leaves a zero beside the amount', () => {
     const parsed = readFile(

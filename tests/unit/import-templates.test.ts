@@ -12,7 +12,11 @@ function read(name: string) {
   const table = sample(name)
   const layout = detectLayout(table.rows)
   if (!layout) throw new Error(`no layout for ${name}`)
-  return { table, layout, ...applyMapping(table.rows, layout.mapping) }
+  return {
+    table,
+    layout,
+    ...applyMapping(table.rows, layout.mapping, table.delimiter),
+  }
 }
 
 const rows = (...lines: string[][]): Row[] =>
@@ -96,6 +100,7 @@ describe('bank templates', () => {
         ['29 May 26', '-1', '0', '', 'FEE', '', '0'],
       ),
       layout!.mapping,
+      ',',
     )
     expect(parsed.rows.map((row) => row.description)).toEqual([
       'Fake Bank',
@@ -282,6 +287,7 @@ describe('layouts as public sample files write them', () => {
           ['29/05/2026', '-15.26', 'Fake Shop'],
         ),
         anz!.mapping,
+        ',',
       ).errors,
     ).toEqual([])
   })
@@ -296,7 +302,7 @@ describe('layouts as public sample files write them', () => {
     )
     const layout = detectLayout(table.rows)
     expect(layout?.template).toBe('nab')
-    expect(applyMapping(table.rows, layout!.mapping)).toEqual({
+    expect(applyMapping(table.rows, layout!.mapping, table.delimiter)).toEqual({
       rows: [
         {
           line: 2,
@@ -418,7 +424,7 @@ describe('tolerance of export variations', () => {
       const table = readTable(write(base.table.rows, template, variant))
       const layout = detectLayout(table.rows)
       expect(layout?.template).toBe(template)
-      const parsed = applyMapping(table.rows, layout!.mapping)
+      const parsed = applyMapping(table.rows, layout!.mapping, table.delimiter)
       expect(parsed.errors).toEqual([])
       expect(
         parsed.rows.map(({ date, cents, description }) => ({

@@ -193,7 +193,11 @@ export class ImportSession {
       return targets.get(key) ?? null
     }
 
-    const { rows, errors } = applyMapping(table, request.mapping)
+    const { rows, errors } = applyMapping(
+      table,
+      request.mapping,
+      pending.table.delimiter,
+    )
     const incoming: (IncomingRow & { line: number })[] = []
     rows.forEach((row, index) => {
       const accountId = accountOf(row.line)

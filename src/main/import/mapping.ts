@@ -65,10 +65,11 @@ function splitAmount(
 }
 
 /**
- * An amount split at its thousands separators, rejoined: "-1" and "200.00"
- * are "-1,200.00". The row need be no wider than the others, since an empty
- * last cell, or one a shortened row lacks, takes up the shift. A zero beside
- * an amount, as on the unused side of debit and credit columns, is not one.
+ * An amount a comma-separated file split at its thousands separators,
+ * rejoined: "-1" and "200.00" are "-1,200.00". The row need be no wider than
+ * the others, since an empty last cell, or one a shortened row lacks, takes
+ * up the shift. A zero beside an amount, as on the unused side of debit and
+ * credit columns, is not one.
  */
 function rejoinedAmount(
   cells: readonly string[],
@@ -89,10 +90,14 @@ function rejoinedAmount(
   return null
 }
 
-/** The rows read through the mapping, and the rows that could not be. */
+/**
+ * The rows read through the mapping, and the rows that could not be; the
+ * delimiter is the file's.
+ */
 export function applyMapping(
   rows: readonly Row[],
   mapping: Mapping,
+  delimiter: string,
 ): { rows: ParsedRow[]; errors: RowError[] } {
   const parsed: ParsedRow[] = []
   const errors: RowError[] = []
@@ -108,7 +113,9 @@ export function applyMapping(
     const split =
       extra > 0
         ? splitAmount(cells, mapping.amount, extra)
-        : rejoinedAmount(cells, mapping.amount)
+        : delimiter === ','
+          ? rejoinedAmount(cells, mapping.amount)
+          : null
     const amount =
       split === null ? amountOf(cells, mapping.amount) : { value: split }
     if ('value' in amount) {
