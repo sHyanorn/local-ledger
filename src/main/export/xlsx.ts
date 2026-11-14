@@ -69,9 +69,13 @@ const xmlSafe = (text: string): string =>
  * escaped the same way.
  */
 export function xmlText(text: string): string {
-  return xmlSafe(text)
-    .replace(/_(x[0-9A-Fa-f]{4}_)/g, '_x005F_$1')
-    .replace(/[&<>"\r]/g, (char) => `&#${char.charCodeAt(0)};`)
+  return (
+    xmlSafe(text)
+      // Only the leading underscore is matched, so one that ends a sequence
+      // can still start the next.
+      .replace(/_(?=x[0-9A-Fa-f]{4}_)/g, '_x005F_')
+      .replace(/[&<>"\r]/g, (char) => `&#${char.charCodeAt(0)};`)
+  )
 }
 
 /** The column's letters: 0 is A, 26 is AA. */

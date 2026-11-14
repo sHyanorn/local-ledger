@@ -53,6 +53,11 @@ describe('xlsx parts', () => {
   it('escapes XML and Excel escapes, drops what XML cannot hold', () => {
     expect(xmlText('a & <b> "c"')).toBe('a &#38; &#60;b&#62; &#34;c&#34;')
     expect(xmlText('_x0041_ and _X_')).toBe('_x005F_x0041_ and _X_')
+    // Two sequences that share an underscore are both escaped.
+    expect(xmlText('_x0041_x0042_')).toBe('_x005F_x0041_x005F_x0042_')
+    expect(xmlText('Fake _x0041_x000A_ note')).toBe(
+      'Fake _x005F_x0041_x005F_x000A_ note',
+    )
     expect(xmlText('a\rb\nc\td')).toBe('a&#13;b\nc\td')
     expect(xmlText('a\u0000b\u0008c\u001Fd￾')).toBe('abcd')
     expect(xmlText('lone \uD800 high')).toBe('lone � high')
