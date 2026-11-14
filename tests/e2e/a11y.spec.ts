@@ -69,15 +69,17 @@ async function setScheme(
 }
 
 for (const scheme of ['light', 'dark'] as const) {
-  test(`the setup page has no accessibility violations, ${scheme}`, async ({
-    app,
-    page,
-  }) => {
+  test.describe(() => {
     // The light run is the suite's first test, which on a fresh CI machine
-    // has taken anywhere from 1 s to over 30 s.
-    test.setTimeout(60_000)
-    await setScheme(app, page, scheme)
-    expect(await violations(page, 'setup')).toEqual([])
+    // has taken anywhere from 1 s to over 30 s, the app's launch included.
+    test.describe.configure({ timeout: 60_000 })
+    test(`the setup page has no accessibility violations, ${scheme}`, async ({
+      app,
+      page,
+    }) => {
+      await setScheme(app, page, scheme)
+      expect(await violations(page, 'setup')).toEqual([])
+    })
   })
 
   ledgerTest(
