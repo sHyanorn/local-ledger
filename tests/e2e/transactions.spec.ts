@@ -174,7 +174,15 @@ test('a change keeps the reader’s place, and focus goes back where it was', as
     element.scrollTop = element.scrollHeight
   })
   await expect(rows(home)).toHaveCount(400)
-  const row = rows(home).nth(250)
+  // The seed follows today's date, and so do the paired transfers, which
+  // have no category: take the first row from 250 on that has one.
+  const index = await rows(home).evaluateAll((all) =>
+    all.findIndex(
+      (row, n) =>
+        n >= 250 && row.querySelector('button[aria-label^="Category of "]'),
+    ),
+  )
+  const row = rows(home).nth(index)
   await row.scrollIntoViewIfNeeded()
   const before = await list.evaluate((element) => element.scrollTop)
   const description = row.locator('.description button')
