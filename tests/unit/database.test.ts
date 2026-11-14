@@ -140,6 +140,16 @@ describe('schema', () => {
   })
 
   it('checks dates, months and currencies', () => {
+    const category = db
+      .prepare("INSERT INTO categories (name) VALUES ('Fake Food')")
+      .run().lastInsertRowid
+    expect(() =>
+      db
+        .prepare(
+          "INSERT INTO budgets (category_id, month, amount_cents) VALUES (?, '05/2026', 1)",
+        )
+        .run(category),
+    ).toThrow(/CHECK/)
     expect(() =>
       db
         .prepare(

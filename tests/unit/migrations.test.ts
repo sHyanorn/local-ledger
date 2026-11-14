@@ -35,8 +35,11 @@ const sha256 = (path: string) =>
 const count = (db: Db, table: string) =>
   db.prepare(`SELECT count(*) FROM ${table}`).pluck().get() as number
 
-/** Rows in every table of the first schema version, in columns it had. */
-function seed(db: Db): void {
+/**
+ * Rows in every table of the first schema version, in columns it had, and
+ * one in each table a later version up to `version` added.
+ */
+function seed(db: Db, version: number): void {
   db.exec(`
     INSERT INTO accounts (id, name, type, currency) VALUES
       (1, 'Fake Everyday', 'bank', 'AUD'), (2, 'Fake Savings', 'bank', 'AUD');
@@ -52,6 +55,32 @@ function seed(db: Db): void {
     INSERT INTO rules (pattern, match_type, category_id) VALUES ('fake cafe', 'contains', 2);
     INSERT INTO budgets (category_id, month, amount_cents) VALUES (1, '2026-05', 30000);
   `)
+  if (version >= 3)
+    db.exec(
+      "INSERT INTO import_mappings (signature, mapping) VALUES ('fake signature', '{}')",
+    )
+  if (version >= 4)
+    db.exec("INSERT INTO rule_dismissals (key) VALUES ('fake payee')")
+  if (version >= 5)
+    db.exec(
+      "INSERT INTO transfer_links (out_id, in_id, status) VALUES (2, 3, 'confirmed')",
+    )
+  if (version >= 7)
+    db.exec("INSERT INTO settings (key, value) VALUES ('homeCurrency', 'AUD')")
+}
+
+/** Every row of every table, by table. */
+function contents(db: Db): Record<string, object[]> {
+  const tables = db
+    .prepare("SELECT name FROM sqlite_schema WHERE type = 'table'")
+    .pluck()
+    .all() as string[]
+  return Object.fromEntries(
+    tables.map((table) => [
+      table,
+      db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all() as object[],
+    ]),
+  )
 }
 const TABLES = [
   ['accounts', 2],
@@ -63,13 +92,15 @@ const TABLES = [
 ] as const
 
 /** A ledger at schema version `version`, holding the seed rows, closed. */
-function ledgerAt(version: number): void {
+function ledgerAt(version: number): Record<string, object[]> {
   const db = openDatabase(file, KEY, {
     create: true,
     migrations: migrations.slice(0, version),
   })
-  seed(db)
+  seed(db, version)
+  const rows = contents(db)
   db.close()
+  return rows
 }
 
 // The table rebuild of the SQLite documentation, on a table others refer to.
@@ -94,33 +125,19 @@ const rebuildCategories: Migration = (db) =>
 describe('migrating from each earlier schema version', () => {
   for (let version = 1; version < migrations.length; version++) {
     it(`keeps every row from version ${version}`, () => {
-      ledgerAt(version)
+      const before = ledgerAt(version)
       const db = openDatabase(file, KEY)
       try {
         expect(db.pragma('user_version', { simple: true })).toBe(
           migrations.length,
         )
-        for (const [table, rows] of TABLES) {
-          expect(count(db, table), table).toBe(rows)
+        // Every value of every row, but in columns later versions added.
+        const after = contents(db)
+        for (const [table, rows] of Object.entries(before)) {
+          expect(after[table], table).toEqual(
+            rows.map((row) => expect.objectContaining(row)),
+          )
         }
-        expect(
-          db
-            .prepare(
-              'SELECT account_id, sum(amount_cents) FROM transactions GROUP BY account_id ORDER BY account_id',
-            )
-            .raw()
-            .all(),
-        ).toEqual([
-          [1, -20450],
-          [2, 20000],
-        ])
-        expect(
-          db
-            .prepare(
-              'SELECT category_id, import_batch_id, hash FROM transactions WHERE id = 1',
-            )
-            .get(),
-        ).toEqual({ category_id: 2, import_batch_id: 1, hash: 'fake-hash-1' })
         expect(db.pragma('foreign_key_check')).toEqual([])
         expect(db.pragma('integrity_check', { simple: true })).toBe('ok')
         expect(db.pragma('foreign_keys', { simple: true })).toBe(1)

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { formatDate, periodRange } from '../../src/renderer/src/ledger/format'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { periodRange } from '../../src/renderer/src/ledger/format'
 
 describe('periodRange', () => {
   it.each([
@@ -18,8 +18,25 @@ describe('periodRange', () => {
 })
 
 describe('formatDate', () => {
-  it('writes the calendar date, whatever the time zone', () => {
-    expect(formatDate('2026-11-08')).toBe('8 Nov 2026')
-    expect(formatDate('2026-01-01')).toBe('1 Jan 2026')
+  // The formatter is made when its module loads, so each zone loads it anew.
+  // West of UTC a date read as UTC shows a day early if shown in local time;
+  // east of it, a date read as local time shows a day early in UTC.
+  const zone = process.env.TZ
+  afterEach(() => {
+    if (zone === undefined) delete process.env.TZ
+    else process.env.TZ = zone
+    vi.resetModules()
   })
+
+  it.each(['America/Los_Angeles', 'UTC', 'Australia/Melbourne'])(
+    'writes the calendar date in %s',
+    async (timeZone) => {
+      process.env.TZ = timeZone
+      vi.resetModules()
+      const { formatDate } =
+        await import('../../src/renderer/src/ledger/format')
+      expect(formatDate('2026-11-08')).toBe('8 Nov 2026')
+      expect(formatDate('2026-01-01')).toBe('1 Jan 2026')
+    },
+  )
 })
