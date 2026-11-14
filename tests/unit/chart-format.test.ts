@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { compactAmount } from '../../src/shared/chart-format'
 
 describe('compactAmount', () => {
-  // Rounding happens on the decimal amount: 1.15 shows as 1.2, 1,250 as 1.3K.
+  // Halves round away from zero: 1.15 shows as 1.2, 1,250 as 1.3K.
   it.each([
     ['AUD', 0, '$0'],
     ['AUD', 450, '$4.5'],
