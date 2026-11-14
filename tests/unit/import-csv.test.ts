@@ -414,13 +414,15 @@ describe('applyMapping', () => {
   })
 })
 
+function readFile(...lines: string[]) {
+  const table = readTable(bytes(lines.join('\n')))
+  const layout = detectLayout(table.rows)
+  if (!layout) throw new Error('no layout')
+  return applyMapping(table.rows, layout.mapping)
+}
+
 describe("a row with a value past its file's columns", () => {
-  function read(...lines: string[]) {
-    const table = readTable(bytes(lines.join('\n')))
-    const layout = detectLayout(table.rows)
-    if (!layout) throw new Error('no layout')
-    return applyMapping(table.rows, layout.mapping)
-  }
+  const read = readFile
 
   // An unquoted thousands separator splits the amount and shifts every cell
   // after it; read by position, -1,200.00 would be -1.00.
@@ -485,6 +487,64 @@ describe("a row with a value past its file's columns", () => {
         '27 May 26,-20.00,0000,,TRANSFER DEBIT,FAKE SAVINGS,1279.82,Transfers',
       ).errors,
     ).toEqual([])
+  })
+})
+
+describe('an amount split by an unquoted thousands separator', () => {
+  // The row need be no wider than the others: an empty last cell, or one a
+  // shortened row lacks, takes up the shift.
+  it.each([
+    [
+      'Westpac, with an empty Serial last',
+      [
+        'Bank Account,Date,Narrative,Debit Amount,Credit Amount,Balance,Categories,Serial',
+        '000000000001,29/05/2026,FAKE MARKET,15.26,,1234.56,OTHER,',
+        '000000000001,28/05/2026,FAKE PAY,,2,500.00,3734.56,DEP,',
+      ],
+      3,
+      '2,500.00',
+    ],
+    [
+      'NAB, in a row without a merchant',
+      [
+        'Date,Amount,Account Number,,Transaction Type,Transaction Details,Balance,Category,Merchant Name',
+        '29 May 26,-15.26,0000,,CARD PURCHASE,FAKE MARKET,1234.56,Groceries,Fake Market',
+        '28 May 26,-1,200.00,0000,,TRANSFER DEBIT,FAKE SAVINGS,34.56,Transfers',
+      ],
+      3,
+      '-1,200.00',
+    ],
+    [
+      'ANZ, with empty columns last',
+      [
+        '29/05/2026,"-15.26","FAKE MARKET","","","","",""',
+        '28/05/2026,-1,234,567.89,"FAKE RENT","","","","",""',
+      ],
+      2,
+      '-1,234,567.89',
+    ],
+    [
+      'without a header, in as many rows as not',
+      [
+        '01/05/2026,-15.26,FAKE CAFE,+984.74',
+        '02/05/2026,-1,200.00,FAKE RENT,-215.26',
+      ],
+      2,
+      '-1,200.00',
+    ],
+  ])('is an amount it cannot read: %s', (_, lines, line, value) => {
+    expect(readFile(...lines).errors).toEqual([
+      { line, problem: 'amount', value },
+    ])
+  })
+
+  it('leaves a zero beside the amount', () => {
+    const parsed = readFile(
+      'Bank Account,Date,Narrative,Debit Amount,Credit Amount,Balance,Categories,Serial',
+      '000000000001,28/05/2026,FAKE PAY,0,500.00,1734.56,DEP,',
+    )
+    expect(parsed.rows.map((row) => row.cents)).toEqual([50000])
+    expect(parsed.errors).toEqual([])
   })
 })
 

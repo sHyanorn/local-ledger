@@ -49,17 +49,44 @@ function columnsOf(rows: readonly Row[], header: boolean): number {
   return usualWidth(rows.map((row) => row.cells.length)).width
 }
 
+const amountColumns = (amount: AmountColumns) =>
+  amount.kind === 'signed' ? [amount.column] : [amount.debit, amount.credit]
+
 /** The amount's cells and the cells the split added, as a comma-separated file wrote them. */
 function splitAmount(
   cells: readonly string[],
   amount: AmountColumns,
   extra: number,
 ): string {
-  const columns =
-    amount.kind === 'signed' ? [amount.column] : [amount.debit, amount.credit]
+  const columns = amountColumns(amount)
   return cells
     .slice(Math.min(...columns), Math.max(...columns) + extra + 1)
     .join(',')
+}
+
+/**
+ * An amount split at its thousands separators, rejoined: "-1" and "200.00"
+ * are "-1,200.00". The row need be no wider than the others, since an empty
+ * last cell, or one a shortened row lacks, takes up the shift. A zero beside
+ * an amount, as on the unused side of debit and credit columns, is not one.
+ */
+function rejoinedAmount(
+  cells: readonly string[],
+  amount: AmountColumns,
+): string | null {
+  for (const column of amountColumns(amount)) {
+    let text = cells[column] ?? ''
+    if (parseBankAmount(text) === 0) continue
+    let next = column + 1
+    while (
+      next < cells.length &&
+      parseBankAmount(`${text},${cells[next]}`) !== null
+    ) {
+      text = `${text},${cells[next++]}`
+    }
+    if (next > column + 1) return text
+  }
+  return null
 }
 
 /** The rows read through the mapping, and the rows that could not be. */
@@ -78,10 +105,12 @@ export function applyMapping(
       continue
     }
     const extra = width(cells) - columns
-    const amount =
+    const split =
       extra > 0
-        ? { value: splitAmount(cells, mapping.amount, extra) }
-        : amountOf(cells, mapping.amount)
+        ? splitAmount(cells, mapping.amount, extra)
+        : rejoinedAmount(cells, mapping.amount)
+    const amount =
+      split === null ? amountOf(cells, mapping.amount) : { value: split }
     if ('value' in amount) {
       errors.push({ line, problem: 'amount', value: amount.value })
       continue
