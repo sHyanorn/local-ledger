@@ -4,6 +4,7 @@ import {
   APP_ORIGIN,
   CONTENT_SECURITY_POLICY,
   contentType,
+  devUserData,
   isAllowedRequest,
   isAppUrl,
   isTrustedSender,
@@ -15,12 +16,12 @@ import switches from '../../src/main/switches.json' with { type: 'json' }
 
 const DEV = 'http://localhost:5173'
 
-describe('refusedSwitches', () => {
-  const present =
-    (...names: string[]) =>
-    (name: string) =>
-      names.includes(name)
+const present =
+  (...names: string[]) =>
+  (name: string) =>
+    names.includes(name)
 
+describe('refusedSwitches', () => {
   it.each(switches.sandboxOff)('refuses --%s in every build', (name) => {
     expect(refusedSwitches(present(name), false)).toEqual([name])
     expect(refusedSwitches(present(name), true)).toEqual([name])
@@ -36,6 +37,23 @@ describe('refusedSwitches', () => {
 
   it('accepts other switches', () => {
     expect(refusedSwitches(present('lang', 'enable-logging'), true)).toEqual([])
+  })
+})
+
+describe('devUserData', () => {
+  const appData = '/home/fake/.config'
+
+  it('gives an unpackaged run a directory of its own', () => {
+    expect(devUserData(present('lang'), false, appData)).toBe(
+      '/home/fake/.config/local-ledger-dev',
+    )
+  })
+
+  it('leaves the packaged app and a named directory alone', () => {
+    expect(devUserData(present(), true, appData)).toBeUndefined()
+    expect(
+      devUserData(present('user-data-dir'), false, appData),
+    ).toBeUndefined()
   })
 })
 

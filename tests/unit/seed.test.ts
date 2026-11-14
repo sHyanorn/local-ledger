@@ -132,33 +132,33 @@ describe('the seed', () => {
   it('knows where the app keeps its data on each platform', () => {
     const home = '/home/fake'
     expect(appUserDataDirs('linux', {}, home)).toEqual([
-      '/home/fake/.config/Local Ledger',
       '/home/fake/.config/local-ledger',
+      '/home/fake/.config/local-ledger-dev',
     ])
     expect(
       appUserDataDirs('linux', { XDG_CONFIG_HOME: '/fake/config' }, home)[0],
-    ).toBe('/fake/config/Local Ledger')
+    ).toBe('/fake/config/local-ledger')
     expect(appUserDataDirs('darwin', {}, home)[0]).toBe(
-      '/home/fake/Library/Application Support/Local Ledger',
+      '/home/fake/Library/Application Support/local-ledger',
     )
   })
 
   it('refuses the app’s own data directories and anything inside them', () => {
     const dirs = [
-      '/home/fake/.config/Local Ledger',
       '/home/fake/.config/local-ledger',
+      '/home/fake/.config/local-ledger-dev',
     ]
     expect(
       isAppUserData('/home/fake/.config/local-ledger', dirs, 'linux'),
     ).toBe(true)
     expect(
-      isAppUserData('/home/fake/.config/Local Ledger/vault', dirs, 'linux'),
+      isAppUserData('/home/fake/.config/local-ledger-dev/vault', dirs, 'linux'),
     ).toBe(true)
     expect(
-      isAppUserData('/home/fake/.config/LOCAL LEDGER', dirs, 'darwin'),
+      isAppUserData('/home/fake/.config/LOCAL-LEDGER', dirs, 'darwin'),
     ).toBe(true)
     expect(
-      isAppUserData('/home/fake/.config/LOCAL LEDGER', dirs, 'linux'),
+      isAppUserData('/home/fake/.config/LOCAL-LEDGER', dirs, 'linux'),
     ).toBe(false)
     expect(isAppUserData('/home/fake/.config', dirs, 'linux')).toBe(false)
     expect(

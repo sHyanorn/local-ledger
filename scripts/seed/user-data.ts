@@ -3,7 +3,8 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 /**
  * Where the app keeps its data when nothing overrides it: the packaged app
- * under its product name, a development build under the package name.
+ * under the package name, which Electron uses as package.json has no
+ * product name, and a development build in a directory of its own.
  */
 export function appUserDataDirs(
   platform: NodeJS.Platform = process.platform,
@@ -16,7 +17,7 @@ export function appUserDataDirs(
       : platform === 'win32'
         ? (env.APPDATA ?? join(home, 'AppData', 'Roaming'))
         : (env.XDG_CONFIG_HOME ?? join(home, '.config'))
-  return ['Local Ledger', 'local-ledger'].map((name) => join(appData, name))
+  return ['local-ledger', 'local-ledger-dev'].map((name) => join(appData, name))
 }
 
 /**

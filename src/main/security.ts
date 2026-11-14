@@ -47,6 +47,21 @@ export function refusedSwitches(
   return names.filter(hasSwitch)
 }
 
+/**
+ * The user data directory of an unpackaged run that names none. Electron
+ * names the default after package.json, so a development build would
+ * otherwise share the packaged app's directory, and open its vault.
+ */
+export function devUserData(
+  hasSwitch: (name: string) => boolean,
+  packaged: boolean,
+  appData: string,
+): string | undefined {
+  return packaged || hasSwitch('user-data-dir')
+    ? undefined
+    : nodePath.join(appData, 'local-ledger-dev')
+}
+
 export function windowWebPreferences(
   preload: string,
   packaged: boolean,

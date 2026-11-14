@@ -6,13 +6,13 @@ import { execFileSync, spawn } from 'node:child_process'
 import {
   closeSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   openSync,
   readSync,
   readdirSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
@@ -60,32 +60,60 @@ function locate() {
 }
 
 /**
- * Lists the files in an asar archive from its header, which is a pickled
- * JSON tree: UInt32 4, UInt32 header size, then a pickle of the JSON string.
+ * Reads the header of an asar archive, which is a pickled JSON tree: UInt32
+ * 4, UInt32 header size, then a pickle of the JSON string. The files' data
+ * follows the header.
  * @param {string} archive
  */
-function listAsar(archive) {
+function asarHeader(archive) {
   const fd = openSync(archive, 'r')
   try {
     const sizes = Buffer.alloc(16)
     readSync(fd, sizes, 0, 16, 0)
     const json = Buffer.alloc(sizes.readUInt32LE(12))
     readSync(fd, json, 0, json.length, 16)
-    /** @type {string[]} */
-    const files = []
-    /** @param {{ files?: Record<string, any> }} node @param {string} prefix */
-    const walk = (node, prefix) => {
-      for (const [name, child] of Object.entries(node.files ?? {})) {
-        const path = prefix ? `${prefix}/${name}` : name
-        if (child.files) walk(child, path)
-        else files.push(path)
-      }
+    return {
+      tree: JSON.parse(json.toString('utf8')),
+      dataStart: 8 + sizes.readUInt32LE(4),
     }
-    walk(JSON.parse(json.toString('utf8')), '')
-    return files
   } finally {
     closeSync(fd)
   }
+}
+
+/** @param {string} archive */
+function listAsar(archive) {
+  /** @type {string[]} */
+  const files = []
+  /** @param {{ files?: Record<string, any> }} node @param {string} prefix */
+  const walk = (node, prefix) => {
+    for (const [name, child] of Object.entries(node.files ?? {})) {
+      const path = prefix ? `${prefix}/${name}` : name
+      if (child.files) walk(child, path)
+      else files.push(path)
+    }
+  }
+  walk(asarHeader(archive).tree, '')
+  return files
+}
+
+/**
+ * Reads a file at the root of an asar archive. Its header entry gives the
+ * size, and the offset, as a string, from the start of the files' data.
+ * @param {string} archive
+ * @param {string} name
+ */
+function readAsarFile(archive, name) {
+  const { tree, dataStart } = asarHeader(archive)
+  const { offset, size } = tree.files[name]
+  const data = Buffer.alloc(size)
+  const fd = openSync(archive, 'r')
+  try {
+    readSync(fd, data, 0, size, dataStart + Number(offset))
+  } finally {
+    closeSync(fd)
+  }
+  return data.toString('utf8')
 }
 
 /** @param {string} dir @returns {string[]} */
@@ -162,9 +190,17 @@ function checkFiles(resources) {
   )
 }
 
-/** Where the packaged app keeps its data when nothing overrides it. */
-function defaultUserData() {
-  const name = config.productName ?? pkg.name
+/**
+ * Where the packaged app keeps its data when nothing overrides it: Electron
+ * names the directory after the package.json it runs from, by its
+ * productName, or else its name.
+ * @param {string} resources
+ */
+function defaultUserData(resources) {
+  const packaged = JSON.parse(
+    readAsarFile(join(resources, 'app.asar'), 'package.json'),
+  )
+  const name = packaged.productName ?? packaged.name
   if (process.platform === 'darwin') {
     return join(homedir(), 'Library', 'Application Support', name)
   }
@@ -184,7 +220,7 @@ function defaultUserData() {
 function snapshot(dir) {
   return listDir(dir)
     .map((file) => {
-      const stats = statSync(join(dir, file))
+      const stats = lstatSync(join(dir, file))
       return `${file} ${stats.size} ${stats.mtimeMs}`
     })
     .sort()
@@ -221,14 +257,14 @@ async function run(executable, args, env = {}) {
   return { code, output }
 }
 
-/** @param {string} executable */
-async function checkLaunch(executable) {
+/** @param {string} executable @param {string} resources */
+async function checkLaunch(executable, resources) {
   // If a fuse failed, ELECTRON_RUN_AS_NODE would run the -e script, and
   // --inspect would start a debugger.
   const marker = 'ran-as-node'
   const scratch = mkdtempSync(join(tmpdir(), 'ledger-package-'))
   const netLog = join(scratch, 'net-log.json')
-  const userData = defaultUserData()
+  const userData = defaultUserData(resources)
   const sentinel = !existsSync(userData)
   if (sentinel) {
     mkdirSync(userData, { recursive: true })
@@ -298,7 +334,7 @@ console.log(`checking ${executable}`)
 await checkFuses(executable)
 checkFiles(resources)
 if (bundle) checkSignature(bundle)
-await checkLaunch(executable)
+await checkLaunch(executable, resources)
 if (failures > 0) {
   console.error(`${failures} check(s) failed`)
   process.exit(1)
