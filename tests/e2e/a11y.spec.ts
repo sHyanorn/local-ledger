@@ -73,6 +73,9 @@ for (const scheme of ['light', 'dark'] as const) {
     app,
     page,
   }) => {
+    // The light run is the suite's first test, which on a fresh CI machine
+    // has taken anywhere from 1 s to over 30 s.
+    test.setTimeout(60_000)
     await setScheme(app, page, scheme)
     expect(await violations(page, 'setup')).toEqual([])
   })
