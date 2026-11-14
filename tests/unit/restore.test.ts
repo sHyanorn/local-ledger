@@ -261,7 +261,7 @@ describe('a crash during a restore', () => {
 })
 
 describe('a restore that fails part way', () => {
-  it('puts the vault back and keeps it open', async () => {
+  it('puts the vault back, keeps it open and leaves no copy beside it', async () => {
     const failing = open(root, (at) => {
       if (at === 'vault moved aside') throw new Error('rename refused')
     })
@@ -275,7 +275,8 @@ describe('a restore that fails part way', () => {
     expect(failing.unlocked).toBe(true)
     expect(states).toEqual(['unlocked'])
     expect(names(failing)).toEqual(['Fake Added Later', 'Fake Backed Up'])
-    expect(replaced(root)).toEqual([])
+    // The staged vault holds the backup's data under the password in use.
+    expect(readdirSync(root)).toEqual(['vault'])
     failing.lock()
   })
 

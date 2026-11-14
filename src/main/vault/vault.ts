@@ -434,11 +434,15 @@ export class Vault {
             renameSync(whole, this.dir)
           } catch (error) {
             // Nothing was replaced after all: put back and reopen the vault
-            // that was there, so the page is not left on a closed one.
+            // that was there, so the page is not left on a closed one. The
+            // staged vault, a second copy of the backup sealed under the
+            // password the restore was given, then goes.
             try {
               if (aside && !existsSync(this.dir)) renameSync(aside, this.dir)
               flushDirectory(this.root)
               if (current && currentKey) this.#openWithKey(current, currentKey)
+              if (existsSync(this.dir))
+                rmSync(whole, { recursive: true, force: true })
             } catch {
               // Left as it is; startup finds whichever vault is whole.
             }
