@@ -19,6 +19,7 @@ import {
   openDatabase,
   openFailure,
   passesIntegrityCheck,
+  passesOnDisk,
 } from './database'
 import type { Db } from './database'
 import {
@@ -504,11 +505,11 @@ export class Vault {
       const copy = openDatabase(temporary, oldKey)
       try {
         changeKey(copy, created.dataKey)
-        if (!passesIntegrityCheck(copy)) {
-          throw new Error('the re-encrypted copy failed integrity_check')
-        }
       } finally {
         copy.close()
+      }
+      if (!passesOnDisk(temporary, created.dataKey, passesIntegrityCheck)) {
+        throw new Error('the re-encrypted copy failed integrity_check')
       }
       syncFile(temporary)
       this.checkpoint('re-encrypted')

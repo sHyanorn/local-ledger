@@ -10,6 +10,7 @@ import {
   openDatabase,
   openFailure,
   passesIntegrityCheck,
+  passesOnDisk,
   passesQuickCheck,
 } from './database'
 import { seal } from './envelope'
@@ -60,11 +61,9 @@ export function stageBackup(
     let rekeyed = false
     try {
       const db = openDatabase(path, backupKey)
+      let whole: boolean
       try {
-        const whole = passesIntegrityCheck(db)
-        changeKey(db, fresh)
-        if (!(whole ? passesIntegrityCheck(db) : passesQuickCheck(db)))
-          return { ok: false, reason: 'damaged' }
+        whole = passesIntegrityCheck(db)
         summary = db
           .prepare(
             `SELECT (SELECT count(*) FROM accounts) AS accounts,
@@ -72,9 +71,13 @@ export function stageBackup(
                (SELECT max(date) FROM transactions) AS lastDate`,
           )
           .get() as BackupSummary
+        changeKey(db, fresh)
       } finally {
         db.close()
       }
+      const check = whole ? passesIntegrityCheck : passesQuickCheck
+      if (!passesOnDisk(path, fresh, check))
+        return { ok: false, reason: 'damaged' }
       rekeyed = true
     } catch (error) {
       const reason = openFailure(error)

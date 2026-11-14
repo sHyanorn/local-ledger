@@ -86,6 +86,28 @@ export const passesQuickCheck = (db: Db): boolean =>
   db.pragma('quick_check', { simple: true }) === 'ok'
 
 /**
+ * Whether the file, read by a new connection under the key, passes the
+ * check. The connection that rewrote every page, as a rekey does, holds
+ * them in its cache and would answer from there, not from the file.
+ */
+export function passesOnDisk(
+  file: string,
+  key: Uint8Array,
+  check: (db: Db) => boolean,
+): boolean {
+  const db = new Database(file, { fileMustExist: true, readonly: true })
+  try {
+    selectCipher(db)
+    applyKey(db, key)
+    return check(db)
+  } catch {
+    return false
+  } finally {
+    db.close()
+  }
+}
+
+/**
  * An existing ledger: the first read decrypts page 1 and so checks the key,
  * migrations have run at least once, and every page reads back. An empty
  * file decrypts under any key, so the second check matters.
