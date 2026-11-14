@@ -1,5 +1,7 @@
 # Local Ledger
 
+[![CI](https://github.com/sHyanorn/local-ledger/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sHyanorn/local-ledger/actions/workflows/ci.yml?query=branch%3Amain)
+
 A personal finance desktop app for macOS and Windows that keeps everything on your computer, in an encrypted database. Import bank CSV files, categorize transactions with rules, set monthly budgets, see charts, and export a month to Excel or PDF. The app makes no network requests.
 
 ![Overview in light mode](docs/screenshots/overview-light.png)
