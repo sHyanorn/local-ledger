@@ -67,7 +67,7 @@ function parseRows(text: string, options: Options): Row[] {
 }
 
 /** The most common row width, the wider on a tie, and the share of rows with it. */
-function usualWidth(widths: readonly number[]): {
+export function usualWidth(widths: readonly number[]): {
   width: number
   share: number
 } {
@@ -88,7 +88,7 @@ function usualWidth(widths: readonly number[]): {
  * Row widths without trailing empty cells, which a trailing delimiter adds.
  * Only an empty cell counts: one of spaces held in quotes is a value.
  */
-const width = (cells: readonly string[]) => {
+export const width = (cells: readonly string[]) => {
   let end = cells.length
   while (end > 0 && cells[end - 1] === '') end--
   return end
@@ -149,7 +149,7 @@ export function readTable(bytes: Uint8Array, encoding?: Encoding): Table {
  * delimiter without quotes splits there, and the cells after it shift. A
  * comma-separated file is left alone, since there a longer row is more
  * often an amount with an unquoted thousands separator, which joining
- * would turn into a wrong amount.
+ * would turn into a wrong amount; applyMapping lists such a row instead.
  */
 export function joinOverflow(
   rows: readonly Row[],

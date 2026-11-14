@@ -11,6 +11,7 @@ import {
 import { decode } from '../../src/main/import/decode'
 import { cleanText } from '../../src/main/clean-text'
 import { applyMapping } from '../../src/main/import/mapping'
+import { detectLayout } from '../../src/main/import/templates'
 import type { Mapping } from '../../src/shared/imports'
 import {
   dateOrders,
@@ -410,6 +411,80 @@ describe('applyMapping', () => {
       { line: 6, problem: 'description-too-long', value: `${'x'.repeat(40)}…` },
       { line: 7, problem: 'amount', value: '' },
     ])
+  })
+})
+
+describe("a row with a value past its file's columns", () => {
+  function read(...lines: string[]) {
+    const table = readTable(bytes(lines.join('\n')))
+    const layout = detectLayout(table.rows)
+    if (!layout) throw new Error('no layout')
+    return applyMapping(table.rows, layout.mapping)
+  }
+
+  // An unquoted thousands separator splits the amount and shifts every cell
+  // after it; read by position, -1,200.00 would be -1.00.
+  it.each([
+    [
+      'without a header, the amount before the description',
+      [
+        '01/05/2026,-15.26,FAKE CAFE,+984.74',
+        '02/05/2026,-1,200.00,FAKE RENT,-215.26',
+        '03/05/2026,-20.00,FAKE SHOP,-235.26',
+      ],
+      2,
+    ],
+    [
+      'with a header, the amount last',
+      [
+        'Date,Description,Amount',
+        '01/05/2026,FAKE CAFE,-15.26',
+        '02/05/2026,FAKE RENT,-1,200.00',
+        '03/05/2026,FAKE SHOP,-20.00',
+      ],
+      3,
+    ],
+  ])('is an amount it cannot read, %s', (_, lines, line) => {
+    const parsed = read(...lines)
+    expect(parsed.rows.map((row) => row.cents)).toEqual([-1526, -2000])
+    expect(parsed.errors).toEqual([
+      { line, problem: 'amount', value: '-1,200.00' },
+    ])
+  })
+
+  it('is found against the header when most rows are that wide', () => {
+    const parsed = read(
+      'Date,Description,Amount',
+      '01/05/2026,FAKE RENT,-1,200.00',
+      '02/05/2026,FAKE PAY,2,500.00',
+      '03/05/2026,FAKE CAFE,-4.50',
+    )
+    expect(parsed.rows.map((row) => row.cents)).toEqual([-450])
+    expect(parsed.errors.map((error) => error.value)).toEqual([
+      '-1,200.00',
+      '2,500.00',
+    ])
+  })
+
+  it('leaves rows that fill columns the header names', () => {
+    // Westpac writes Serial for cheques only; NAB shortens rows that lack a
+    // merchant, here most of them.
+    expect(
+      read(
+        'Bank Account,Date,Narrative,Debit Amount,Credit Amount,Balance,Categories,Serial',
+        '000000000001,29/05/2026,FAKE MARKET,15.26,,1234.56,OTHER,',
+        '000000000001,28/05/2026,FAKE CHEQUE,50.00,,1249.82,OTHER,000123',
+        '000000000001,27/05/2026,FAKE SHOP,4.50,,1299.82,OTHER,',
+      ).errors,
+    ).toEqual([])
+    expect(
+      read(
+        'Date,Amount,Account Number,,Transaction Type,Transaction Details,Balance,Category,Merchant Name',
+        '29 May 26,-15.26,0000,,CARD PURCHASE,FAKE MARKET,1234.56,Groceries,Fake Market',
+        '28 May 26,-30.00,0000,,TRANSFER DEBIT,FAKE SAVINGS,1249.82,Transfers',
+        '27 May 26,-20.00,0000,,TRANSFER DEBIT,FAKE SAVINGS,1279.82,Transfers',
+      ).errors,
+    ).toEqual([])
   })
 })
 

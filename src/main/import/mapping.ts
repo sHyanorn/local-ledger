@@ -3,7 +3,7 @@
 import type { AmountColumns, Mapping, RowError } from '../../shared/imports'
 import { DESCRIPTION_MAX } from '../../shared/ledger'
 import { cleanText } from '../clean-text'
-import type { Row } from './csv'
+import { usualWidth, width, type Row } from './csv'
 import { parseBankAmount, parseDate } from './values'
 
 interface ParsedRow {
@@ -36,6 +36,32 @@ function amountOf(
   return { cents: credit - debit }
 }
 
+/**
+ * How many cells a row of the file has: as many as its header, which names
+ * every column the export writes, or else as most rows have. A row with a
+ * value past them was split where a cell held the delimiter, most often an
+ * amount's unquoted thousands separator in a comma-separated file (D024),
+ * and every cell after the split has moved: read by position, -1,200.00
+ * would be -1.00.
+ */
+function columnsOf(rows: readonly Row[], header: boolean): number {
+  if (header) return rows[0]?.cells.length ?? 0
+  return usualWidth(rows.map((row) => row.cells.length)).width
+}
+
+/** The amount's cells and the cells the split added, as a comma-separated file wrote them. */
+function splitAmount(
+  cells: readonly string[],
+  amount: AmountColumns,
+  extra: number,
+): string {
+  const columns =
+    amount.kind === 'signed' ? [amount.column] : [amount.debit, amount.credit]
+  return cells
+    .slice(Math.min(...columns), Math.max(...columns) + extra + 1)
+    .join(',')
+}
+
 /** The rows read through the mapping, and the rows that could not be. */
 export function applyMapping(
   rows: readonly Row[],
@@ -43,6 +69,7 @@ export function applyMapping(
 ): { rows: ParsedRow[]; errors: RowError[] } {
   const parsed: ParsedRow[] = []
   const errors: RowError[] = []
+  const columns = columnsOf(rows, mapping.header)
   for (const { line, cells } of mapping.header ? rows.slice(1) : rows) {
     const dateText = cells[mapping.date] ?? ''
     const date = parseDate(dateText, mapping.dateOrder)
@@ -50,7 +77,11 @@ export function applyMapping(
       errors.push({ line, problem: 'date', value: dateText })
       continue
     }
-    const amount = amountOf(cells, mapping.amount)
+    const extra = width(cells) - columns
+    const amount =
+      extra > 0
+        ? { value: splitAmount(cells, mapping.amount, extra) }
+        : amountOf(cells, mapping.amount)
     if ('value' in amount) {
       errors.push({ line, problem: 'amount', value: amount.value })
       continue
