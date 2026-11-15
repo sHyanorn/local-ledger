@@ -31,8 +31,8 @@ test('the memory of every app process, unlocked and after a lock (report only)',
   userData,
 }, testInfo) => {
   test.setTimeout(600_000)
-  const mainPid = app.process().pid
-  if (mainPid === undefined) throw new Error('no main process')
+  // On Windows the process Playwright starts is the main process's parent.
+  const mainPid = await app.evaluate(() => process.pid)
 
   await page.getByLabel('Master password').pressSequentially(DEMO_PASSWORD)
   const home = await replacedBy(app, () =>
