@@ -12,6 +12,7 @@ import {
   replacedBy,
   sidebar,
   unlock,
+  vaultHosts,
 } from './fixtures'
 
 const sample = (name: string) => resolve(__dirname, '../fixtures/csv', name)
@@ -180,7 +181,7 @@ ledgerTest(
 )
 
 ledgerTest(
-  'after a lock, no imported or waiting file text is reachable in the main process',
+  'after a lock, the vault host that read the files has ended, and no imported or waiting file text is reachable in the main process',
   async ({ app, home }, testInfo) => {
     const control = `Control ${randomUUID()}`
     await app.evaluate(
@@ -226,10 +227,12 @@ ledgerTest(
     await open(file('waiting.csv', waiting))
 
     const shown = await rendererPid(app)
+    const [host] = await vaultHosts(app)
     const locked = await replacedBy(app, () =>
       sidebar(home).getByRole('button', { name: 'Lock' }).click(),
     )
     await expectExited(shown)
+    await expectExited(host!)
     await expect(locked.getByLabel('Master password')).toBeVisible()
 
     const snapshot = await mainHeapSnapshot(app, testInfo)

@@ -11,6 +11,7 @@ import {
   rendererPid,
   replacedBy,
   sidebar,
+  vaultHosts,
 } from './fixtures'
 
 /** Uncategorized and not one side of a seeded transfer, which the seed pairs. */
@@ -228,7 +229,7 @@ test('a row recategorized out of the category shown leaves the list, and the tot
   await expect(rows(home).first()).not.toContainText(description ?? '')
 })
 
-test('after a lock, no transaction text stays in a page or reachable in the main process', async ({
+test('after a lock, no transaction text stays in a page or its vault host, nor is reachable in the main process', async ({
   app,
   home,
 }, testInfo) => {
@@ -249,16 +250,19 @@ test('after a lock, no transaction text stays in a page or reachable in the main
   await expect(rows(home).first()).toContainText(marker)
 
   const shown = await rendererPid(app)
+  const [host] = await vaultHosts(app)
   const locked = await replacedBy(app, () =>
     sidebar(home).getByRole('button', { name: 'Lock' }).click(),
   )
   await expectExited(shown)
+  await expectExited(host!)
   await expect(locked.getByLabel('Master password')).toBeVisible()
   expect(await locked.content()).not.toContain(marker)
 
-  // A heap snapshot collects garbage first, so it holds only what is still
-  // reachable. It does not hold the contents of Buffers and other binary
-  // arrays; SECURITY_DESIGN says so.
+  // The vault host read the text and has ended; the main process only
+  // passed it a port. A heap snapshot collects garbage first, so it holds
+  // only what is still reachable. It does not hold the contents of Buffers
+  // and other binary arrays; SECURITY_DESIGN says so.
   // Booleans, so a failure does not print a snapshot of many megabytes.
   const snapshot = await mainHeapSnapshot(app, testInfo)
   expect(snapshot.includes(control), 'the control is found').toBe(true)

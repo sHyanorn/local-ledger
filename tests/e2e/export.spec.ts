@@ -10,12 +10,14 @@ import type { Page } from '@playwright/test'
 import { strFromU8, unzipSync } from 'fflate'
 import {
   expect,
+  expectExited,
   ledgerTest,
   lockScreen,
   mainHeapSnapshot,
   saveTo,
   sidebar,
   unlock,
+  vaultHosts,
 } from './fixtures'
 
 const thisMonth = () => {
@@ -197,7 +199,7 @@ ledgerTest(
 )
 
 ledgerTest(
-  'after exporting and a lock, the exported text is not reachable in the main process',
+  'after exporting and a lock, the vault host that built the files has ended, and the exported text is not reachable in the main process',
   async ({ app, home }, testInfo) => {
     const control = `Control ${randomUUID()}`
     await app.evaluate(
@@ -231,7 +233,9 @@ ledgerTest(
         ),
       ).toEqual({ ok: true })
     }
+    const [host] = await vaultHosts(app)
     await lockScreen(app)
+    await expectExited(host!)
     const snapshot = await mainHeapSnapshot(app, testInfo)
     expect(snapshot.includes(control), 'the control is found').toBe(true)
     expect(snapshot.includes(marker), 'the exported text is reachable').toBe(
