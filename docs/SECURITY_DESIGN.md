@@ -8,7 +8,7 @@ Protected against:
 
 - Someone who obtains the vault files: a copied or stolen disk, a backup, a synced folder. Without the master password the files reveal nothing but their size, the key derivation settings and the generation number, which counts password changes; a backup's header also shows the database's schema version and the SHA-256 of the encrypted database, and the folder a restore sets aside is named with the date and time of the restore.
 - Someone at the computer after the app locked itself (idle, screen lock, sleep).
-- Web content: the app loads none. The renderer is sandboxed, has no Node.js, and reaches the main process only through a fixed, validated IPC API.
+- Web content: the app loads none. The renderer is sandboxed, has no Node.js, and reaches the vault host and the main process only through a fixed, validated API.
 
 Not protected against:
 
@@ -73,7 +73,7 @@ A backup file is the 8 bytes `LLBACKUP`, the header's length as a 4-byte big-end
 
 - **Create**: the vault is built in a staging directory and renamed into place, so a crash leaves no vault or a whole one. If the rename was lost (a power cut after a failed directory flush), the app finds the whole vault in its staging directory at startup and puts it back.
 - **Unlock**: derive the sealing key in a worker thread, unseal the data key, open the current generation and run `quick_check`. Only then, and once a directory flush shows that `vault.json` names that generation on disk, are leftovers of an interrupted change removed.
-- **Lock**: close the database; SQLite3 Multiple Ciphers wipes its key schedule when it frees the cipher context. The page is replaced, and its renderer process exits; this happens on every lock, also when the vault was already locked, so a password typed but not submitted does not survive it. A lock takes effect at once, without waiting for other vault operations, and cancels an unlock, create or password change that is still deriving its key.
+- **Lock**: close the database at once, without waiting for other vault operations; SQLite3 Multiple Ciphers wipes its key schedule when it frees the cipher context, but in 0.2.1 half of the data key still outlived a lock (Memory). The vault host takes no new call and exits once the calls under way have settled; if one is still running 30 s after the lock, the host is killed (D047). The page is replaced, and its renderer process exits; this happens on every lock, also when the vault was already locked, so a password typed but not submitted does not survive it. A lock also cancels an unlock, create or password change that is still deriving its key.
 - **Auto-lock**: after the system has been idle for the time set in Settings (1, 5, 15 or 30 minutes; 5 by default, with no option to turn it off), when the screen locks, when the computer sleeps, when the window closes. Closing the window also ends its page process.
 - **Change password**: a new data key under the new password. The database is copied, the copy re-encrypted, checked with `integrity_check`, flushed and renamed to the next generation. Renaming the new `vault.json` over the old one is the single commit point: a crash before it leaves the old password working, after it the new one. A failure without a crash reopens whichever generation `vault.json` on disk names: before the commit the page reports the failure and the old password stays, after it the change stands. The old generation is deleted only after a later directory flush succeeds; Windows cannot flush a directory and relies on NTFS. Copies of the old generation, in backups, synced folders or unallocated disk blocks, still open with the old password, and the app says so once after the change (D043). Tests copy the disk at each of the five steps of a change and check that exactly one password works, and fail the change at each step without a crash and check the same.
 - **Damaged vault**: a missing or invalid `vault.json`, one that does not match its checksum and whose key does not unseal, a missing current database, or one that is empty or fails `quick_check`, is reported and nothing is deleted.
@@ -82,27 +82,44 @@ On Windows, a directory cannot be flushed; renames rely on NTFS `MoveFileEx` sem
 
 ## Memory
 
+The vault and its database are opened, queried and read only in the vault host, a utility process that each page calls over a port of its own; a page gets what it shows, and the main process the page of a PDF export. The main process starts a host when a page asks for one and none is running, the locked or setup page after each lock; that host serves the pages that follow until the next lock ends it, and what it held goes with it (D047). The main process keeps the windows, shows the dialogs, prints PDFs and handles the lock.
+
 What the app does:
 
-- The data key, the sealing key, the encoded password and the raw key literal live in buffers the app owns and fills with zeros after use, also when an operation fails or is cancelled. While unlocked, the only copy of the data key is inside SQLite.
+- The data key, the sealing key, the encoded password and the raw key literal live in buffers the app owns and fills with zeros after use, also when an operation fails or is cancelled. While unlocked, the data key is only inside SQLite, in the vault host. Copies made outside these buffers, by the key derivation or by SQLite, are not wiped by the app; they go when the vault host ends.
 - Argon2id runs in a worker thread that ends after each derivation, releasing its 64 MiB.
 - On unlock, lock and a password change that commits, the renderer process that showed the previous page ends.
 - A password change that fails keeps its page so it can say so, and clears its fields; the typed passwords stay in that process as strings until the next lock ends it.
-- The data handlers keep no reference to rows between calls. A test shows a transaction, locks, and checks that its text is gone from the pages and no longer reachable in the main process heap: a heap snapshot collects garbage first and here keeps strings whole. It does not see the contents of Buffers and other binary arrays, nor memory already freed.
-- A CSV file being imported waits in the main process until it is imported, another is chosen, or the vault locks or unlocks; then its bytes are zeroed and its parsed rows dropped. Bytes read but refused are zeroed too. A test imports one file, leaves another waiting, locks, and checks that neither file's text is reachable.
+- The data handlers keep no reference to rows between calls. A test shows a transaction, locks, and checks that the host that read it has ended, that its text is gone from the pages, and that it is not reachable in the main process heap: a heap snapshot collects garbage first and here keeps strings whole. It does not see the contents of Buffers and other binary arrays, nor memory already freed.
+- A CSV file being imported waits in the vault host until it is imported, another is chosen, or the vault locks or unlocks; then its bytes are zeroed and its parsed rows dropped. Bytes read but refused are zeroed too. A test imports one file, leaves another waiting, locks, and checks that the host that read them has ended and that neither file's text is reachable in the main process. A test exports a workbook and a PDF, locks, and checks that the host has ended and that the exported text is not reachable in the main process heap; copies of the printed page still stay in its memory (below).
+- A test reads the memory of every process of the app on Linux, Windows and macOS: unlocked; after a lock, once the host and the page have exited and the main process has collected garbage; and 30 s later. It locks with no call under way. It counts copies of a typed description, two imported ones, one of them in a page printed to PDF, the 40 seeded descriptions, the master password, the sealing key and the data key, and fails if the main process holds any of them, or if any process does after a lock, but for the copies in the main process listed below. On macOS it reads only the pages a process has written, so its counts there are a lower bound, and a phase whose read of the main process misses the test's own marker does not check the main process. In 0.2.1, as before, the main process held the vault, and after a lock this test found there, on Linux, 38 copies of the imported text, 36 of the 40 seeded descriptions, the master password, the sealing key and the second half of the data key, and 30 s later 8 copies of the imported text and the half key. Windows and macOS also kept the imported text and the half key after the lock and 30 s later.
 
 What it cannot do, and does not claim:
 
-- JavaScript strings are immutable and cannot be wiped. The master password exists as strings in the renderer that took it (the input's value, React state) until that process ends, and in the main process after crossing IPC until garbage collection reclaims it. V8 may have copied it while compacting the heap.
-- Memory that is released, by a worker or a renderer process, is returned to the operating system, not overwritten by the app.
-- Decrypted data read from the database becomes JavaScript strings in the main process and stays there until garbage collection.
-- While unlocked, SQLite keeps up to 16 MB of decrypted pages in its page cache in the main process. Closing the database frees them without overwriting; this build of SQLite3 Multiple Ciphers leaves its secure memory option off.
+- JavaScript strings are immutable and cannot be wiped. The master password exists as strings in the renderer that took it (the input's value, React state) until that process ends, and in the vault host after crossing its port, until the host ends at the next lock. V8 may have copied it while compacting the heap.
+- Memory that is released, by a worker, the vault host or a renderer process, is returned to the operating system, not overwritten by the app.
+- Decrypted data read from the database becomes JavaScript strings in the vault host and stays there until garbage collection, or until the host ends. A call under way at a lock keeps its data there until it settles, for at most 30 s (D047).
+- While unlocked, SQLite keeps up to 16 MB of decrypted pages in its page cache in the vault host. Closing the database frees them without overwriting; this build of SQLite3 Multiple Ciphers leaves its secure memory option off.
+- A PDF export hands the page of the month's statement to the main process, which prints it, and copies of its text stay there after a lock.
+- Copies of a description typed into the page also appear in the main process, though the app's calls do not carry it there. They come from Chromium or from the test driver that types it; the test does not tell which, and finds none of the master password, which is typed too. The test reports both kinds of copy and asserts neither. Copies in the main process, one byte per character / UTF-16; the typed rows give the range over 12 CI runs on each platform (12 to 14 test runs, counting runs repeated), the printed rows one CI run, and the local rows runs outside CI:
+
+  | Main process | Unlocked | After a lock | 30 s later |
+  | --- | --- | --- | --- |
+  | Typed, Linux | 3-6 / 1-2 | 3-8 / 0 | 2-8 / 0 |
+  | Typed, Windows | 3-4 / 4 | 3-4 / 3 | 2-4 / 3 |
+  | Typed, macOS | 0-3 / 0-3 | 0-6 / 0 | 0-6 / 0 |
+  | Typed, Linux, local | 0-4 / 1 | 0-4 / 0 | 0-3 / 0 |
+  | Printed, Linux | 2 / 0 | 2 / 0 | 1 / 0 |
+  | Printed, Windows | 6 / 0 | 2 / 0 | 0 / 0 |
+  | Printed, macOS | 4 / 0 | 1 / 0 | 1 / 0 |
+  | Printed, Linux, local | 2 / 0 | 2 / 0 | 1 / 0 |
+
 - The operating system may write any of this memory to swap or a hibernation file. The app does not lock pages in memory.
 
 ## Importing files
 
-- Only the system open dialog, shown by the main process, picks a file by path; the page cannot name a path, and its IPC payloads carry no paths. A file dropped on the window is read by the page, which can read only what the user dropped, and its bytes (at most 10 MB, checked again in the main process) go through the same reading as a chosen file. Only a regular file is read: the path is checked before it is opened, without waiting, and the open handle must be that same file. It is read through that handle, never past the limit, whatever size the file system reports; if the vault locked while the dialog was open, nothing is read.
-- A file is refused whole past 10 MB, 50,000 rows, 64 columns or 64 KB in one record. Fields are split by `csv-parse`; dates and amounts are read strictly. Every request from the page is validated with zod, and an import is computed again in the main process from the settings of the last preview, refusing any others, before anything is written.
+- Only the system open dialog, shown by the main process, picks a file by path; the page cannot name a path, and its calls carry no paths. A file dropped on the window is read by the page, which can read only what the user dropped, and its bytes (at most 10 MB, checked again in the vault host) go through the same reading as a chosen file. Only a regular file is read: the path is checked before it is opened, without waiting, and the open handle must be that same file. It is read through that handle, never past the limit, whatever size the file system reports; if the vault locked while the dialog was open, nothing is read.
+- A file is refused whole past 10 MB, 50,000 rows, 64 columns or 64 KB in one record. Fields are split by `csv-parse`; dates and amounts are read strictly. Every request from the page is validated with zod, and an import is computed again in the vault host from the settings of the last preview, refusing any others, before anything is written.
 - Text from a file is stored without control characters, bidirectional controls or zero-width spaces, and shown only as text, so a cell such as `=HYPERLINK(...)` does nothing in the app. Exports neutralize such text for spreadsheets (below).
 - The source file stays where it is, unencrypted, and its name is stored inside the vault for the import history. Deleting or protecting the original is up to the user.
 
@@ -117,7 +134,7 @@ What it cannot do, and does not claim:
 ## Exporting
 
 - An export is a month's statement in one currency, as an Excel workbook or a PDF. It is not encrypted. The export dialog says so before the user goes on, and the file is written only where the user picks in the system save dialog, shown by the main process; the page cannot name a path. The file is made readable by the user only (mode 0600 where the file system has modes), also when it replaces an existing file. The app keeps no list of exported files and never deletes or changes them.
-- Nothing else is written: the workbook is built in memory, and the PDF is printed from a page served from memory at a random `app://` path that exists only while it prints, marked `no-store`, by a hidden window made for that export with no preload and JavaScript off; its process ends after printing. The buffer holding the file is zeroed once written. The statement's text, as for any query, stays as strings in the main process until garbage collection.
+- Nothing else is written: the workbook is built in memory, and the PDF is printed from a page served from memory at a random `app://` path that exists only while it prints, marked `no-store`, by a hidden window made for that export with no preload and JavaScript off; its process ends after printing. The PDF's bytes are zeroed in the main process once sent to the vault host, and the file's in the host once written. The statement's text, as for any query, stays as strings in the vault host until garbage collection or the next lock; copies of the page printed stay in the main process (Memory).
 - A lock or unlock while the save dialog is open, or while the PDF prints, cancels the export, and nothing is written.
 - Spreadsheet formulas: every text cell is an inline string, so the file holds no formula. Text that starts like one, once characters XML cannot hold are dropped (`=`, `+`, `-`, `@`, tab, carriage return, line feed, or the full-width `＝＋－＠`, following OWASP) is also marked with the cell's quote prefix, and all text cells use the Text format, so editing a cell does not turn it into a formula. Checked in LibreOffice; Excel and Numbers have not been tried (D030).
 - The PDF's title is fixed text. The PDF records the time it was made.
@@ -126,8 +143,8 @@ What it cannot do, and does not claim:
 
 - Renderer: `contextIsolation`, `sandbox` (checked at the OS level in tests), no Node.js integration, no webview, spellcheck off. The page is served from `app://local-ledger` with a strict CSP on every response.
 - New windows, navigation, redirects and permission requests are refused; the session cancels every request outside the app. Tests read a Chromium net log and fail on any network request.
-- The only messages from the main process to the page are menu commands, sent while the vault is open; preload passes on a command's name only if it is on a fixed list.
-- IPC: one handler per channel; each checks that the sender is the app's own page and validates its payload with zod (D017). The data channels need the vault unlocked. A failure reaches the page as a code only; the main process logs the channel and an error code, never a message or the payload.
+- The only messages from the main process to the page are its port to the vault host, sent once, and menu commands, sent while the vault is open; preload passes on a command's name only if it is on a fixed list.
+- IPC: the main process takes two requests from the app's own pages, a port to the vault host and a lock, and serves the host's requests for the open and save dialogs and for printing a PDF. Over its port a page calls the host, which validates each payload with zod (D017); the data channels need the vault unlocked. A failure reaches the page as a code only; the host logs the channel and an error code, never a message or the payload.
 - The app refuses to start with any switch that weakens the Chromium sandbox and, when packaged, with a remote debugging port.
 - Fuses: no `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` or `--inspect`; the app loads only from an integrity-checked `app.asar`; `file://` gets no extra privileges. The native SQLite binary sits in `app.asar.unpacked`, outside the integrity check.
 
@@ -142,7 +159,7 @@ What it cannot do, and does not claim:
 ## Known limits
 
 - Malware running as the user, a weak or forgotten master password: see the threat model.
-- Decrypted data lives in memory while the vault is open, as JavaScript strings until garbage collection and in SQLite's page cache, and may reach swap or a hibernation file (Memory).
+- Decrypted data lives in memory while the vault is open: as JavaScript strings until garbage collection in the vault host and in the page that shows it, and in SQLite's page cache in the host, which can keep it up to 30 s after a lock while calls under way settle. It may reach swap or a hibernation file. The main process keeps copies of a page printed to PDF, and the test finds copies there of text typed into the page, from Chromium or the test driver, but none of the master password (Memory).
 - Files outside the vault are plaintext: exports, the CSV files imported, and nothing else the app writes. Backups are encrypted, but an old backup, and a vault set aside by a restore, open with the password they had.
 - SQLCipher authenticates pages, not the database as a whole, so a vault folder replaced by an older copy of itself still opens. A backup's sealed header binds its own pages together.
 - Releases are unsigned; a download is only as trustworthy as the checksum and attestation check the user makes.

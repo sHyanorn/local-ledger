@@ -8,7 +8,7 @@ A personal finance desktop app whose data stays on the local machine in a databa
 
 | Component | Contents |
 |---|---|
-| Desktop shell | Electron main, preload and renderer processes, typed IPC, native menus, macOS and Windows packaging |
+| Desktop shell | Electron main, preload and renderer processes, a utility process for the vault, typed IPC, native menus, macOS and Windows packaging |
 | Security | Whole-database encryption, Argon2id key derivation, Electron hardening, auto-lock |
 | Interface | React + Zustand, macOS-style design, dark mode, keyboard shortcuts |
 | Data processing | CSV parsing and column mapping, deduplication, rule-based categorization, export |
@@ -51,15 +51,20 @@ A personal finance desktop app whose data stays on the local machine in a databa
 ┌───────── Renderer process (sandbox) ─────────┐
 │ React + Zustand                              │
 │ window.ledger.* (typed API from preload)     │
-└───────────────────┬──────────────────────────┘
-                    │ IPC (zod-validated)
-┌───────────────────▼──────────────────────────┐
-│ Main process                                 │
-│  vault: password → Argon2id → sealed DB key  │
-│  db: SQLCipher-compatible encrypted SQLite   │
-│  import / export / rules / backup            │
-└──────────────────────────────────────────────┘
+└──────────┬───────────────────────┬───────────┘
+           │ port (zod-validated)  │ IPC: a port, the lock
+┌──────────▼─────────────────┐ ┌───▼────────────────────────┐
+│ Vault host (utility)       │ │ Main process               │
+│  vault: password →         │ │  windows, menus, auto-lock │
+│   Argon2id → sealed DB key │◄┤  dialogs and PDF printing  │
+│  db: SQLCipher-compatible  │ │   for the host             │
+│   encrypted SQLite         │ │  starts the host, ends it  │
+│  import / export / rules / │ │   at every lock            │
+│   backup                   │ │                            │
+└────────────────────────────┘ └────────────────────────────┘
 ```
+
+The vault host opens and reads the vault, and every lock ends it; the next page gets a new one (D047).
 
 Encryption scheme:
 
