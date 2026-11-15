@@ -49,3 +49,15 @@ it('kills a host that has not exited 30 seconds after a lock', () => {
   vi.advanceTimersByTime(1)
   expect(forked[0]!.kill).toHaveBeenCalledOnce()
 })
+
+it('starts no host for a page that went while the last host ended', () => {
+  const vaultHost = start()
+  vaultHost.connect(page())
+  vaultHost.lock()
+  // The locked page waits for the next host; then its window closes.
+  vaultHost.connect(page())
+  vaultHost.lock()
+  forked[0]!.emit('exit', 0)
+  expect(forked).toHaveLength(1)
+  expect(vaultHost.running).toBe(false)
+})

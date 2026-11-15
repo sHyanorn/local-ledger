@@ -70,6 +70,9 @@ export class VaultHost {
 
   /** Tells the host to lock and exit; the next page gets a new one. */
   lock(): void {
+    // A page still waiting for a host is gone, or replaced after this lock.
+    for (const port of this.#waiting.ports) port.close()
+    this.#waiting.ports = []
     this.#waiting.failures.push(...this.#failAfterLock)
     this.#failAfterLock = []
     const host = this.#current
