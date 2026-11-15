@@ -89,13 +89,20 @@ export async function expectExited(pid: number): Promise<void> {
     .toBe('exited')
 }
 
+/** How Playwright fails a call whose page has closed. */
+const PAGE_CLOSED = 'Target page, context or browser has been closed'
+
 /** Runs an action that makes the app replace its page, and returns the new page. */
 export async function replacedBy(
   app: ElectronApplication,
   action: () => Promise<unknown>,
 ): Promise<Page> {
   const next = app.waitForEvent('window')
-  await action()
+  await action().catch((error: unknown) => {
+    // The main process can close the page an action clicked in before the
+    // click returns; the page that replaces it must still come.
+    if (!String(error).includes(PAGE_CLOSED)) throw error
+  })
   const page = await next
   await page.waitForLoadState('load')
   return page
