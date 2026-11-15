@@ -1,14 +1,57 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { isCommand } from '../shared/commands'
 import type { LedgerApi } from '../shared/api'
-import type { Channel, Payload, Results } from '../shared/ipc'
+import type {
+  Channel,
+  Payload,
+  PortAnswer,
+  PortCall,
+  Results,
+} from '../shared/ipc'
 
 declare const __APP_VERSION__: string
 
-const invoke = <C extends Channel>(
+/** The DOM MessagePort that comes with the event, as this file uses it. */
+interface VaultPort {
+  onmessage: ((event: { data: PortAnswer }) => void) | null
+  postMessage(call: PortCall): void
+}
+
+// The vault host answers over a port the main process hands this preload;
+// the port stays here, out of the page's reach. Calls made before it comes
+// wait for it.
+const port = new Promise<VaultPort>((resolve) => {
+  ipcRenderer.once('vault:port', ({ ports }) =>
+    resolve(ports[0] as unknown as VaultPort),
+  )
+})
+ipcRenderer.send('vault:port')
+const calls = new Map<
+  number,
+  { resolve: (result: unknown) => void; reject: (error: Error) => void }
+>()
+let nextCall = 0
+void port.then((vault) => {
+  vault.onmessage = ({ data }) => {
+    const call = calls.get(data.id)
+    if (!call) return
+    calls.delete(data.id)
+    if (data.ok) call.resolve(data.result)
+    else call.reject(new Error(data.code))
+  }
+})
+
+const invoke = async <C extends Channel>(
   channel: C,
   payload: Payload<C>,
-): Promise<Results[C]> => ipcRenderer.invoke(channel, payload)
+): Promise<Results[C]> => {
+  const vault = await port
+  return new Promise((resolve, reject) => {
+    const id = nextCall++
+    calls.set(id, { resolve: resolve as (result: unknown) => void, reject })
+    vault.postMessage({ id, channel, payload })
+  })
+}
 
 // contextBridge hands the page a frozen copy of this object.
 const api: LedgerApi = {
@@ -30,7 +73,7 @@ const api: LedgerApi = {
     status: () => invoke('vault:status', undefined),
     create: (password) => invoke('vault:create', { password }),
     unlock: (password) => invoke('vault:unlock', { password }),
-    lock: () => invoke('vault:lock', undefined),
+    lock: () => ipcRenderer.invoke('vault:lock'),
     changePassword: (current, next) =>
       invoke('vault:change-password', { current, next }),
     takeNotice: () => invoke('vault:take-notice', undefined),

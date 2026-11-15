@@ -1,4 +1,4 @@
-// A file being imported. It waits here, in the main process, between being
+// A file being imported. It waits here, in the vault host, between being
 // chosen and being imported; the page sees only what it needs to decide. It
 // is dropped when imported, when another file is chosen, and whenever the
 // vault locks or unlocks.

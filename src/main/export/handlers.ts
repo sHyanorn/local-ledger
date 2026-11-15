@@ -1,6 +1,6 @@
 // Exporting a statement. The page asks for a month, a currency and a format;
-// the main process asks the user where to save it, builds the file, and
-// writes it there. The file is not encrypted (SECURITY_DESIGN). A lock or
+// the main process asks the user where to save it, and this builds the file
+// and writes it there. The file is not encrypted (SECURITY_DESIGN). A lock or
 // unlock while this runs cancels it, and nothing is written.
 import type { FileFilter } from 'electron'
 import chartCss from '../../shared/charts.css?raw'

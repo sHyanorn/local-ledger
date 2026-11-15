@@ -5,7 +5,11 @@ import pkg from './package.json' with { type: 'json' }
 export default defineConfig({
   main: {
     build: {
-      rolldownOptions: { experimental: { attachDebugInfo: 'none' } },
+      rolldownOptions: {
+        // The vault host runs in a utility process of its own.
+        input: { index: 'src/main/index.ts', host: 'src/main/host.ts' },
+        experimental: { attachDebugInfo: 'none' },
+      },
     },
   },
   preload: {

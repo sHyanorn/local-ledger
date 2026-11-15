@@ -6,11 +6,11 @@ export type Reason<C extends 'vault:create' | 'vault:unlock'> = Extract<
   Results[C],
   { ok: false }
 >['reason']
-/** A refusal from the main process, or 'failed' when the call itself failed. */
+/** A refusal from the vault, or 'failed' when the call itself failed. */
 type Notice = Reason<'vault:create'> | Reason<'vault:unlock'> | 'failed' | null
 
 interface VaultStore {
-  /** 'unreadable' when the main process could not say which state it is in. */
+  /** 'unreadable' when the vault could not say which state it is in. */
   state: VaultState | 'loading' | 'unreadable'
   busy: boolean
   notice: Notice

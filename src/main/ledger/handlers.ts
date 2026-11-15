@@ -1,6 +1,7 @@
 // IPC handlers for the ledger. Each reads the open database from the vault,
 // so a call while the vault is locked fails with the code "locked".
 import type { Handle } from '../dispatch'
+import type { Settings } from '../../shared/settings'
 import type { Vault } from '../vault/vault'
 import {
   createAccount,
@@ -44,7 +45,12 @@ import {
   updateTransaction,
 } from './transactions'
 
-export function handleLedger(vault: Vault, handle: Handle): void {
+/** `onSettings` hears of each change to the settings. */
+export function handleLedger(
+  vault: Vault,
+  handle: Handle,
+  onSettings: (settings: Settings) => void = () => {},
+): void {
   const db = () => vault.database()
   handle('accounts:list', () => listAccounts(db()))
   handle('accounts:create', (fields) => createAccount(db(), fields))
@@ -72,7 +78,11 @@ export function handleLedger(vault: Vault, handle: Handle): void {
   handle('budgets:month', ({ month }) => monthBudgets(db(), month))
   handle('budgets:set', (budget) => setBudget(db(), budget))
   handle('settings:get', () => getSettings(db()))
-  handle('settings:update', (changes) => updateSettings(db(), changes))
+  handle('settings:update', (changes) => {
+    const settings = updateSettings(db(), changes)
+    onSettings(settings)
+    return settings
+  })
   handle('reports:month', ({ month, currency }) =>
     reportData(db(), month, currency),
   )

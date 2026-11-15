@@ -38,7 +38,7 @@ export const MAX_COLUMNS = 64
 /** Rows shown while choosing the columns. */
 export const SAMPLE_ROWS = 8
 
-/** A file read and waiting in the main process to be imported. */
+/** A file read and waiting in the vault host to be imported. */
 export interface ImportFile {
   /** Names the waiting file in later calls. */
   id: string

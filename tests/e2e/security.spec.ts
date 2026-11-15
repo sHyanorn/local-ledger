@@ -497,6 +497,6 @@ ledgerTest(
       )
     })
     expect(results).toHaveLength(35)
-    for (const result of results) expect(result).toMatch(/Error: locked$/)
+    for (const result of results) expect(result).toBe('locked')
   },
 )

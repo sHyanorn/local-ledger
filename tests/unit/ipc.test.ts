@@ -1,13 +1,21 @@
 import { ipcMain } from 'electron'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDispatcher } from '../../src/main/dispatch'
 import type { Handler } from '../../src/main/dispatch'
-import { ipcHandlers } from '../../src/main/ipc'
+import { listenToPages } from '../../src/main/ipc'
 import { LockedError } from '../../src/main/vault/vault'
 import type { Channel } from '../../src/shared/ipc'
 import { PASSWORD_MIN, passwordLength } from '../../src/shared/password'
 
-vi.mock('electron', () => ({ ipcMain: { handle: vi.fn() } }))
+vi.mock('electron', () => ({
+  ipcMain: { handle: vi.fn(), on: vi.fn() },
+  MessageChannelMain: class {
+    port1 = { name: 'port1' }
+    port2 = { name: 'port2', pair: this.port1 }
+  },
+}))
+
+const APP = 'app://local-ledger'
 
 const strong = 'correct horse battery staple'
 
@@ -89,47 +97,74 @@ describe('dispatch', () => {
 })
 
 describe('ipcMain', () => {
-  /** The listener ipcMain was given for a channel with this handler. */
-  function listener(handler: Handler<'vault:status'>, devOrigin?: string) {
-    ipcHandlers(devOrigin).handle('vault:status', handler)
-    const [channel, registered] = vi.mocked(ipcMain.handle).mock.lastCall!
-    expect(channel).toBe('vault:status')
-    return (origin: string | undefined) =>
-      registered(
-        { senderFrame: origin === undefined ? null : { origin } } as never,
-        undefined,
-      )
+  const lock = vi.fn()
+  const connect = vi.fn()
+  /** The listeners the main process puts on ipcMain. */
+  function listen(devOrigin?: string) {
+    vi.mocked(ipcMain.handle).mockClear()
+    vi.mocked(ipcMain.on).mockClear()
+    listenToPages(devOrigin, { lock, connect })
+    expect(vi.mocked(ipcMain.handle).mock.calls.map(([name]) => name)).toEqual([
+      'vault:lock',
+    ])
+    expect(vi.mocked(ipcMain.on).mock.calls.map(([name]) => name)).toEqual([
+      'vault:port',
+    ])
+    return {
+      lock: vi.mocked(ipcMain.handle).mock.calls[0]![1],
+      port: vi.mocked(ipcMain.on).mock.calls[0]![1],
+    }
   }
+  const frame = (origin: string) => ({ origin, postMessage: vi.fn() })
+  beforeEach(() => {
+    lock.mockClear()
+    connect.mockClear()
+  })
 
-  it('answers the app', async () => {
-    await expect(listener(() => 'new')('app://local-ledger')).resolves.toBe(
-      'new',
-    )
+  it('locks for the app', async () => {
+    await listen().lock({ senderFrame: frame(APP) } as never, undefined)
+    expect(lock).toHaveBeenCalledOnce()
   })
 
   it.each(['https://example.com', 'null', 'app://other', 'file://'])(
-    'refuses a sender from %s',
+    'refuses a lock or a port to a sender from %s',
     async (origin) => {
-      const handler = vi.fn()
-      await expect(async () => listener(handler)(origin)).rejects.toThrow(
-        /^forbidden$/,
-      )
-      expect(handler).not.toHaveBeenCalled()
+      const listeners = listen()
+      const sender = frame(origin)
+      expect(() =>
+        listeners.lock({ senderFrame: sender } as never, undefined),
+      ).toThrow(/^forbidden$/)
+      listeners.port({ senderFrame: sender } as never)
+      expect(lock).not.toHaveBeenCalled()
+      expect(connect).not.toHaveBeenCalled()
+      expect(sender.postMessage).not.toHaveBeenCalled()
     },
   )
 
-  it('refuses a frame that has gone away', async () => {
-    await expect(async () => listener(vi.fn())(undefined)).rejects.toThrow(
-      /^forbidden$/,
-    )
+  it('refuses a lock with a payload', () => {
+    expect(() =>
+      listen().lock({ senderFrame: frame(APP) } as never, 'surprise'),
+    ).toThrow(/^invalid-argument$/)
+    expect(lock).not.toHaveBeenCalled()
   })
 
-  it('accepts the dev server only when one is given', async () => {
+  it('gives the app one end of a channel and the host the other', () => {
+    const sender = frame(APP)
+    listen().port({ senderFrame: sender } as never)
+    const [name, , [port]] = sender.postMessage.mock.calls[0]!
+    expect(name).toBe('vault:port')
+    expect(connect).toHaveBeenCalledOnce()
+    expect(connect.mock.calls[0]![0]).not.toBe(port)
+    expect(connect.mock.calls[0]![0].pair).toBe(port)
+  })
+
+  it('accepts the dev server only when one is given', () => {
     const dev = 'http://localhost:5173'
-    await expect(listener(() => 'new', dev)(dev)).resolves.toBe('new')
-    await expect(async () => listener(() => 'new')(dev)).rejects.toThrow(
-      /^forbidden$/,
-    )
+    listen(dev).port({ senderFrame: frame(dev) } as never)
+    expect(connect).toHaveBeenCalledOnce()
+    expect(() =>
+      listen().lock({ senderFrame: frame(dev) } as never, undefined),
+    ).toThrow(/^forbidden$/)
   })
 })
 

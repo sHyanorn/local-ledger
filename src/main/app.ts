@@ -1,24 +1,16 @@
 import { join } from 'node:path'
 import { app, powerMonitor, shell } from 'electron'
+import type { IdleLockMinutes } from '../shared/settings'
 import { IDLE_LIMIT_SECONDS, watchForLock } from './auto-lock'
-import { getSettings } from './ledger/settings'
-import { hardenApp } from './hardening'
-import { handleBackup } from './backup/handlers'
 import { mainServices } from './dialogs'
-import { handleExport } from './export/handlers'
-import { handleImport } from './import/handlers'
-import { ipcHandlers } from './ipc'
-import { handleLedger } from './ledger/handlers'
+import { hardenApp } from './hardening'
+import { VaultHost } from './host-process'
+import { listenToPages } from './ipc'
 import { RELEASES_URL, setMenu } from './menu'
-import { handlePasswordChange } from './password-change'
 import { registerAppScheme, serveAppScheme } from './protocol'
 import { APP_ORIGIN, windowWebPreferences } from './security'
 import { runSelfTest, SELF_TEST_SWITCH } from './self-test'
 import { exposeTestHooks } from './test-hooks'
-import type { Channel, Results } from '../shared/ipc'
-import { deriveInWorker } from './vault/derive-in-worker'
-import { probeVault } from './vault/probe'
-import { Vault } from './vault/vault'
 import { AppWindow } from './window'
 
 export function startApp(): void {
@@ -31,59 +23,57 @@ export function startApp(): void {
 
   void app.whenReady().then(() => {
     serveAppScheme(join(__dirname, '../renderer'))
-    const { handle, dispatch, failNext } = ipcHandlers(devOrigin)
-    const vault = new Vault(app.getPath('userData'), {
-      derive: deriveInWorker,
-    })
-
-    handle('vault:status', () => vault.state)
-    handle('vault:create', ({ password }) => vault.create(password))
-    handle('vault:unlock', ({ password }) => vault.unlock(password))
-    handlePasswordChange(vault, handle)
-    handleLedger(vault, handle)
-
     const webPreferences = windowWebPreferences(
       join(__dirname, '../preload/index.js'),
       app.isPackaged,
     )
     let window: AppWindow | null = null
+    let unlocked = false
+    /** The open vault's auto-lock setting. */
+    let idleMinutes: IdleLockMinutes | null = null
+    const host = new VaultHost({
+      entry: join(__dirname, 'host.js'),
+      root: app.getPath('userData'),
+      services: mainServices(() => window?.window ?? null),
+      testHooks: !app.isPackaged,
+      onChange: (state) => {
+        if (state !== 'unlocked') return lock()
+        unlocked = true
+        window?.replaceView()
+      },
+      onIdle: (minutes) => {
+        idleMinutes = minutes
+      },
+    })
+    // Every lock ends the host and replaces the page, also one that was
+    // already locked, so a password typed but not submitted, or a backup
+    // chosen for a restore, does not survive it.
+    const lock = () => {
+      unlocked = false
+      idleMinutes = null
+      host.lock()
+      window?.replaceView()
+    }
     const open = () => {
       window = new AppWindow(pageUrl, webPreferences)
       // Closing the window locks the vault; on macOS the app stays running.
       window.window.on('closed', () => {
         window = null
-        backups.forget()
-        vault.lock()
+        lock()
       })
     }
+    listenToPages(devOrigin, { lock, connect: (port) => host.connect(port) })
     open()
-    const services = mainServices(() => window?.window ?? null)
-    handleImport(vault, services, handle)
-    handleExport(vault, services, handle)
-    const backups = handleBackup(vault, services, handle)
-    vault.onChange(() => window?.replaceView())
-    let failingAfterLock: Channel[] = []
-    // Also replaces a page that was already locked, so a password typed
-    // but not submitted does not survive a lock.
-    const lock = () => {
-      // A backup chosen for a restore goes too, also at setup, where there
-      // is no vault to lock and so no change for it to hear of.
-      backups.forget()
-      if (!vault.lock()) window?.replaceView()
-      failingAfterLock.forEach(failNext)
-      failingAfterLock = []
-    }
     if (!app.isPackaged) {
       exposeTestHooks({
-        failNext,
-        failAfterLock: (channel) => failingAfterLock.push(channel),
+        failNext: (channel) => host.failNext(channel),
+        failAfterLock: (channel) => host.failAfterLock(channel),
       })
     }
-    handle('vault:lock', lock)
     setMenu({
       lock,
       command: (name) => {
-        if (vault.unlocked) window?.contents?.send('command', name)
+        if (unlocked) window?.contents?.send('command', name)
       },
       openReleases: () => void shell.openExternal(RELEASES_URL),
       packaged: app.isPackaged,
@@ -95,11 +85,7 @@ export function startApp(): void {
       // The vault's own setting while it is open; locking again is harmless.
       idleLimit: () => {
         if (selfTest) return Number.POSITIVE_INFINITY
-        try {
-          return getSettings(vault.database()).idleLockMinutes * 60
-        } catch {
-          return IDLE_LIMIT_SECONDS
-        }
+        return idleMinutes === null ? IDLE_LIMIT_SECONDS : idleMinutes * 60
       },
     })
 
@@ -112,14 +98,24 @@ export function startApp(): void {
     app.on('activate', () => {
       if (!window) open()
     })
+    // The host locks and exits before the app does.
+    app.on('will-quit', (event) => {
+      if (!host.running) return
+      event.preventDefault()
+      host.lock()
+      void host.ended().then(() => app.quit())
+    })
     if (selfTest) {
       void runSelfTest(
         {
-          root: vault.root,
-          call: (channel, payload) =>
-            dispatch(channel, payload) as Promise<Results[typeof channel]>,
+          root: app.getPath('userData'),
+          call: (channel, payload) => host.call(channel, payload),
           lock,
-          probe: async () => probeVault(vault),
+          probe: async () => {
+            const probe = await host.probe()
+            if (!probe) throw new Error('no open vault to probe')
+            return probe
+          },
         },
         () => window?.contents,
         pageUrl,

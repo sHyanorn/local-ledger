@@ -69,7 +69,7 @@ export interface LedgerApi {
     delete(id: number): Promise<Results['transactions:delete']>
   }
   readonly imports: {
-    /** Asks the user for a CSV file and reads it; the file waits in the main process. */
+    /** Asks the user for a CSV file and reads it; the file waits in the vault host. */
     open(): Promise<Results['import:open']>
     /** Reads a file dropped on the window, as open reads a chosen one. */
     drop(
@@ -135,7 +135,7 @@ export interface LedgerApi {
     save(password: string): Promise<Results['backup:save']>
   }
   readonly restore: {
-    /** Asks for a backup file and keeps it in the main process. */
+    /** Asks for a backup file and keeps it in the vault host. */
     open(): Promise<Results['restore:open']>
     /** Opens the chosen backup with its password and says what it holds. */
     check(password: string): Promise<Results['restore:check']>

@@ -1,7 +1,7 @@
 // Backing up and restoring the vault. The page sends passwords; the main
-// process shows the save and open dialogs and keeps the chosen backup, and
-// the backup it has checked, until restored, discarded, or the vault locks
-// or unlocks.
+// process shows the save and open dialogs. The chosen backup, and the backup
+// checked, stay here until restored, discarded, or the vault locks or
+// unlocks.
 import { isoDate } from '../../shared/dates'
 import { fileLabel } from '../clean-text'
 import type { Handle } from '../dispatch'

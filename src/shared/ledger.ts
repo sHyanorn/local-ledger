@@ -1,6 +1,6 @@
 // Ledger records as the page sees them. Free of zod: the page imports it,
 // and zod probes for eval, which the CSP refuses. The schemas are in
-// schemas.ts, for the main process.
+// schemas.ts, for the vault host.
 import type { Currency } from './money'
 import type {
   AccountFields,

@@ -1,5 +1,5 @@
-// IPC channels between preload and the main process, with the schema the
-// main process validates each payload against.
+// Channels between the preload and the vault host, with the schema the host
+// validates each payload against; vault:lock alone goes to the main process.
 import { z } from 'zod'
 import {
   accountFields,
@@ -113,9 +113,21 @@ export const channels = {
 export type Channel = keyof typeof channels
 export type Payload<C extends Channel> = z.infer<(typeof channels)[C]>
 
+/** A call from a page to the vault host, over the page's port. */
+export interface PortCall {
+  id: number
+  channel: string
+  payload: unknown
+}
+
+/** The host's answer: the result, or only a code. */
+export type PortAnswer =
+  | { id: number; ok: true; result: unknown }
+  | { id: number; ok: false; code: string }
+
 export type VaultState = 'new' | 'locked' | 'unlocked' | 'damaged'
 
-/** Something the main process has the next page say once. */
+/** Something the vault host has the next page say once. */
 export type Notice = 'password-changed'
 
 export type Outcome<Reason extends string> =

@@ -1,4 +1,4 @@
-// The schemas the main process checks every IPC payload against.
+// The schemas the vault host checks every payload from the page against.
 import { z } from 'zod'
 import { isIsoDate } from './dates'
 import { DATE_ORDERS, ENCODINGS, MAX_COLUMNS } from './imports'
