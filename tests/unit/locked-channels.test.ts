@@ -6,9 +6,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { handleBackup } from '../../src/main/backup/handlers'
+import { createDispatcher } from '../../src/main/dispatch'
 import { handleExport } from '../../src/main/export/handlers'
 import { handleImport } from '../../src/main/import/handlers'
-import { guard, type Handle } from '../../src/main/ipc'
 import { handleLedger } from '../../src/main/ledger/handlers'
 import { handlePasswordChange } from '../../src/main/password-change'
 import { deriveHere } from '../../src/main/vault/kdf'
@@ -16,9 +16,7 @@ import { Vault } from '../../src/main/vault/vault'
 import { channels, type Channel, type Payload } from '../../src/shared/ipc'
 import { FAST, PASSWORD } from '../support/vault'
 
-vi.mock('electron', () => ({ ipcMain: {}, dialog: {} }))
-
-const APP = { senderFrame: { origin: 'app://local-ledger' } } as never
+vi.mock('electron', () => ({ dialog: {} }))
 
 /** Channels that answer while locked: the vault's own, and a restore. */
 const ANSWER_WHILE_LOCKED = [
@@ -116,14 +114,12 @@ const payloads: { [C in Refusing]: Payload<C> } = {
 }
 
 let root: string
-const handlers = new Map<Channel, Parameters<Handle>[1]>()
+const { handle, dispatch } = createDispatcher()
 
 beforeAll(async () => {
   root = mkdtempSync(join(tmpdir(), 'ledger-locked-'))
   const vault = new Vault(root, { derive: deriveHere, kdf: FAST })
   await vault.create(PASSWORD)
-  const handle: Handle = (channel, handler) =>
-    handlers.set(channel, handler as Parameters<Handle>[1])
   handlePasswordChange(vault, handle)
   handleLedger(vault, handle)
   handleImport(vault, () => null, handle)
@@ -139,8 +135,5 @@ const refusing = (Object.keys(channels) as Channel[]).filter(
 )
 
 it.each(refusing)('%s refuses while the vault is locked', async (channel) => {
-  const handler = handlers.get(channel)
-  expect(handler, 'a handler is registered').toBeDefined()
-  const listener = guard(channel, handler!)
-  await expect(listener(APP, payloads[channel])).rejects.toThrow(/^locked$/)
+  await expect(dispatch(channel, payloads[channel])).rejects.toThrow(/^locked$/)
 })

@@ -4,7 +4,7 @@
 import { cpSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeEach, expect, it, vi } from 'vitest'
-import type { Handle } from '../../src/main/ipc'
+import type { Handle } from '../../src/main/dispatch'
 import { handlePasswordChange } from '../../src/main/password-change'
 import { deriveHere } from '../../src/main/vault/kdf'
 import { Vault } from '../../src/main/vault/vault'

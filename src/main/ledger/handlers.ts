@@ -1,6 +1,6 @@
 // IPC handlers for the ledger. Each reads the open database from the vault,
 // so a call while the vault is locked fails with the code "locked".
-import type { Handle } from '../ipc'
+import type { Handle } from '../dispatch'
 import type { Vault } from '../vault/vault'
 import {
   createAccount,

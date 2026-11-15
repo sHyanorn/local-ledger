@@ -5,7 +5,7 @@
 import type { BaseWindow } from 'electron'
 import { isoDate } from '../../shared/dates'
 import { fileLabel, showOpen, showSave } from '../dialogs'
-import type { Handle } from '../ipc'
+import type { Handle } from '../dispatch'
 import { writeFailure, writeOwnerOnly } from '../owner-only'
 import { readChosen } from '../read-file'
 import { readBackup } from '../vault/backup'

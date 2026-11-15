@@ -1,50 +1,49 @@
+import { ipcMain } from 'electron'
 import { describe, expect, it, vi } from 'vitest'
-import { guard } from '../../src/main/ipc'
+import { createDispatcher } from '../../src/main/dispatch'
+import type { Handler } from '../../src/main/dispatch'
+import { ipcHandlers } from '../../src/main/ipc'
 import { LockedError } from '../../src/main/vault/vault'
+import type { Channel } from '../../src/shared/ipc'
 import { PASSWORD_MIN, passwordLength } from '../../src/shared/password'
 
-vi.mock('electron', () => ({ ipcMain: {} }))
+vi.mock('electron', () => ({ ipcMain: { handle: vi.fn() } }))
 
-const APP = { senderFrame: { origin: 'app://local-ledger' } } as never
-const from = (origin: string) => ({ senderFrame: { origin } }) as never
 const strong = 'correct horse battery staple'
 
-describe('guard', () => {
-  it('runs the handler for the app with a valid payload', async () => {
+/** A dispatcher with one handler, called on the channel. */
+function dispatchTo<C extends Channel>(channel: C, handler: Handler<C>) {
+  const { handle, dispatch } = createDispatcher()
+  handle(channel, handler)
+  return (payload: unknown) => dispatch(channel, payload)
+}
+
+describe('dispatch', () => {
+  it('runs the handler with a valid payload', async () => {
     const handler = vi.fn(() => ({ ok: true as const }))
-    const listener = guard('vault:unlock', handler)
-    await expect(listener(APP, { password: strong })).resolves.toEqual({
-      ok: true,
-    })
+    await expect(
+      dispatchTo('vault:unlock', handler)({ password: strong }),
+    ).resolves.toEqual({ ok: true })
     expect(handler).toHaveBeenCalledWith({ password: strong })
   })
 
-  it.each(['https://example.com', 'null', 'app://other', 'file://'])(
-    'refuses a sender from %s',
-    async (origin) => {
+  it.each(['vault:unknown', 'toString', '__proto__', 'constructor'])(
+    'refuses %s, a channel without a handler',
+    async (channel) => {
+      const { handle, dispatch } = createDispatcher()
       const handler = vi.fn()
-      await expect(
-        guard('vault:status', handler)(from(origin), undefined),
-      ).rejects.toThrow('forbidden')
+      handle('vault:status', handler)
+      await expect(dispatch(channel, undefined)).rejects.toThrow(
+        /^unknown-channel$/,
+      )
       expect(handler).not.toHaveBeenCalled()
     },
   )
 
-  it('refuses a frame that has gone away', async () => {
-    const event = { senderFrame: null } as never
-    await expect(
-      guard('vault:status', vi.fn())(event, undefined),
-    ).rejects.toThrow('forbidden')
-  })
-
-  it('accepts the dev server only when one is given', async () => {
-    const dev = 'http://localhost:5173'
-    await expect(
-      guard('vault:status', () => 'new', dev)(from(dev), undefined),
-    ).resolves.toBe('new')
-    await expect(
-      guard('vault:status', () => 'new')(from(dev), undefined),
-    ).rejects.toThrow('forbidden')
+  it('takes one handler per channel', () => {
+    const { handle } = createDispatcher()
+    handle('vault:status', () => 'new')
+    expect(() => handle('vault:status', () => 'new')).toThrow()
   })
 
   it('passes on only a code when the handler fails', async () => {
@@ -53,10 +52,8 @@ describe('guard', () => {
       new Error("EIO: i/o error, open '/home/fake/vault/ledger-2.db'"),
       { code: 'EIO' },
     )
-    const listener = guard('vault:unlock', () => Promise.reject(failure))
-    await expect(listener(APP, { password: strong })).rejects.toThrow(
-      /^failed$/,
-    )
+    const call = dispatchTo('vault:unlock', () => Promise.reject(failure))
+    await expect(call({ password: strong })).rejects.toThrow(/^failed$/)
     expect(log).toHaveBeenCalledWith('vault:unlock failed: EIO')
     log.mockRestore()
   })
@@ -72,21 +69,67 @@ describe('guard', () => {
     const handler = vi.fn()
     const channel =
       typeof payload === 'string' ? 'vault:status' : 'vault:unlock'
-    const result = guard(channel, handler)(APP, payload)
-    await expect(result).rejects.toThrow(/^invalid-argument$/)
+    await expect(dispatchTo(channel, handler)(payload)).rejects.toThrow(
+      /^invalid-argument$/,
+    )
     expect(handler).not.toHaveBeenCalled()
   })
 })
 
+describe('ipcMain', () => {
+  /** The listener ipcMain was given for a channel with this handler. */
+  function listener(handler: Handler<'vault:status'>, devOrigin?: string) {
+    ipcHandlers(devOrigin)('vault:status', handler)
+    const [channel, registered] = vi.mocked(ipcMain.handle).mock.lastCall!
+    expect(channel).toBe('vault:status')
+    return (origin: string | undefined) =>
+      registered(
+        { senderFrame: origin === undefined ? null : { origin } } as never,
+        undefined,
+      )
+  }
+
+  it('answers the app', async () => {
+    await expect(listener(() => 'new')('app://local-ledger')).resolves.toBe(
+      'new',
+    )
+  })
+
+  it.each(['https://example.com', 'null', 'app://other', 'file://'])(
+    'refuses a sender from %s',
+    async (origin) => {
+      const handler = vi.fn()
+      await expect(async () => listener(handler)(origin)).rejects.toThrow(
+        /^forbidden$/,
+      )
+      expect(handler).not.toHaveBeenCalled()
+    },
+  )
+
+  it('refuses a frame that has gone away', async () => {
+    await expect(async () => listener(vi.fn())(undefined)).rejects.toThrow(
+      /^forbidden$/,
+    )
+  })
+
+  it('accepts the dev server only when one is given', async () => {
+    const dev = 'http://localhost:5173'
+    await expect(listener(() => 'new', dev)(dev)).resolves.toBe('new')
+    await expect(async () => listener(() => 'new')(dev)).rejects.toThrow(
+      /^forbidden$/,
+    )
+  })
+})
+
 describe('new passwords', () => {
-  const create = guard('vault:create', () => ({ ok: true as const }))
+  const create = dispatchTo('vault:create', () => ({ ok: true as const }))
 
   it(`need ${PASSWORD_MIN} code points after NFKC`, async () => {
     await expect(
-      create(APP, { password: 'x'.repeat(PASSWORD_MIN - 1) }),
+      create({ password: 'x'.repeat(PASSWORD_MIN - 1) }),
     ).rejects.toThrow()
     await expect(
-      create(APP, { password: 'x'.repeat(PASSWORD_MIN) }),
+      create({ password: 'x'.repeat(PASSWORD_MIN) }),
     ).resolves.toEqual({
       ok: true,
     })
@@ -103,10 +146,10 @@ describe('new passwords', () => {
   })
 
   it('accept a long passphrase', async () => {
-    await expect(create(APP, { password: 'a'.repeat(1024) })).resolves.toEqual({
+    await expect(create({ password: 'a'.repeat(1024) })).resolves.toEqual({
       ok: true,
     })
-    await expect(create(APP, { password: 'a'.repeat(1025) })).rejects.toThrow()
+    await expect(create({ password: 'a'.repeat(1025) })).rejects.toThrow()
   })
 })
 
@@ -129,7 +172,10 @@ describe('data channels', () => {
 
   it('store text in composed form, so look-alike names collide', async () => {
     const handler = vi.fn(ok)
-    await guard('accounts:create', handler)(APP, {
+    await dispatchTo(
+      'accounts:create',
+      handler,
+    )({
       ...account,
       name: 'Cafe\u0301',
     })
@@ -138,7 +184,10 @@ describe('data channels', () => {
 
   it('pass trimmed text to the handler', async () => {
     const handler = vi.fn(ok)
-    await guard('accounts:create', handler)(APP, {
+    await dispatchTo(
+      'accounts:create',
+      handler,
+    )({
       ...account,
       name: '  Fake Everyday  ',
     })
@@ -173,7 +222,7 @@ describe('data channels', () => {
     ['transactions:totals', { accountId: 1, sql: '1=1' }],
   ] as const)('%s refuses %j', async (channel, payload) => {
     const handler = vi.fn()
-    await expect(guard(channel, handler)(APP, payload)).rejects.toThrow(
+    await expect(dispatchTo(channel, handler)(payload)).rejects.toThrow(
       /^invalid-argument$/,
     )
     expect(handler).not.toHaveBeenCalled()
@@ -181,7 +230,10 @@ describe('data channels', () => {
 
   it('accept a page request for uncategorized transactions', async () => {
     const handler = vi.fn(() => ({ rows: [], next: null }))
-    await guard('transactions:page', handler)(APP, {
+    await dispatchTo(
+      'transactions:page',
+      handler,
+    )({
       filter: { category: 'none', from: '2026-01-01', text: '50%' },
       limit: 200,
       after: { date: '2026-01-31', id: 7 },
@@ -191,10 +243,10 @@ describe('data channels', () => {
 
   it('report a locked vault by its own code, without logging', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const listener = guard('accounts:list', () => {
+    const call = dispatchTo('accounts:list', () => {
       throw new LockedError()
     })
-    await expect(listener(APP, undefined)).rejects.toThrow(/^locked$/)
+    await expect(call(undefined)).rejects.toThrow(/^locked$/)
     expect(log).not.toHaveBeenCalled()
     log.mockRestore()
   })

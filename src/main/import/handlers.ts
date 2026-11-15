@@ -3,7 +3,7 @@
 import type { BaseWindow } from 'electron'
 import { fileLabel, showOpen } from '../dialogs'
 import { readChosen } from '../read-file'
-import type { Handle } from '../ipc'
+import type { Handle } from '../dispatch'
 import type { Vault } from '../vault/vault'
 import { undoBatch, listBatches } from './batches'
 import { MAX_FILE_BYTES } from './csv'

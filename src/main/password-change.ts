@@ -1,7 +1,7 @@
 // Changing the password, and the notice about copies of the old one. The
 // page that replaces the one that changed the password shows it once; it
 // is gone when the vault locks.
-import type { Handle } from './ipc'
+import type { Handle } from './dispatch'
 import type { Vault } from './vault/vault'
 import type { Notice } from '../shared/ipc'
 
