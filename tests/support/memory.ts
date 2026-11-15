@@ -332,7 +332,8 @@ function dump(pid: number, file: string): void {
   } else {
     // macOS: a core file of the pages the process has written, by root
     // through lldb, which stops the process while it is attached. A full
-    // core holds the shared cache too and outgrows the disk.
+    // core holds the shared cache too and outgrows the disk. A dump takes
+    // seconds; one that hangs fails here instead of stalling the test.
     const lldb = spawnSync(
       'sudo',
       [
@@ -346,10 +347,12 @@ function dump(pid: number, file: string): void {
         '--one-line',
         'process detach',
       ],
-      { encoding: 'utf8' },
+      { encoding: 'utf8', timeout: 120_000 },
     )
-    if (!existsSync(file)) {
-      throw new Error(`no core file: ${lldb.stderr || lldb.stdout}`)
+    if (lldb.error || !existsSync(file)) {
+      throw new Error(
+        `no core file: ${lldb.error?.message ?? ''} ${lldb.stderr || lldb.stdout}`,
+      )
     }
     execFileSync('sudo', ['-n', 'chown', String(process.getuid!()), file])
   }

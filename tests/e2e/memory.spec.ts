@@ -121,7 +121,11 @@ test('the memory of every app process, unlocked and after a lock (report only)',
   sealingKey.fill(0)
 
   const phases: Record<string, unknown> = {}
-  const lines: string[] = []
+  const platform = `${process.platform} ${process.arch}`
+  // Each phase is printed once read, so a step that fails later keeps it.
+  console.log(
+    `Memory, ${platform}, ${new Date().toISOString()}. Copies of each text as ascii/utf16, not counting those inside a longer text counted; seeds: how many of the ${seeds.length} descriptions have a copy in either case.`,
+  )
   const measure = async (phase: string, shown: Page) => {
     await shown.evaluate((value) => {
       Object.assign(window, { memoryControl: value })
@@ -156,9 +160,13 @@ test('the memory of every app process, unlocked and after a lock (report only)',
         .map(({ pid, type }) => ({ pid, type })),
     }
     phases[phase] = { valid, pagePid, scans }
-    lines.push(
-      `${phase}: ${JSON.stringify(valid)}`,
-      ...scans.map((scan) => summary(scan, seeds.length, scan.pid === pagePid)),
+    console.log(
+      [
+        `${phase}: ${JSON.stringify(valid)}`,
+        ...scans.map((scan) =>
+          summary(scan, seeds.length, scan.pid === pagePid),
+        ),
+      ].join('\n'),
     )
   }
 
@@ -179,19 +187,13 @@ test('the memory of every app process, unlocked and after a lock (report only)',
 
   const report = {
     when: new Date().toISOString(),
-    platform: `${process.platform} ${process.arch}`,
+    platform,
     seeds: seeds.length,
     phases,
   }
   writeFileSync(
     testInfo.outputPath('memory.json'),
     JSON.stringify(report, null, 2),
-  )
-  console.log(
-    [
-      `Memory, ${report.platform}, ${report.when}. Copies of each text as ascii/utf16, not counting those inside a longer text counted; seeds: how many of the ${seeds.length} descriptions have a copy in either case.`,
-      ...lines,
-    ].join('\n'),
   )
 })
 
