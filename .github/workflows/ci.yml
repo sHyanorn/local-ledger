@@ -73,3 +73,26 @@ jobs:
           name: test-results-${{ matrix.os }}
           path: test-results
           if-no-files-found: ignore
+
+  # app.asar must not depend on where the app is built (D038).
+  reproducible:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: ./.github/actions/install-electron
+      - name: Build from two paths and compare app.asar
+        run: |
+          npm run build:dir
+          other="$RUNNER_TEMP/another/path/local-ledger"
+          git worktree add --detach "$other"
+          cd "$other"
+          npm ci
+          npm run build:dir
+          cmp "$GITHUB_WORKSPACE/release/linux-unpacked/resources/app.asar" \
+            release/linux-unpacked/resources/app.asar

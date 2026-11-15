@@ -213,6 +213,7 @@
 - Date: 2026-11-08
 - Decision: a `v*` tag runs `release.yml`, which first runs the checks of `ci.yml` (lint, types, unit and end-to-end tests), so a tag on a commit that fails them builds nothing; then macOS 15 on arm64 and on Intel each build a DMG, Windows 2025 builds an x64 NSIS installer, and each runner first runs the self-test of the unpackaged app and then the package checks against what it built. A final job writes `SHA256SUMS`, records a build provenance attestation for every file in it, and creates a draft release; publishing the draft is a manual step. The tag must equal `v` plus the package version. Run by hand (`workflow_dispatch`), the workflow builds and checksums the same files and keeps them as workflow artifacts, with no attestation (attestations go to a public log) and no release. File names carry no spaces: `local-ledger-<version>-mac-<arch>.dmg`, `local-ledger-<version>-windows-x64-setup.exe`
 - Alternatives: building the Intel DMG on an arm64 runner (its self-test would then run under Rosetta, if at all); a third-party release action (the `gh` CLI on the runner does the same)
+- 2026-11-15: the main process build attaches no module comments. Rolldown's comment for electron-vite's worker import held the absolute path of the importing file, so `app.asar` differed between build paths. CI builds the unpacked app from a second path and compares `app.asar`
 
 ## D039 Migrating an existing ledger
 - Date: 2026-11-10
