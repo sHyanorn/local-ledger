@@ -36,7 +36,7 @@ parent.once('message', ({ data }) => {
   handleLedger(vault, handle, idle)
   handleImport(vault, main, handle)
   handleExport(vault, main, handle)
-  handleBackup(vault, main, handle)
+  const backups = handleBackup(vault, main, handle)
   vault.onChange((state) => {
     post({ type: 'state', state })
     if (state === 'unlocked') idle(getSettings(vault.database()))
@@ -49,6 +49,9 @@ parent.once('message', ({ data }) => {
         if (ports[0]) serve(ports[0], dispatch)
         break
       case 'lock':
+        // Also at setup, where there is no vault to lock and so no change
+        // for the backup handlers to hear of.
+        backups.forget()
         vault.lock()
         process.exit(0)
         break

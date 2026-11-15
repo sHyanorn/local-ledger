@@ -1,22 +1,13 @@
 // The vault host: a process of its own that each lock ends, and whose end,
 // asked for or not, leaves the vault locked.
-import type { ElectronApplication } from '@playwright/test'
 import {
   expect,
   expectExited,
   ledgerTest as test,
   lockScreen,
   replacedBy,
+  vaultHosts as hosts,
 } from './fixtures'
-
-/** The pids of the vault hosts running. */
-const hosts = (app: ElectronApplication) =>
-  app.evaluate(({ app }) =>
-    app
-      .getAppMetrics()
-      .filter((metric) => metric.name === 'Vault Host')
-      .map(({ pid }) => pid),
-  )
 
 test('a lock ends the vault host, and the locked page has a new one', async ({
   app,

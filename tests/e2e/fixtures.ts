@@ -50,6 +50,15 @@ export function rendererPid(app: ElectronApplication): Promise<number> {
   })
 }
 
+/** The pids of the vault host processes running. */
+export const vaultHosts = (app: ElectronApplication) =>
+  app.evaluate(({ app }) =>
+    app
+      .getAppMetrics()
+      .filter((metric) => metric.name === 'Vault Host')
+      .map(({ pid }) => pid),
+  )
+
 /** The next call on this channel fails, as one the app cannot answer. */
 export const failNext = (app: ElectronApplication, channel: Channel) =>
   app.evaluate((_electron, channel) => {

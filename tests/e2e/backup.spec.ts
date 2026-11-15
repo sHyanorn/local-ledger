@@ -12,6 +12,7 @@ import {
   chooseFile,
   expect,
   expectDialogsAsked,
+  expectExited,
   launch,
   ledgerTest,
   lockScreen,
@@ -19,6 +20,7 @@ import {
   saveTo,
   sidebar,
   unlock,
+  vaultHosts,
 } from './fixtures'
 
 const openBackup = async (page: Page) => {
@@ -229,6 +231,8 @@ ledgerTest(
       ).toBeVisible()
       await chooseFile(fresh, path)
       // A lock at setup, with no vault to lock, still drops a checked backup.
+      // Closing the window locks without a new page, so no new vault host
+      // starts, whose start-up would remove the staged copy too.
       expect(
         await setup.evaluate(() => window.ledger.restore.open()),
       ).toMatchObject({ ok: true })
@@ -238,15 +242,24 @@ ledgerTest(
           DEMO_PASSWORD,
         ),
       ).toMatchObject({ ok: true })
-      const afterLock = await lockScreen(fresh)
-      expect(
-        await afterLock.evaluate(() => window.ledger.restore.commit(null)),
-      ).toEqual({ ok: false, reason: 'not-checked' })
-      expect(
+      const staged = () =>
         readdirSync(testInfo.outputPath('fresh-user-data')).filter((name) =>
           name.startsWith('vault.restoring-'),
-        ),
-      ).toEqual([])
+        )
+      expect(staged()).toHaveLength(1)
+      const [host] = await vaultHosts(fresh)
+      await fresh.evaluate(({ app, BaseWindow }) => {
+        // As on macOS, where the app keeps running without a window.
+        app.removeAllListeners('window-all-closed')
+        BaseWindow.getAllWindows()[0]?.close()
+      })
+      await expectExited(host!)
+      expect(staged()).toEqual([])
+      const afterLock = await replacedBy(fresh, () =>
+        fresh.evaluate(({ app }) => {
+          app.emit('activate')
+        }),
+      )
       await afterLock
         .getByRole('button', { name: 'Restore from Backup…' })
         .click()
