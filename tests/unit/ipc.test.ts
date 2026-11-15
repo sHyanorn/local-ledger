@@ -160,6 +160,16 @@ describe('ipcMain', () => {
     },
   )
 
+  it('refuses a frame that has gone away', () => {
+    const listeners = listen()
+    expect(() =>
+      listeners.lock({ senderFrame: null } as never, undefined),
+    ).toThrow(/^forbidden$/)
+    listeners.port({ senderFrame: null } as never)
+    expect(lock).not.toHaveBeenCalled()
+    expect(connect).not.toHaveBeenCalled()
+  })
+
   it('refuses a lock with a payload', () => {
     expect(() =>
       listen().lock({ senderFrame: frame(APP) } as never, 'surprise'),
@@ -181,9 +191,14 @@ describe('ipcMain', () => {
     const dev = 'http://localhost:5173'
     listen(dev).port({ senderFrame: frame(dev) } as never)
     expect(connect).toHaveBeenCalledOnce()
+    const listeners = listen()
+    const sender = frame(dev)
     expect(() =>
-      listen().lock({ senderFrame: frame(dev) } as never, undefined),
+      listeners.lock({ senderFrame: sender } as never, undefined),
     ).toThrow(/^forbidden$/)
+    listeners.port({ senderFrame: sender } as never)
+    expect(connect).toHaveBeenCalledOnce()
+    expect(sender.postMessage).not.toHaveBeenCalled()
   })
 })
 
