@@ -2,9 +2,10 @@
 // removes a transaction: it only decides which rows are new.
 //
 // A row's fingerprint is its account, date, amount and description, plus its
-// occurrence among identical rows of the file (YNAB's import_id). Two genuine
-// purchases alike in every way are occurrences 1 and 2, so both import; a later
-// file that overlaps gives them the same fingerprints, so neither repeats.
+// occurrence among identical rows of the file (YNAB's import_id has no
+// description). Two genuine purchases alike in every way are occurrences 1 and
+// 2, so both import; a later file that overlaps gives them the same
+// fingerprints, so neither repeats.
 //
 // A row without an exact match may still be a transaction entered by hand,
 // or one the bank has since reworded: the same amount in the same account
