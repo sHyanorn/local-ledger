@@ -22,7 +22,7 @@ A personal finance desktop app whose data stays on the local machine in a databa
 - CSV import
   - Built-in templates for common Australian bank formats (CommBank, NAB, ANZ, Westpac), plus a generic column-mapping wizard
   - Date and amount format detection, with a preview before import
-  - Duplicate transaction detection (fuzzy matching on date, amount and description)
+  - Duplicate transaction detection: matches on date, amount and description (case and spacing aside), and likely duplicates of the same amount within 4 days (D025)
 - Automatic categorization
   - User rules: if the description contains, starts with or is some text, assign it to a category
   - When the user changes a category manually, offer to create a new rule
