@@ -5,9 +5,10 @@
 // Two transactions may pair when they are in different accounts of one
 // currency, their amounts are exactly opposite, they are dated at most
 // TRANSFER_DAYS apart, and neither is paired already. On import they pair on
-// their own when each is the other's one candidate; every other candidate,
-// and any that edits or decisions leave, waits for the user. A pair the user
-// splits or turns down is remembered and not offered again.
+// their own when each is the other's one candidate and their descriptions
+// show a transfer (D046); every other candidate, and any that edits or
+// decisions leave, waits for the user. A pair the user splits or turns down
+// is remembered and not offered again.
 import type { Outcome } from '../../shared/ipc'
 import {
   TRANSFER_DAYS,
@@ -16,6 +17,7 @@ import {
 } from '../../shared/transfers'
 import type { Db } from '../vault/database'
 import { found } from './errors'
+import { matchKey } from './match-key'
 
 interface Candidate {
   outId: number
@@ -23,6 +25,10 @@ interface Candidate {
   days: number
   outBatch: number | null
   inBatch: number | null
+  outText: string
+  inText: string
+  outAccount: string
+  inAccount: string
 }
 
 function candidates(db: Db): Candidate[] {
@@ -30,7 +36,9 @@ function candidates(db: Db): Candidate[] {
     .prepare(
       `SELECT o.id AS outId, i.id AS inId,
          abs(julianday(i.date) - julianday(o.date)) AS days,
-         o.import_batch_id AS outBatch, i.import_batch_id AS inBatch
+         o.import_batch_id AS outBatch, i.import_batch_id AS inBatch,
+         o.description AS outText, i.description AS inText,
+         ao.name AS outAccount, ai.name AS inAccount
        FROM transactions o
        JOIN accounts ao ON ao.id = o.account_id
        JOIN transactions i
@@ -93,6 +101,36 @@ function unique(all: readonly Candidate[]): Candidate[] {
   return sure
 }
 
+/** A description's words, lower case, each with one space on either side. */
+function words(text: string): string {
+  const spaced = matchKey(text).replace(/[^\p{L}\p{N}]+/gu, ' ')
+  return ` ${spaced.trim()} `
+}
+
+/** Words for money moved between one's own accounts, card payments included. */
+const TRANSFER_WORD = / (?:transfer|payment|repayment) /
+
+/** Whether a description's words hold an account's whole name. */
+function names(text: string, account: string): boolean {
+  const name = words(account)
+  return name.trim() !== '' && text.includes(name)
+}
+
+/**
+ * Whether the descriptions show a transfer: one names the other side's
+ * account, or both use a transfer word. Opposite amounts alone are not
+ * enough: a purchase and a friend paying back as much are not a transfer.
+ */
+function shown(pair: Candidate): boolean {
+  const out = words(pair.outText)
+  const into = words(pair.inText)
+  return (
+    names(out, pair.inAccount) ||
+    names(into, pair.outAccount) ||
+    (TRANSFER_WORD.test(out) && TRANSFER_WORD.test(into))
+  )
+}
+
 const confirm = (db: Db, outId: number, inId: number) =>
   db
     .prepare(
@@ -103,17 +141,18 @@ const confirm = (db: Db, outId: number, inId: number) =>
     .run(outId, inId)
 
 /**
- * Pairs the transfers that have one candidate (see `unique`); with a batch,
- * only those with a side in it, so an import never pairs older rows alone.
- * Returns how many.
+ * Pairs the transfers that have one candidate (see `unique`) and whose
+ * descriptions show it (see `shown`); with a batch, only those with a side in
+ * it, so an import never pairs older rows alone. Returns how many.
  */
 export function pairTransfers(db: Db, batchId?: number): number {
   return db.transaction(() => {
     const sure = unique(candidates(db)).filter(
       (pair) =>
-        batchId === undefined ||
-        pair.outBatch === batchId ||
-        pair.inBatch === batchId,
+        (batchId === undefined ||
+          pair.outBatch === batchId ||
+          pair.inBatch === batchId) &&
+        shown(pair),
     )
     for (const pair of sure) confirm(db, pair.outId, pair.inId)
     return sure.length

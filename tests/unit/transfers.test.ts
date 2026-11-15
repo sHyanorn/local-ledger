@@ -3,6 +3,7 @@ import { listBatches, undoBatch } from '../../src/main/import/batches'
 import { ImportSession } from '../../src/main/import/session'
 import { createAccount } from '../../src/main/ledger/accounts'
 import { createCategory } from '../../src/main/ledger/categories'
+import { monthSpending, reportData } from '../../src/main/ledger/reports'
 import { createRule } from '../../src/main/ledger/rules'
 import {
   createTransaction,
@@ -245,6 +246,98 @@ describe('pairing', () => {
   })
 })
 
+describe('evidence in the descriptions (D046)', () => {
+  it.each([
+    ['both use a transfer word', 'Fake Transfer Out', 'Fake Transfer In', 1],
+    [
+      'a card repayment',
+      'Card Repayment 4417',
+      'PAYMENT RECEIVED, THANK YOU',
+      1,
+    ],
+    [
+      'the money out names the other account',
+      'To fake  SAVINGS',
+      'Fake Deposit',
+      1,
+    ],
+    [
+      'the money in names the other account',
+      'Fake Withdrawal',
+      'From Fake Everyday',
+      1,
+    ],
+    [
+      'only one uses a transfer word',
+      'Fake Restaurant',
+      'Transfer From A Friend',
+      0,
+    ],
+    [
+      'a transfer word inside another word',
+      'Fake Prepayment',
+      'Fake Transferwise',
+      0,
+    ],
+    [
+      'each names its own account',
+      'Fake Everyday Shop',
+      'Fake Savings Bonus',
+      0,
+    ],
+  ])('%s: "%s" and "%s" pair %i', (_, outText, inText, paired) => {
+    add(everyday, '2026-05-01', -5000, outText)
+    add(savings, '2026-05-02', 5000, inText)
+    expect(pairTransfers(db)).toBe(paired)
+    expect(possibleTransfers(db)).toHaveLength(1 - paired)
+  })
+
+  it('asks the same of recurring pairs on the same days', () => {
+    for (const date of ['2026-05-01', '2026-05-02']) {
+      add(everyday, date, -500, 'Fake Shop')
+      add(savings, date, 500, 'Fake Cashback')
+    }
+    expect(pairTransfers(db)).toBe(0)
+    expect(possibleTransfers(db)).toHaveLength(4)
+  })
+
+  it('keeps a purchase apart from a friend paying back as much', () => {
+    // Paired on amounts alone until 0.2.1, which took the purchase out of the
+    // month's spending.
+    const fuel = createCategory(db, { name: 'Fake Fuel', parentId: null })
+    if (!fuel.ok) throw new Error('no category')
+    const bought = createTransaction(db, {
+      accountId: card(),
+      date: '2026-05-10',
+      amountCents: -5000,
+      description: 'Fake Petrol Station',
+      categoryId: fuel.id,
+      notes: '',
+    })
+    if (!bought.ok) throw new Error('no transaction')
+    const session = new ImportSession()
+    const opened = session.open(
+      db,
+      'savings.csv',
+      new TextEncoder().encode(
+        '12/05/2026,+50.00,Fake Payment From A Friend,1\n',
+      ),
+    )
+    if (!opened.ok) throw new Error(opened.reason)
+    const committed = previewAndCommit(db, session, {
+      id: opened.file.id,
+      encoding: opened.file.encoding,
+      mapping: opened.file.mapping!,
+      targets: [{ key: '', accountId: savings }],
+      selected: [0],
+    })
+    expect(committed).toMatchObject({ ok: true, count: 1, paired: 0 })
+    expect(monthSpending(db, '2026-05', 'AUD')).toBe(5000)
+    expect(reportData(db, '2026-05', 'AUD').report.incomeCents).toBe(5000)
+    expect(possibleTransfers(db)).toHaveLength(1)
+  })
+})
+
 describe('a pair in the ledger', () => {
   it('is left out of reports and of the uncategorized filter', () => {
     const out = add(everyday, '2026-05-01', -5000)
@@ -300,7 +393,7 @@ describe('a pair in the ledger', () => {
 
 describe('imports and transfers', () => {
   it('pairs after an import, counts the pairs, and unpairs when undone', () => {
-    add(everyday, '2026-05-27', -125000, 'Fake To Savings')
+    add(everyday, '2026-05-27', -125000, 'Transfer to Fake Savings')
     const session = new ImportSession()
     const opened = session.open(
       db,
@@ -327,9 +420,9 @@ describe('imports and transfers', () => {
 describe('pairing after an import', () => {
   it('pairs only around the imported rows', () => {
     // Older rows that could pair are left to the user.
-    add(everyday, '2026-04-01', -2500, 'Fake Old Purchase')
-    add(savings, '2026-04-02', 2500, 'Fake Old Refund')
-    add(everyday, '2026-05-27', -125000, 'Fake To Savings')
+    add(everyday, '2026-04-01', -2500, 'Fake Old Transfer Out')
+    add(savings, '2026-04-02', 2500, 'Fake Old Transfer In')
+    add(everyday, '2026-05-27', -125000, 'Transfer to Fake Savings')
     const category = createCategory(db, { name: 'Fake Moves', parentId: null })
     if (!category.ok) throw new Error('no category')
     createRule(db, {
@@ -362,7 +455,7 @@ describe('pairing after an import', () => {
         .get(),
     ).toBeNull()
     expect(possibleTransfers(db).map((pair) => pair.out.description)).toEqual([
-      'Fake Old Purchase',
+      'Fake Old Transfer Out',
     ])
   })
 })

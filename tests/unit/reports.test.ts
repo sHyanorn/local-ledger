@@ -49,12 +49,13 @@ const add = (
   date: string,
   amountCents: number,
   category: string | null,
+  description = 'Fake',
 ) => {
   const result = createTransaction(db, {
     accountId: ids[account]!,
     date,
     amountCents,
-    description: 'Fake',
+    description,
     categoryId: category ? ids[category]! : null,
     notes: '',
   })
@@ -80,8 +81,8 @@ describe('reports', () => {
     add('everyday', '2026-11-05', 1000, 'food')
     add('everyday', '2026-11-06', -700, null)
     add('travel', '2026-11-06', -99999, 'food')
-    add('everyday', '2026-11-07', -100000, null)
-    add('savings', '2026-11-07', 100000, null)
+    add('everyday', '2026-11-07', -100000, null, 'Fake Transfer')
+    add('savings', '2026-11-07', 100000, null, 'Fake Transfer')
     expect(pairTransfers(db)).toBe(1)
 
     const { report, months } = reportData(db, '2026-11', 'AUD')

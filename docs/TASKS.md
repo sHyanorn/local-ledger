@@ -55,6 +55,9 @@
 - [x] A note after a password change; AA contrast; axe-core in the end-to-end tests (D043, D044)
 - [x] Docs: what is and is not encrypted, the sealed layouts, the limits of upgrading
 
+## 0.2.1
+- [x] An import pairs a transfer on its own only when the descriptions show one (D046)
+
 ## Nice to have
 - [ ] Open an exported workbook in Excel and Numbers, which have not been tried (D030); and see the sidebar vibrancy on a real Mac (D037)
 - [ ] Check the bank layouts against real exports, should any become available (D024): every check so far used public, made-up samples

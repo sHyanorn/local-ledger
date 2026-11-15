@@ -50,12 +50,13 @@ const add = (
   date: string,
   amountCents: number,
   categoryId: number | null,
+  description = 'Fake',
 ) => {
   const result = createTransaction(db, {
     accountId,
     date,
     amountCents,
-    description: 'Fake',
+    description,
     categoryId,
     notes: '',
   })
@@ -110,8 +111,8 @@ describe('spending', () => {
     add(travel, '2026-05-07', 1000, coffee)
     add(everyday, '2026-05-04', -700, null)
     // A transfer whose sides are categorized does not count.
-    add(everyday, '2026-05-05', -50000, food)
-    add(savings, '2026-05-05', 50000, null)
+    add(everyday, '2026-05-05', -50000, food, 'Fake Transfer')
+    add(savings, '2026-05-05', 50000, null, 'Fake Transfer')
     expect(pairTransfers(db)).toBe(1)
     const may = monthBudgets(db, '2026-05')
     expect(of(may, food)?.spentCents).toBe(2500)

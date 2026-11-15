@@ -215,7 +215,7 @@ describe('undoing an import', () => {
       accountId: savings,
       date: '2026-02-05',
       amountCents: 500,
-      description: 'Fake From Everyday',
+      description: 'From Fake Everyday',
       categoryId: null,
       notes: '',
     })
