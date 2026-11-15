@@ -15,8 +15,9 @@ import { registerAppScheme, serveAppScheme } from './protocol'
 import { APP_ORIGIN, windowWebPreferences } from './security'
 import { runSelfTest, SELF_TEST_SWITCH } from './self-test'
 import { exposeTestHooks } from './test-hooks'
-import type { Channel } from '../shared/ipc'
+import type { Channel, Results } from '../shared/ipc'
 import { deriveInWorker } from './vault/derive-in-worker'
+import { probeVault } from './vault/probe'
 import { Vault } from './vault/vault'
 import { AppWindow } from './window'
 
@@ -30,7 +31,7 @@ export function startApp(): void {
 
   void app.whenReady().then(() => {
     serveAppScheme(join(__dirname, '../renderer'))
-    const { handle, failNext } = ipcHandlers(devOrigin)
+    const { handle, dispatch, failNext } = ipcHandlers(devOrigin)
     const vault = new Vault(app.getPath('userData'), {
       derive: deriveInWorker,
     })
@@ -112,7 +113,17 @@ export function startApp(): void {
       if (!window) open()
     })
     if (selfTest) {
-      void runSelfTest(vault, () => window?.contents, pageUrl)
+      void runSelfTest(
+        {
+          root: vault.root,
+          call: (channel, payload) =>
+            dispatch(channel, payload) as Promise<Results[typeof channel]>,
+          lock,
+          probe: async () => probeVault(vault),
+        },
+        () => window?.contents,
+        pageUrl,
+      )
     }
   })
 

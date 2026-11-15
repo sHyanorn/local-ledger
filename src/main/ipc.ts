@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import type { Channel } from '../shared/ipc'
 import { createDispatcher } from './dispatch'
-import type { Handle } from './dispatch'
+import type { Dispatch, Handle } from './dispatch'
 import { isTrustedSender } from './security'
 
 /**
@@ -10,6 +10,7 @@ import { isTrustedSender } from './security'
  */
 export function ipcHandlers(devOrigin?: string): {
   handle: Handle
+  dispatch: Dispatch
   failNext: (channel: Channel) => void
 } {
   const { handle, dispatch, failNext } = createDispatcher()
@@ -23,6 +24,7 @@ export function ipcHandlers(devOrigin?: string): {
         return dispatch(channel, payload)
       })
     },
+    dispatch,
     failNext,
   }
 }
