@@ -12,7 +12,8 @@ This repository is a personal finance desktop app that keeps its data on the loc
 
 ```
 src/
-  main/       Electron main process: windows, database, encryption, file import/export
+  main/       Electron main process: windows, dialogs, printing, the lock; and the vault host,
+              a utility process: database, encryption, file import/export
   preload/    Preload script: exposes only a typed allowlist of APIs
   renderer/   React + TypeScript + Zustand UI
   shared/     Types and validation schemas shared by the main and renderer processes
@@ -50,7 +51,7 @@ npm run csv:shape -- <file.csv>   # structure report of a CSV, with none of its 
 
 - `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`
 - The renderer must never access Node or the database directly; it communicates only through the limited API exposed by preload
-- Validate the arguments of every IPC channel in the main process with zod
+- Validate the arguments of every IPC channel with zod where it is handled; the vault host handles the data channels
 - Strict CSP; never load remote content; no `eval`; block new windows and external navigation
 - The master password stays in memory only briefly and is discarded as soon as the key is derived; passwords, keys and transaction details must never appear in logs
 - Auto-lock after an idle timeout; on lock, clear the key and decrypted data from memory
