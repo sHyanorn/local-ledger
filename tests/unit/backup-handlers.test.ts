@@ -2,7 +2,7 @@
 // that does not open, and an open one.
 import { existsSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { handleBackup } from '../../src/main/backup/handlers'
 import type { Handle } from '../../src/main/dispatch'
 import { createAccount } from '../../src/main/ledger/accounts'
@@ -11,14 +11,11 @@ import { REPLACED_PREFIX } from '../../src/main/vault/layout'
 import { Vault } from '../../src/main/vault/vault'
 import type { Channel, Payload, Results } from '../../src/shared/ipc'
 import { tempDirs } from '../support/temp-dir'
+import { mainServices } from '../support/services'
 import { FAST, NEW, OLD } from '../support/vault'
 
-const dialog = vi.hoisted(() => ({ path: '' }))
-vi.mock('electron', () => ({
-  dialog: {
-    showOpenDialog: async () => ({ canceled: false, filePaths: [dialog.path] }),
-  },
-}))
+/** The file the open dialog answers with. */
+let chosenPath = ''
 
 const newRoot = tempDirs('ledger-handlers-')
 const open = (root: string) =>
@@ -37,7 +34,11 @@ function channelsOf(vault: Vault) {
   const handlers = new Map<Channel, (payload: never) => unknown>()
   const handle: Handle = (channel, handler) =>
     handlers.set(channel, handler as (payload: never) => unknown)
-  handleBackup(vault, () => null, handle)
+  handleBackup(
+    vault,
+    mainServices({ openPath: async () => chosenPath }),
+    handle,
+  )
   return <C extends Channel>(channel: C, payload: Payload<C>) =>
     handlers.get(channel)!(payload as never) as Promise<Results[C]>
 }
@@ -56,8 +57,8 @@ beforeEach(async () => {
   const made = await source.backup(OLD)
   if (!made.ok) throw new Error(made.reason)
   source.lock()
-  dialog.path = join(root, 'fake.llbackup')
-  writeFileSync(dialog.path, made.file)
+  chosenPath = join(root, 'fake.llbackup')
+  writeFileSync(chosenPath, made.file)
 })
 
 /** A vault under NEW, in the given state. */

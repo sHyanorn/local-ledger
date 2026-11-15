@@ -4,6 +4,7 @@ import { IDLE_LIMIT_SECONDS, watchForLock } from './auto-lock'
 import { getSettings } from './ledger/settings'
 import { hardenApp } from './hardening'
 import { handleBackup } from './backup/handlers'
+import { mainServices } from './dialogs'
 import { handleExport } from './export/handlers'
 import { handleImport } from './import/handlers'
 import { ipcHandlers } from './ipc'
@@ -53,9 +54,10 @@ export function startApp(): void {
       })
     }
     open()
-    handleImport(vault, () => window?.window ?? null, handle)
-    handleExport(vault, () => window?.window ?? null, handle)
-    const backups = handleBackup(vault, () => window?.window ?? null, handle)
+    const services = mainServices(() => window?.window ?? null)
+    handleImport(vault, services, handle)
+    handleExport(vault, services, handle)
+    const backups = handleBackup(vault, services, handle)
     vault.onChange(() => window?.replaceView())
     // Also replaces a page that was already locked, so a password typed
     // but not submitted does not survive a lock.

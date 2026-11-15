@@ -12,6 +12,7 @@ import { REPLACED_PREFIX } from '../../src/main/vault/layout'
 import { LockedError, Vault } from '../../src/main/vault/vault'
 import type { Channel, Payload, Results } from '../../src/shared/ipc'
 import { tempDirs } from '../support/temp-dir'
+import { mainServices } from '../support/services'
 import { FAST, NEW, OLD } from '../support/vault'
 
 type Step = 'derive' | 'dialog' | 'read'
@@ -39,19 +40,6 @@ const held = vi.hoisted(() => {
   }
 })
 
-vi.mock('electron', () => ({
-  dialog: {
-    showOpenDialog: async () => {
-      await held.at('dialog')
-      return { canceled: false, filePaths: [held.openPath] }
-    },
-    showSaveDialog: async () => {
-      held.saves.push(held.savePath)
-      await held.at('dialog')
-      return { canceled: false, filePath: held.savePath }
-    },
-  },
-}))
 vi.mock('../../src/main/read-file', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('../../src/main/read-file')>()
@@ -117,8 +105,19 @@ beforeEach(async () => {
   const handlers = new Map<Channel, (payload: never) => unknown>()
   const handle: Handle = (channel, handler) =>
     handlers.set(channel, handler as (payload: never) => unknown)
-  handleBackup(vault, () => null, handle)
-  handleImport(vault, () => null, handle)
+  const services = mainServices({
+    openPath: async () => {
+      await held.at('dialog')
+      return held.openPath
+    },
+    savePath: async () => {
+      held.saves.push(held.savePath)
+      await held.at('dialog')
+      return held.savePath
+    },
+  })
+  handleBackup(vault, services, handle)
+  handleImport(vault, services, handle)
   call = (channel, payload) =>
     handlers.get(channel)!(payload as never) as Promise<Results[typeof channel]>
 })

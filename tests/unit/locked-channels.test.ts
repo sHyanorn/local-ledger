@@ -4,7 +4,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, beforeAll, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, expect, it } from 'vitest'
 import { handleBackup } from '../../src/main/backup/handlers'
 import { createDispatcher } from '../../src/main/dispatch'
 import { handleExport } from '../../src/main/export/handlers'
@@ -14,9 +14,8 @@ import { handlePasswordChange } from '../../src/main/password-change'
 import { deriveHere } from '../../src/main/vault/kdf'
 import { Vault } from '../../src/main/vault/vault'
 import { channels, type Channel, type Payload } from '../../src/shared/ipc'
+import { mainServices } from '../support/services'
 import { FAST, PASSWORD } from '../support/vault'
-
-vi.mock('electron', () => ({ dialog: {} }))
 
 /** Channels that answer while locked: the vault's own, and a restore. */
 const ANSWER_WHILE_LOCKED = [
@@ -122,9 +121,9 @@ beforeAll(async () => {
   await vault.create(PASSWORD)
   handlePasswordChange(vault, handle)
   handleLedger(vault, handle)
-  handleImport(vault, () => null, handle)
-  handleExport(vault, () => null, handle)
-  handleBackup(vault, () => null, handle)
+  handleImport(vault, mainServices(), handle)
+  handleExport(vault, mainServices(), handle)
+  handleBackup(vault, mainServices(), handle)
   vault.lock()
 })
 afterAll(() => rmSync(root, { recursive: true, force: true }))

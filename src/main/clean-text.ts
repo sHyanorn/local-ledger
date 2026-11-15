@@ -1,5 +1,6 @@
 // Text from outside the app, such as a CSV cell or a file name, as the
 // ledger stores and shows it.
+import { basename } from 'node:path'
 
 /**
  * Bidirectional controls, which can reorder how text around them reads,
@@ -23,3 +24,7 @@ export function cleanText(text: string): string {
     .trim()
     .normalize('NFC')
 }
+
+/** A chosen file's name as the page shows it: cleaned, at most 255 characters. */
+export const fileLabel = (path: string, fallback: string) =>
+  cleanText(basename(path)).slice(0, 255) || fallback

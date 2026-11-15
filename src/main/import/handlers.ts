@@ -1,9 +1,9 @@
 // IPC handlers for importing CSV files. The page never names a path: the
-// file comes from the system's open dialog, shown here.
-import type { BaseWindow } from 'electron'
-import { fileLabel, showOpen } from '../dialogs'
-import { readChosen } from '../read-file'
+// file comes from the system's open dialog, which the main process shows.
+import { fileLabel } from '../clean-text'
 import type { Handle } from '../dispatch'
+import { readChosen } from '../read-file'
+import type { MainServices } from '../services'
 import type { Vault } from '../vault/vault'
 import { undoBatch, listBatches } from './batches'
 import { MAX_FILE_BYTES } from './csv'
@@ -11,7 +11,7 @@ import { ImportSession } from './session'
 
 export function handleImport(
   vault: Vault,
-  window: () => BaseWindow | null,
+  main: MainServices,
   handle: Handle,
 ): void {
   const session = new ImportSession()
@@ -21,14 +21,11 @@ export function handleImport(
 
   handle('import:open', async () => {
     db() // Fails when locked, before any dialog opens.
-    const chosen = await showOpen(window(), {
-      properties: ['openFile'],
-      filters: [{ name: 'CSV files', extensions: ['csv', 'txt'] }],
+    const path = await main.openPath({
+      name: 'CSV files',
+      extensions: ['csv', 'txt'],
     })
-    const path = chosen.filePaths[0]
-    if (chosen.canceled || path === undefined) {
-      return { ok: false, reason: 'cancelled' } as const
-    }
+    if (path === null) return { ok: false, reason: 'cancelled' } as const
     // The vault may have locked while the dialog was open.
     db()
     const bytes = await readChosen(path, MAX_FILE_BYTES)

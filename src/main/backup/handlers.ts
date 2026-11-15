@@ -2,23 +2,23 @@
 // process shows the save and open dialogs and keeps the chosen backup, and
 // the backup it has checked, until restored, discarded, or the vault locks
 // or unlocks.
-import type { BaseWindow } from 'electron'
 import { isoDate } from '../../shared/dates'
-import { fileLabel, showOpen, showSave } from '../dialogs'
+import { fileLabel } from '../clean-text'
 import type { Handle } from '../dispatch'
 import { writeFailure, writeOwnerOnly } from '../owner-only'
 import { readChosen } from '../read-file'
+import type { MainServices } from '../services'
 import { readBackup } from '../vault/backup'
 import type { StagedBackup } from '../vault/stage-backup'
 import { LockedError, signalUntilChange, type Vault } from '../vault/vault'
 
-const BACKUP_EXTENSION = 'llbackup'
+const FILTER = { name: 'Local Ledger Backup', extensions: ['llbackup'] }
 /** Larger than any ledger this app is made for. */
 const MAX_BACKUP_BYTES = 1024 * 1024 * 1024
 
 export function handleBackup(
   vault: Vault,
-  window: () => BaseWindow | null,
+  main: MainServices,
   handle: Handle,
 ): { forget: () => void } {
   const currentSignal = signalUntilChange(vault)
@@ -40,37 +40,25 @@ export function handleBackup(
       if (made.reason === 'locked') throw new LockedError()
       return { ok: false, reason: made.reason }
     }
-    const chosen = await showSave(window(), {
-      defaultPath: `Local Ledger ${isoDate(new Date())}.${BACKUP_EXTENSION}`,
-      filters: [
-        { name: 'Local Ledger Backup', extensions: [BACKUP_EXTENSION] },
-      ],
-    })
-    if (chosen.canceled || !chosen.filePath) {
-      return { ok: false, reason: 'cancelled' }
-    }
+    const path = await main.savePath(
+      `Local Ledger ${isoDate(new Date())}.llbackup`,
+      FILTER,
+    )
+    if (path === null) return { ok: false, reason: 'cancelled' }
     if (signal.aborted) throw new LockedError()
     try {
-      await writeOwnerOnly(chosen.filePath, made.file)
+      await writeOwnerOnly(path, made.file)
       return { ok: true }
     } catch {
-      return { ok: false, reason: writeFailure(chosen.filePath) }
+      return { ok: false, reason: writeFailure(path) }
     }
   })
 
   handle('restore:open', async () => {
     if (committing) return busy
     const signal = currentSignal()
-    const picked = await showOpen(window(), {
-      properties: ['openFile'],
-      filters: [
-        { name: 'Local Ledger Backup', extensions: [BACKUP_EXTENSION] },
-      ],
-    })
-    const path = picked.filePaths[0]
-    if (picked.canceled || path === undefined) {
-      return { ok: false, reason: 'cancelled' } as const
-    }
+    const path = await main.openPath(FILTER)
+    if (path === null) return { ok: false, reason: 'cancelled' } as const
     if (signal.aborted) throw new LockedError()
     const bytes = await readChosen(path, MAX_BACKUP_BYTES)
     if (typeof bytes === 'string') return { ok: false, reason: bytes } as const

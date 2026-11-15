@@ -2,16 +2,15 @@
 // the main process asks the user where to save it, builds the file, and
 // writes it there. The file is not encrypted (SECURITY_DESIGN). A lock or
 // unlock while this runs cancels it, and nothing is written.
-import type { BaseWindow, FileFilter } from 'electron'
+import type { FileFilter } from 'electron'
 import chartCss from '../../shared/charts.css?raw'
 import type { ExportFormat } from '../../shared/export'
 import type { Outcome } from '../../shared/ipc'
 import type { Currency } from '../../shared/money'
-import { showSave } from '../dialogs'
 import type { Handle } from '../dispatch'
 import { writeFailure, writeOwnerOnly } from '../owner-only'
+import type { MainServices } from '../services'
 import { LockedError, signalUntilChange, type Vault } from '../vault/vault'
-import { printPdf } from './print'
 import reportCss from './report.css?raw'
 import { statementPage } from './report-page'
 import { statement, statementSheets } from './statement'
@@ -24,7 +23,7 @@ const FILTERS: Record<ExportFormat, FileFilter> = {
 
 export function handleExport(
   vault: Vault,
-  window: () => BaseWindow | null,
+  main: MainServices,
   handle: Handle,
 ): void {
   const currentSignal = signalUntilChange(vault)
@@ -47,13 +46,11 @@ export function handleExport(
     format: ExportFormat,
     signal: AbortSignal,
   ): Promise<Outcome<'cancelled' | 'unwritable' | 'unwritable-kept'>> {
-    const chosen = await showSave(window(), {
-      defaultPath: `Statement ${month} ${currency}.${format}`,
-      filters: [FILTERS[format]],
-    })
-    if (chosen.canceled || !chosen.filePath) {
-      return { ok: false, reason: 'cancelled' }
-    }
+    const path = await main.savePath(
+      `Statement ${month} ${currency}.${format}`,
+      FILTERS[format],
+    )
+    if (path === null) return { ok: false, reason: 'cancelled' }
     if (signal.aborted) throw new LockedError()
     const data = statement(vault.database(), month, currency)
     let bytes: Uint8Array
@@ -61,7 +58,7 @@ export function handleExport(
       bytes =
         format === 'xlsx'
           ? workbook(statementSheets(data))
-          : await printPdf(
+          : await main.printPdf(
               statementPage(data),
               `${chartCss}\n${reportCss}`,
               signal,
@@ -72,11 +69,11 @@ export function handleExport(
     }
     try {
       if (signal.aborted) throw new LockedError()
-      await writeOwnerOnly(chosen.filePath, bytes)
+      await writeOwnerOnly(path, bytes)
       return { ok: true }
     } catch (error) {
       if (error instanceof LockedError) throw error
-      return { ok: false, reason: writeFailure(chosen.filePath) }
+      return { ok: false, reason: writeFailure(path) }
     } finally {
       bytes.fill(0)
     }
