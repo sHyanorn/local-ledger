@@ -1,6 +1,7 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import {
   closeSync,
+  existsSync,
   mkdirSync,
   openSync,
   readdirSync,
@@ -329,8 +330,27 @@ function dump(pid: number, file: string): void {
       file,
     ])
   } else {
-    // macOS: a core file, written by root with the process suspended.
-    execFileSync('sudo', ['-n', 'gcore', '-s', '-o', file, String(pid)])
+    // macOS: a core file of the pages the process has written, by root
+    // through lldb, which stops the process while it is attached. A full
+    // core holds the shared cache too and outgrows the disk.
+    const lldb = spawnSync(
+      'sudo',
+      [
+        '-n',
+        'lldb',
+        '--batch',
+        '--attach-pid',
+        String(pid),
+        '--one-line',
+        `process save-core --style modified-memory "${file}"`,
+        '--one-line',
+        'process detach',
+      ],
+      { encoding: 'utf8' },
+    )
+    if (!existsSync(file)) {
+      throw new Error(`no core file: ${lldb.stderr || lldb.stdout}`)
+    }
     execFileSync('sudo', ['-n', 'chown', String(process.getuid!()), file])
   }
 }
@@ -348,7 +368,7 @@ const reason = (error: unknown) =>
  * Counts the needles in the memory of each process. Linux reads /proc with
  * every process stopped, so nothing moves between or during the reads;
  * Windows writes a minidump and macOS a core file of each in turn, each
- * with its process suspended.
+ * with its process stopped.
  */
 export function scanProcesses(
   processes: AppProcess[],
