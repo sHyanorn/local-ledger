@@ -75,6 +75,8 @@ afterEach(() => {
 })
 const onWindows = () =>
   vi.stubGlobal('process', { ...process, platform: 'win32' })
+const onLinux = () =>
+  vi.stubGlobal('process', { ...process, platform: 'linux' })
 
 describe('writeOwnerOnly', () => {
   it('writes a new file, owner-only', async () => {
@@ -166,6 +168,7 @@ describe('writeOwnerOnly', () => {
 
   it('does not try again elsewhere, or for another failure', async () => {
     writeFileSync(path, OLD)
+    onLinux()
     faults.renames = ['EPERM']
     await expect(writeOwnerOnly(path, NEW)).rejects.toThrow('EPERM')
     expect(faults.renamed).toBe(1)

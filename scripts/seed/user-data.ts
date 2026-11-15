@@ -1,5 +1,9 @@
 import { homedir } from 'node:os'
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { posix, win32 } from 'node:path'
+
+/** A platform's path rules, which need not be those of this machine. */
+const pathsOf = (platform: NodeJS.Platform) =>
+  platform === 'win32' ? win32 : posix
 
 /**
  * Where the app keeps its data when nothing overrides it: the packaged app
@@ -11,6 +15,7 @@ export function appUserDataDirs(
   env: NodeJS.ProcessEnv = process.env,
   home = homedir(),
 ): string[] {
+  const { join } = pathsOf(platform)
   const appData =
     platform === 'darwin'
       ? join(home, 'Library', 'Application Support')
@@ -30,6 +35,7 @@ export function isAppUserData(
   dirs = appUserDataDirs(),
   platform: NodeJS.Platform = process.platform,
 ): boolean {
+  const { isAbsolute, relative, resolve, sep } = pathsOf(platform)
   const fold = (path: string) =>
     platform === 'linux' ? resolve(path) : resolve(path).toLowerCase()
   return dirs.some((appDir) => {

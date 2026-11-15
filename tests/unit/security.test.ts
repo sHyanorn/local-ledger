@@ -45,7 +45,7 @@ describe('devUserData', () => {
 
   it('gives an unpackaged run a directory of its own', () => {
     expect(devUserData(present('lang'), false, appData)).toBe(
-      '/home/fake/.config/local-ledger-dev',
+      join(appData, 'local-ledger-dev'),
     )
   })
 
