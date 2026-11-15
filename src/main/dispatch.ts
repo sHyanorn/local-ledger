@@ -22,16 +22,30 @@ export type Dispatch = (channel: string, payload: unknown) => Promise<unknown>
  * reach the caller and the log: never the payload, which may hold a
  * password, nor an error message, which may hold a path or a query.
  */
-export function createDispatcher(): { handle: Handle; dispatch: Dispatch } {
+export function createDispatcher(): {
+  handle: Handle
+  dispatch: Dispatch
+  /** For tests: the next call on the channel fails as if its handler had. */
+  failNext: (channel: Channel) => void
+} {
   const handlers = new Map<string, (payload: never) => unknown>()
+  const failing: string[] = []
   return {
     handle: (channel, handler) => {
       if (handlers.has(channel)) throw new Error(`${channel} has a handler`)
       handlers.set(channel, handler)
     },
+    failNext: (channel) => {
+      failing.push(channel)
+    },
     dispatch: async (channel, payload) => {
       const handler = handlers.get(channel)
       if (!handler) throw new Error('unknown-channel')
+      const injected = failing.indexOf(channel)
+      if (injected >= 0) {
+        failing.splice(injected, 1)
+        throw new Error('failed')
+      }
       const parsed = channels[channel as Channel].safeParse(payload)
       if (!parsed.success) throw new Error('invalid-argument')
       try {

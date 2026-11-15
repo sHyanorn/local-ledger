@@ -40,6 +40,18 @@ describe('dispatch', () => {
     },
   )
 
+  it('fails the next call on a channel once when told to', async () => {
+    const { handle, dispatch, failNext } = createDispatcher()
+    handle('vault:status', () => 'new')
+    handle('accounts:list', () => [])
+    failNext('vault:status')
+    await expect(dispatch('accounts:list', undefined)).resolves.toEqual([])
+    await expect(dispatch('vault:status', undefined)).rejects.toThrow(
+      /^failed$/,
+    )
+    await expect(dispatch('vault:status', undefined)).resolves.toBe('new')
+  })
+
   it('takes one handler per channel', () => {
     const { handle } = createDispatcher()
     handle('vault:status', () => 'new')
@@ -79,7 +91,7 @@ describe('dispatch', () => {
 describe('ipcMain', () => {
   /** The listener ipcMain was given for a channel with this handler. */
   function listener(handler: Handler<'vault:status'>, devOrigin?: string) {
-    ipcHandlers(devOrigin)('vault:status', handler)
+    ipcHandlers(devOrigin).handle('vault:status', handler)
     const [channel, registered] = vi.mocked(ipcMain.handle).mock.lastCall!
     expect(channel).toBe('vault:status')
     return (origin: string | undefined) =>

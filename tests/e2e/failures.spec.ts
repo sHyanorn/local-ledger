@@ -8,8 +8,8 @@ import {
   chooseFile,
   createVault,
   expect,
+  failAfterLock,
   failNext,
-  failOnNextPage,
   ledgerTest,
   lockScreen,
   PASSWORD,
@@ -62,7 +62,7 @@ ledgerTest(
 )
 
 test('a page that cannot read the vault state says so', async ({ app }) => {
-  await failOnNextPage(app, 'vault:status')
+  await failAfterLock(app, 'vault:status')
   const next = await lockScreen(app)
   await expect(
     next.getByText(

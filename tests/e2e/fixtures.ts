@@ -7,6 +7,7 @@ import type { SeedLedger } from '../../scripts/seed/generate'
 import { insertLedger } from '../../scripts/seed/insert'
 import { deriveHere } from '../../src/main/vault/kdf'
 import { Vault } from '../../src/main/vault/vault'
+import type { TestHooks } from '../../src/main/test-hooks'
 import type { Channel } from '../../src/shared/ipc'
 import { FAST, PASSWORD } from '../support/vault'
 
@@ -49,29 +50,20 @@ export function rendererPid(app: ElectronApplication): Promise<number> {
   })
 }
 
-/** The page's next call on this channel fails, as one the main process cannot answer. */
+/** The next call on this channel fails, as one the app cannot answer. */
 export const failNext = (app: ElectronApplication, channel: Channel) =>
-  app.evaluate(({ webContents }, channel) => {
-    const page = webContents
-      .getAllWebContents()
-      .find(
-        (contents) =>
-          !contents.isDestroyed() && contents.getURL().startsWith('app://'),
-      )
-    if (!page) throw new Error('no app page')
-    page.ipc.handleOnce(channel, () => {
-      throw new Error('failed')
-    })
+  app.evaluate((_electron, channel) => {
+    ;(globalThis as unknown as { testHooks: TestHooks }).testHooks.failNext(
+      channel,
+    )
   }, channel)
 
-/** The first call on this channel from the next page the app opens fails. */
-export const failOnNextPage = (app: ElectronApplication, channel: Channel) =>
-  app.evaluate(({ app }, channel) => {
-    app.once('web-contents-created', (_event, contents) => {
-      contents.ipc.handleOnce(channel, () => {
-        throw new Error('failed')
-      })
-    })
+/** The first call on this channel after the next lock fails. */
+export const failAfterLock = (app: ElectronApplication, channel: Channel) =>
+  app.evaluate((_electron, channel) => {
+    ;(
+      globalThis as unknown as { testHooks: TestHooks }
+    ).testHooks.failAfterLock(channel)
   }, channel)
 
 /** Resolves once the process is gone, or fails after a few seconds. */

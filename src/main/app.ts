@@ -14,6 +14,8 @@ import { handlePasswordChange } from './password-change'
 import { registerAppScheme, serveAppScheme } from './protocol'
 import { APP_ORIGIN, windowWebPreferences } from './security'
 import { runSelfTest, SELF_TEST_SWITCH } from './self-test'
+import { exposeTestHooks } from './test-hooks'
+import type { Channel } from '../shared/ipc'
 import { deriveInWorker } from './vault/derive-in-worker'
 import { Vault } from './vault/vault'
 import { AppWindow } from './window'
@@ -28,7 +30,7 @@ export function startApp(): void {
 
   void app.whenReady().then(() => {
     serveAppScheme(join(__dirname, '../renderer'))
-    const handle = ipcHandlers(devOrigin)
+    const { handle, failNext } = ipcHandlers(devOrigin)
     const vault = new Vault(app.getPath('userData'), {
       derive: deriveInWorker,
     })
@@ -59,6 +61,7 @@ export function startApp(): void {
     handleExport(vault, services, handle)
     const backups = handleBackup(vault, services, handle)
     vault.onChange(() => window?.replaceView())
+    let failingAfterLock: Channel[] = []
     // Also replaces a page that was already locked, so a password typed
     // but not submitted does not survive a lock.
     const lock = () => {
@@ -66,6 +69,14 @@ export function startApp(): void {
       // is no vault to lock and so no change for it to hear of.
       backups.forget()
       if (!vault.lock()) window?.replaceView()
+      failingAfterLock.forEach(failNext)
+      failingAfterLock = []
+    }
+    if (!app.isPackaged) {
+      exposeTestHooks({
+        failNext,
+        failAfterLock: (channel) => failingAfterLock.push(channel),
+      })
     }
     handle('vault:lock', lock)
     setMenu({
