@@ -16,15 +16,18 @@ import {
   ledgerTest as test,
   rendererPid,
   replacedBy,
+  saveTo,
   sidebar,
+  vaultHosts,
 } from './fixtures'
 
-// Reports what each process of the app holds in memory; it asserts nothing
-// about the counts yet. Text that Playwright sends to a page crosses the
-// main process, so the texts counted reach the app as a user's would: typed
-// key by key, read from a file, or read from the seeded vault. The page
-// sends back only counts.
-test('the memory of every app process, unlocked and after a lock (report only)', async ({
+// Reads the memory of every process of the app, unlocked and after a lock,
+// prints what each holds, and checks where the ledger's texts and key are
+// found. Text that Playwright sends to a page crosses the main process, so
+// the texts counted reach the app as a user's would: typed key by key, read
+// from a file, or read from the seeded vault. The page sends back only
+// counts.
+test('the main process holds no ledger data or key but typed text and a page printed to PDF, and after a lock no other process holds any', async ({
   app,
   page,
   ledger,
@@ -49,9 +52,15 @@ test('the memory of every app process, unlocked and after a lock (report only)',
   await dialog.getByRole('button', { name: 'Add Transaction' }).click()
   await expect(dialog).toBeHidden()
 
+  // The printed row is alone in its month, so the PDF of that month, which
+  // the main process prints, holds no other text counted.
   const imported = randomUUID()
+  const printed = randomUUID()
   const csv = testInfo.outputPath('import.csv')
-  writeFileSync(csv, `01/05/2026,"-1.00","Imported ${imported}"\n`)
+  writeFileSync(
+    csv,
+    `01/05/2026,"-1.00","Imported ${imported}"\n15/01/2019,"-1.00","Printed ${printed}"\n`,
+  )
   await chooseFile(app, csv)
   const count = await home.evaluate(async () => {
     const { accounts, imports } = window.ledger
@@ -67,10 +76,23 @@ test('the memory of every app process, unlocked and after a lock (report only)',
       targets: [{ key: '', accountId: account.id }],
     }
     await imports.preview(request)
-    const committed = await imports.commit(request, [0])
+    const committed = await imports.commit(request, [0, 1])
     return committed.ok ? committed.count : committed.reason
   })
-  expect(count).toBe(1)
+  expect(count).toBe(2)
+  const before = appProcesses(mainPid).map(({ pid }) => pid)
+  await saveTo(app, testInfo.outputPath('statement.pdf'))
+  expect(
+    await home.evaluate(() =>
+      window.ledger.export.save('2019-01', 'AUD', 'pdf'),
+    ),
+  ).toEqual({ ok: true })
+  // Printing runs in processes of its own, which end once it is done.
+  await expect
+    .poll(() =>
+      appProcesses(mainPid).filter(({ pid }) => !before.includes(pid)),
+    )
+    .toEqual([])
 
   const vault = parseVaultFile(
     readFileSync(join(userData, 'vault', 'vault.json'), 'utf8'),
@@ -98,6 +120,7 @@ test('the memory of every app process, unlocked and after a lock (report only)',
     ...encoded('page control', pageControl),
     ...encoded('typed', typed),
     ...encoded('imported', imported),
+    ...encoded('printed', printed),
     ...encoded('password', DEMO_PASSWORD),
     'sealing key': Buffer.from(sealingKey),
     'key raw': Buffer.from(key),
@@ -120,7 +143,7 @@ test('the memory of every app process, unlocked and after a lock (report only)',
   key.fill(0)
   sealingKey.fill(0)
 
-  const phases: Record<string, unknown> = {}
+  const phases: Record<string, Phase> = {}
   const platform = `${process.platform} ${process.arch}`
   // Each phase is printed once read, so a step that fails later keeps it.
   console.log(
@@ -168,14 +191,18 @@ test('the memory of every app process, unlocked and after a lock (report only)',
         ),
       ].join('\n'),
     )
+    // A process that could not be read leaves nothing to check.
+    expect(valid.errors, phase).toBe(0)
   }
 
   await measure('unlocked', home)
   const shown = await rendererPid(app)
+  const [host] = await vaultHosts(app)
   const locked = await replacedBy(app, () =>
     sidebar(home).getByRole('button', { name: 'Lock' }).click(),
   )
   await expectExited(shown)
+  await expectExited(host!)
   await expect(locked.getByLabel('Master password')).toBeVisible()
   await app.evaluate(() => {
     process.getBuiltinModule('v8').setFlagsFromString('--expose-gc')
@@ -195,7 +222,72 @@ test('the memory of every app process, unlocked and after a lock (report only)',
     testInfo.outputPath('memory.json'),
     JSON.stringify(report, null, 2),
   )
+
+  // A core on macOS holds the pages lldb counts as written, and now and then
+  // not the one with the main process's control; the main process is then
+  // not checked in that phase.
+  const partial = (phase: string) =>
+    process.platform === 'darwin' && !phases[phase]!.valid.control
+  for (const [phase, { valid }] of Object.entries(phases)) {
+    expect(
+      { ...valid, control: valid.control || partial(phase) },
+      phase,
+    ).toEqual({
+      control: true,
+      pageControl: true,
+      errors: 0,
+      unread: 0,
+      missed: [],
+    })
+  }
+  // The host holds the ledger and its key while unlocked: the counts find
+  // what the app keeps.
+  const unlocked = phases.unlocked!.scans.find(({ pid }) => pid === host)!
+  expect(held(unlocked.counts)).toEqual(
+    expect.arrayContaining(['imported ascii', 'printed ascii', 'key raw']),
+  )
+  expect(seedsFound(unlocked.counts, seeds.length, 'ascii')).toBe(seeds.length)
+  // The main process prints the page, and its copies of the typed text come
+  // from Chromium or the test driver, not from the app's calls, which go to
+  // the host.
+  const residue = Object.entries(phases).flatMap(([phase, { scans }]) =>
+    scans
+      .filter(({ pid }) =>
+        pid === mainPid ? !partial(phase) : phase !== 'unlocked',
+      )
+      .flatMap(({ pid, type, counts }) =>
+        held(counts)
+          .filter((name) => pid !== mainPid || !/^(typed|printed) /.test(name))
+          .map((name) => `${phase}: ${type} ${pid} holds ${name}`),
+      ),
+  )
+  expect(residue).toEqual([])
 })
+
+interface Phase {
+  valid: Record<string, unknown>
+  pagePid: number
+  scans: (ProcessScan & { workingSet?: number })[]
+}
+
+/** The needles a process holds a copy of, but for the test's own controls. */
+const held = (counts: ProcessScan['counts']) =>
+  Object.keys(counts).filter(
+    (name) => counts[name]! > 0 && !/^(page )?control /.test(name),
+  )
+
+/** How many seed descriptions have a copy in either case. */
+const seedsFound = (
+  counts: ProcessScan['counts'],
+  seeds: number,
+  encoding: string,
+) =>
+  Array.from({ length: seeds }).filter(
+    (_, index) =>
+      counts[`seed ${index} ${encoding}`]! +
+        (counts[`seed ${index} key ${encoding}`] ?? 0) >
+      0,
+  ).length
 
 /** One line per process: the copies of each text, ascii/utf16. */
 function summary(
@@ -206,13 +298,7 @@ function summary(
   const { counts } = scan
   const pair = (name: string) =>
     `${counts[`${name} ascii`]}/${counts[`${name} utf16`]}`
-  const found = (encoding: string) =>
-    Array.from({ length: seeds }).filter(
-      (_, index) =>
-        counts[`seed ${index} ${encoding}`]! +
-          (counts[`seed ${index} key ${encoding}`] ?? 0) >
-        0,
-    ).length
+  const found = (encoding: string) => seedsFound(counts, seeds, encoding)
   const mb = (bytes = 0) => (bytes / 2 ** 20).toFixed(1)
   const name = `  ${scan.type}${page ? ' (page shown)' : ''} ${scan.pid}:`
   if (scan.error) return `${name} error ${scan.error}`
@@ -220,7 +306,7 @@ function summary(
     name,
     `read ${mb(scan.bytes)} MB${scan.unread === undefined ? '' : `, unread ${mb(scan.unread)} MB`}, working set ${mb(scan.workingSet)} MB;`,
     `control ${pair('control')}, page control ${pair('page control')},`,
-    `typed ${pair('typed')}, imported ${pair('imported')}, seeds ${found('ascii')}/${found('utf16')},`,
+    `typed ${pair('typed')}, imported ${pair('imported')}, printed ${pair('printed')}, seeds ${found('ascii')}/${found('utf16')},`,
     `password ${pair('password')}, sealing key ${counts['sealing key']},`,
     `key raw ${counts['key raw']}, halves ${counts['key first half']}/${counts['key second half']}, hex ${pair('key hex')}, x'' ${pair("key x''")}`,
   ].join(' ')
