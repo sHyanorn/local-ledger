@@ -25,11 +25,34 @@ export type Dispatch = (channel: string, payload: unknown) => Promise<unknown>
 export function createDispatcher(): {
   handle: Handle
   dispatch: Dispatch
+  /** Refuses calls from now on; resolves once those running have settled. */
+  close: () => Promise<void>
   /** For tests: the next call on the channel fails as if its handler had. */
   failNext: (channel: Channel) => void
 } {
   const handlers = new Map<string, (payload: never) => unknown>()
   const failing: string[] = []
+  const running = new Set<Promise<unknown>>()
+  let closed = false
+  const run = async (channel: string, payload: unknown) => {
+    const handler = handlers.get(channel)
+    if (!handler) throw new Error('unknown-channel')
+    const injected = failing.indexOf(channel)
+    if (injected >= 0) {
+      failing.splice(injected, 1)
+      throw new Error('failed')
+    }
+    const parsed = channels[channel as Channel].safeParse(payload)
+    if (!parsed.success) throw new Error('invalid-argument')
+    try {
+      return await handler(parsed.data as never)
+    } catch (error) {
+      // A page that outlived its vault state; it is about to be replaced.
+      if (error instanceof LockedError) throw new Error('locked')
+      console.error(`${channel} failed: ${errorCode(error)}`)
+      throw new Error('failed')
+    }
+  }
   return {
     handle: (channel, handler) => {
       if (handlers.has(channel)) throw new Error(`${channel} has a handler`)
@@ -38,24 +61,17 @@ export function createDispatcher(): {
     failNext: (channel) => {
       failing.push(channel)
     },
-    dispatch: async (channel, payload) => {
-      const handler = handlers.get(channel)
-      if (!handler) throw new Error('unknown-channel')
-      const injected = failing.indexOf(channel)
-      if (injected >= 0) {
-        failing.splice(injected, 1)
-        throw new Error('failed')
-      }
-      const parsed = channels[channel as Channel].safeParse(payload)
-      if (!parsed.success) throw new Error('invalid-argument')
-      try {
-        return await handler(parsed.data as never)
-      } catch (error) {
-        // A page that outlived its vault state; it is about to be replaced.
-        if (error instanceof LockedError) throw new Error('locked')
-        console.error(`${channel} failed: ${errorCode(error)}`)
-        throw new Error('failed')
-      }
+    dispatch: (channel, payload) => {
+      if (closed) return Promise.reject(new Error('locked'))
+      const call = run(channel, payload)
+      running.add(call)
+      const settled = () => running.delete(call)
+      call.then(settled, settled)
+      return call
+    },
+    close: async () => {
+      closed = true
+      await Promise.allSettled(running)
     },
   }
 }

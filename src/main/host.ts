@@ -16,7 +16,7 @@ import { handlePasswordChange } from './password-change'
 import type { MainServices } from './services'
 import { deriveInWorker } from './vault/derive-in-worker'
 import { probeVault } from './vault/probe'
-import { Vault } from './vault/vault'
+import { LockedError, Vault } from './vault/vault'
 
 const parent = process.parentPort
 const post = (message: FromHost) => parent.postMessage(message)
@@ -25,7 +25,7 @@ parent.once('message', ({ data }) => {
   const { root, testHooks } = data as Extract<ToHost, { type: 'start' }>
   const vault = new Vault(root, { derive: deriveInWorker })
   const main = askMain()
-  const { handle, dispatch, failNext } = createDispatcher()
+  const { handle, dispatch, close, failNext } = createDispatcher()
   const idle = ({ idleLockMinutes }: Settings) =>
     post({ type: 'idle', minutes: idleLockMinutes })
 
@@ -48,13 +48,20 @@ parent.once('message', ({ data }) => {
       case 'page':
         if (ports[0]) serve(ports[0], dispatch)
         break
-      case 'lock':
+      case 'lock': {
+        // New calls are refused. Those running stop at their next step, as
+        // vault.lock() says, or finish the step they are in: a save finishes
+        // or removes its temporary file. One waiting for a dialog stops now,
+        // as it would once answered. The host exits once they settle.
+        const settled = close()
         // Also at setup, where there is no vault to lock and so no change
         // for the backup handlers to hear of.
         backups.forget()
         vault.lock()
-        process.exit(0)
+        main.cancel()
+        void settled.then(() => process.exit(0))
         break
+      }
       case 'answer':
       case 'refused':
         main.answer(message)
@@ -89,6 +96,8 @@ function serve(port: MessagePortMain, dispatch: Dispatch): void {
 /** The main process's services, asked for over the parent port. */
 function askMain(): MainServices & {
   answer(message: Extract<ToHost, { type: 'answer' | 'refused' }>): void
+  /** Fails what still waits for an answer, as locked. */
+  cancel(): void
 } {
   let next = 0
   const waiting = new Map<
@@ -137,6 +146,10 @@ function askMain(): MainServices & {
       waiting.delete(message.id)
       if (message.type === 'answer') call.resolve(message.value)
       else call.reject(new Error('refused'))
+    },
+    cancel: () => {
+      for (const call of waiting.values()) call.reject(new LockedError())
+      waiting.clear()
     },
   }
 }

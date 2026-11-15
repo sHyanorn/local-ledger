@@ -60,6 +60,25 @@ describe('dispatch', () => {
     await expect(dispatch('vault:status', undefined)).resolves.toBe('new')
   })
 
+  it('refuses calls once closed, and settles after those running', async () => {
+    const { handle, dispatch, close } = createDispatcher()
+    let finish = () => {}
+    handle(
+      'vault:status',
+      () => new Promise((resolve) => (finish = () => resolve('locked'))),
+    )
+    const running = dispatch('vault:status', undefined)
+    let closed = false
+    const closing = close().then(() => (closed = true))
+    await expect(dispatch('vault:status', undefined)).rejects.toThrow(
+      /^locked$/,
+    )
+    expect(closed).toBe(false)
+    finish()
+    await closing
+    await expect(running).resolves.toBe('locked')
+  })
+
   it('takes one handler per channel', () => {
     const { handle } = createDispatcher()
     handle('vault:status', () => 'new')

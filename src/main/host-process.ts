@@ -1,7 +1,8 @@
 // Starts the vault host, hands it the ports of pages, answers its requests
 // for dialogs and printing, and ends it at each lock. A host has the time
-// below to lock and exit before it is killed; no new one starts until the
-// last has gone, so two never work on the vault's files at once.
+// below to let its calls settle and exit; then it is killed, which cuts a
+// call still running as a crash would. No new host starts until the last
+// has gone, so two never work on the vault's files at once.
 import { MessageChannelMain, utilityProcess } from 'electron'
 import type { MessagePortMain, UtilityProcess } from 'electron'
 import type {
@@ -18,7 +19,7 @@ import type { FromHost, ToHost } from './host-protocol'
 import type { MainServices } from './services'
 import type { VaultProbe } from './vault/probe'
 
-const EXIT_GRACE_MS = 2_000
+const EXIT_GRACE_MS = 30_000
 
 interface HostOptions {
   /** The host's bundle. */
