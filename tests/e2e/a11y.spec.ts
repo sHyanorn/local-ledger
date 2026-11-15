@@ -136,6 +136,9 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(home.getByText('2 new transactions')).toBeVisible()
       await scan(home, 'import')
       await home.getByRole('button', { name: 'Import 2 Transactions' }).click()
+      // Once the rows are in, the page shows the account and Settings lists
+      // the import; leaving sooner, the page would come back over Settings.
+      await expect(home.getByText('Imported 2 transactions.')).toBeVisible()
       await nav.getByRole('button', { name: 'Settings' }).click()
       await scan(home, 'Settings with an import')
       await home.getByRole('button', { name: 'Undo…' }).click()
