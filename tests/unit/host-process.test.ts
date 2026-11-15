@@ -6,7 +6,10 @@ import { VaultHost } from '../../src/main/host-process'
 
 vi.mock('electron', () => ({
   utilityProcess: { fork: vi.fn() },
-  MessageChannelMain: class {},
+  MessageChannelMain: class {
+    port1 = { once: vi.fn(), start: vi.fn(), postMessage: vi.fn() }
+    port2 = { close: vi.fn() }
+  },
 }))
 
 /** A vault host process, as the main process sees it. */
@@ -28,13 +31,13 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-const start = () =>
+const start = (onChange = vi.fn()) =>
   new VaultHost({
     entry: 'host.js',
     root: '/fake',
     services: {} as never,
     testHooks: false,
-    onChange: vi.fn(),
+    onChange,
     onIdle: vi.fn(),
   })
 const page = () => ({ close: vi.fn() }) as unknown as MessagePortMain
@@ -60,4 +63,33 @@ it('starts no host for a page that went while the last host ended', () => {
   forked[0]!.emit('exit', 0)
   expect(forked).toHaveLength(1)
   expect(vaultHost.running).toBe(false)
+})
+
+it('does not replace the page for a host that ended before it was ready, and fails what waits on it', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const onChange = vi.fn()
+  const vaultHost = start(onChange)
+  const calling = vaultHost.call('vault:status', undefined)
+  const probing = vaultHost.probe()
+  forked[0]!.emit('exit', 1)
+  await expect(calling).rejects.toThrow('the vault host ended')
+  await expect(probing).resolves.toBeNull()
+  // A new page would start a new host, which would end the same way.
+  expect(onChange).not.toHaveBeenCalled()
+  expect(log).toHaveBeenCalledWith('the vault host ended before it was ready')
+  log.mockRestore()
+})
+
+it('gives a probe only the answer of the host it asked', async () => {
+  const vaultHost = start()
+  vaultHost.connect(page())
+  const first = vaultHost.probe()
+  vaultHost.lock()
+  forked[0]!.emit('exit', 0)
+  vaultHost.connect(page())
+  const second = vaultHost.probe()
+  const probe = { sqlite: '3', cipher: 'sqlcipher' }
+  forked[1]!.emit('message', { type: 'probe', probe })
+  await expect(first).resolves.toBeNull()
+  await expect(second).resolves.toEqual(probe)
 })

@@ -46,7 +46,12 @@ export class VaultHost {
     failures: [],
   }
   #failAfterLock: Channel[] = []
+  /** Probes of the current host. */
   #probes: ((probe: VaultProbe | null) => void)[] = []
+  /** Calls of the self-test, failed if the host ends unasked. */
+  readonly #calls = new Set<(error: Error) => void>()
+  /** Hosts that have set up their vault. */
+  readonly #ready = new WeakSet<UtilityProcess>()
   readonly #exited = new WeakSet<UtilityProcess>()
   #onEmpty: (() => void)[] = []
 
@@ -78,6 +83,8 @@ export class VaultHost {
     const host = this.#current
     if (!host) return
     this.#current = null
+    // What an ending host sends is dropped, its probes' answers too.
+    this.#probes.splice(0).forEach((done) => done(null))
     this.#ending.add(host)
     this.#post(host, { type: 'lock' })
     const kill = setTimeout(() => host.kill(), EXIT_GRACE_MS)
@@ -98,7 +105,9 @@ export class VaultHost {
     const { port1, port2 } = new MessageChannelMain()
     this.connect(port2)
     return new Promise((resolve, reject) => {
+      this.#calls.add(reject)
       port1.once('message', ({ data }) => {
+        this.#calls.delete(reject)
         port1.close()
         const answer = data as PortAnswer
         if (answer.ok) resolve(answer.result as Results[C])
@@ -144,9 +153,14 @@ export class VaultHost {
       for (const print of prints.values()) print.abort()
       this.#ending.delete(host)
       if (host === this.#current) {
-        // Ended unasked: as after a lock, the page goes.
         this.#current = null
-        this.#options.onChange('locked')
+        this.#probes.splice(0).forEach((done) => done(null))
+        for (const fail of this.#calls) fail(new Error('the vault host ended'))
+        this.#calls.clear()
+        // Ended unasked: as after a lock, the page goes. One that never
+        // started would only fail again for the page that replaced it.
+        if (this.#ready.has(host)) this.#options.onChange('locked')
+        else console.error('the vault host ended before it was ready')
       }
       if (this.#waiting.ports.length > 0) this.#startWhenFree()
       if (!this.running) this.#onEmpty.splice(0).forEach((done) => done())
@@ -180,6 +194,8 @@ export class VaultHost {
         )
         .finally(done)
     switch (message.type) {
+      case 'ready':
+        return void this.#ready.add(host)
       case 'state':
         return onChange(message.state)
       case 'idle':

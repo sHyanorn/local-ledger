@@ -77,6 +77,7 @@ parent.once('message', ({ data }) => {
         break
     }
   })
+  post({ type: 'ready' })
 })
 
 /** Answers a page's calls; the port reaches only pages of this app. */

@@ -25,6 +25,8 @@ const filter = z.strictObject({
 
 /** What the main process accepts from the host. */
 export const fromHost = z.discriminatedUnion('type', [
+  /** The host has set up its vault and answers pages. */
+  z.strictObject({ type: z.literal('ready') }),
   /** The vault opened, closed or changed: the page is out of date. */
   z.strictObject({
     type: z.literal('state'),
