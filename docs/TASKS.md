@@ -57,6 +57,7 @@
 
 ## 0.2.1
 - [x] An import pairs a transfer on its own only when the descriptions show one (D046)
+- [x] Unit tests on Windows and macOS in CI
 
 ## Nice to have
 - [ ] Open an exported workbook in Excel and Numbers, which have not been tried (D030); and see the sidebar vibrancy on a real Mac (D037)

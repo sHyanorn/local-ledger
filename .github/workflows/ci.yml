@@ -47,6 +47,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      # Linux runs them in the check job.
+      - name: Unit tests
+        if: runner.os != 'Linux'
+        run: npm test
       - uses: ./.github/actions/install-electron
       # Ubuntu blocks unprivileged user namespaces, which the Chromium sandbox
       # needs; allow them so the app runs sandboxed as it does for users.
