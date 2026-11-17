@@ -223,16 +223,8 @@ test('the main process holds no ledger data or key but typed text and a page pri
     JSON.stringify(report, null, 2),
   )
 
-  // A core on macOS holds the pages lldb counts as written, and now and then
-  // not the one with the main process's control; the main process is then
-  // not checked in that phase.
-  const partial = (phase: string) =>
-    process.platform === 'darwin' && !phases[phase]!.valid.control
   for (const [phase, { valid }] of Object.entries(phases)) {
-    expect(
-      { ...valid, control: valid.control || partial(phase) },
-      phase,
-    ).toEqual({
+    expect(valid, phase).toEqual({
       control: true,
       pageControl: true,
       errors: 0,
@@ -252,9 +244,7 @@ test('the main process holds no ledger data or key but typed text and a page pri
   // the host.
   const residue = Object.entries(phases).flatMap(([phase, { scans }]) =>
     scans
-      .filter(({ pid }) =>
-        pid === mainPid ? !partial(phase) : phase !== 'unlocked',
-      )
+      .filter(({ pid }) => pid === mainPid || phase !== 'unlocked')
       .flatMap(({ pid, type, counts }) =>
         held(counts)
           .filter((name) => pid !== mainPid || !/^(typed|printed) /.test(name))
@@ -304,7 +294,7 @@ function summary(
   if (scan.error) return `${name} error ${scan.error}`
   return [
     name,
-    `read ${mb(scan.bytes)} MB${scan.unread === undefined ? '' : `, unread ${mb(scan.unread)} MB`}, working set ${mb(scan.workingSet)} MB;`,
+    `read ${mb(scan.bytes)} MB${scan.unread === undefined ? '' : `, unread ${mb(scan.unread)} MB`}${scan.compressed === undefined ? '' : `, compressed ${scan.compressed / 1024} KB`}, working set ${mb(scan.workingSet)} MB;`,
     `control ${pair('control')}, page control ${pair('page control')},`,
     `typed ${pair('typed')}, imported ${pair('imported')}, printed ${pair('printed')}, seeds ${found('ascii')}/${found('utf16')},`,
     `password ${pair('password')}, sealing key ${counts['sealing key']},`,

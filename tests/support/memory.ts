@@ -1,7 +1,6 @@
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import {
   closeSync,
-  existsSync,
   mkdirSync,
   openSync,
   readdirSync,
@@ -203,6 +202,8 @@ export interface ProcessScan extends AppProcess {
   bytes: number
   /** Bytes of readable mappings that a read refused (Linux only). */
   unread?: number
+  /** Bytes of the pages read that the system had compressed (macOS only). */
+  compressed?: number
   error?: string
   /** Copies of each needle, not counting those inside a longer one; none on an error. */
   counts: Record<string, number>
@@ -313,9 +314,14 @@ function stopAll(pids: number[]): void {
 }
 
 const MINIDUMP = resolve(__dirname, 'minidump.ps1')
+const WRITTEN_PAGES = resolve(__dirname, 'written-pages.c')
 
-/** Writes a full memory dump of the process to the file. */
-function dump(pid: number, file: string): void {
+/**
+ * Writes a dump of the process's memory to the file. On macOS the program
+ * built from written-pages.c writes it, and the bytes of compressed pages
+ * in it are returned.
+ */
+function dump(pid: number, file: string, program: string): number | undefined {
   if (process.platform === 'win32') {
     execFileSync('powershell.exe', [
       '-NoProfile',
@@ -329,33 +335,18 @@ function dump(pid: number, file: string): void {
       '-Path',
       file,
     ])
-  } else {
-    // macOS: a core file of the pages the process has written, by root
-    // through lldb, which stops the process while it is attached. A full
-    // core holds the shared cache too and outgrows the disk. A dump takes
-    // seconds; one that hangs fails here instead of stalling the test.
-    const lldb = spawnSync(
-      'sudo',
-      [
-        '-n',
-        'lldb',
-        '--batch',
-        '--attach-pid',
-        String(pid),
-        '--one-line',
-        `process save-core --style modified-memory "${file}"`,
-        '--one-line',
-        'process detach',
-      ],
-      { encoding: 'utf8', timeout: 120_000 },
-    )
-    if (lldb.error || !existsSync(file)) {
-      throw new Error(
-        `no core file: ${lldb.error?.message ?? ''} ${lldb.stderr || lldb.stdout}`,
-      )
-    }
-    execFileSync('sudo', ['-n', 'chown', String(process.getuid!()), file])
+    return undefined
   }
+  // macOS: by root, which task_for_pid needs. Only written pages: every
+  // readable one would take in the shared cache too and outgrow the disk.
+  // A dump takes seconds; one that hangs fails here instead of stalling the
+  // test.
+  const compressed = execFileSync('sudo', ['-n', program, String(pid), file], {
+    encoding: 'utf8',
+    timeout: 120_000,
+  })
+  execFileSync('sudo', ['-n', 'chown', String(process.getuid!()), file])
+  return Number(compressed)
 }
 
 /** An error as one line, preferring what the tool wrote to stderr. */
@@ -370,8 +361,9 @@ const reason = (error: unknown) =>
 /**
  * Counts the needles in the memory of each process. Linux reads /proc with
  * every process stopped, so nothing moves between or during the reads;
- * Windows writes a minidump and macOS a core file of each in turn, each
- * with its process stopped.
+ * Windows and macOS write a dump of each in turn, each with its process
+ * stopped: a minidump on Windows, and on macOS the pages it has written,
+ * compressed ones included.
  */
 export function scanProcesses(
   processes: AppProcess[],
@@ -388,9 +380,9 @@ export function scanProcesses(
       }
       const file = join(dumps, `${target.pid}.dmp`)
       try {
-        dump(target.pid, file)
+        const compressed = dump(target.pid, file, program)
         const bytes = readFile(file, counter)
-        return { ...target, bytes, counts: counter.own() }
+        return { ...target, bytes, compressed, counts: counter.own() }
       } finally {
         rmSync(file, { force: true })
       }
@@ -398,8 +390,12 @@ export function scanProcesses(
       return { ...target, bytes: 0, error: reason(error), counts: {} }
     }
   }
+  const program = join(dumps, 'written-pages')
   if (process.platform !== 'linux') {
     mkdirSync(dumps, { recursive: true })
+    if (process.platform === 'darwin') {
+      execFileSync('clang', ['-o', program, WRITTEN_PAGES])
+    }
     return processes.map(scanOne)
   }
   const pids = processes.map((target) => target.pid)
