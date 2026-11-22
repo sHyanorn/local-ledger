@@ -1,4 +1,10 @@
-import { closeSync, fsyncSync, openSync, renameSync, writeSync } from 'node:fs'
+import {
+  closeSync,
+  fsyncSync,
+  openSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs'
 import { dirname } from 'node:path'
 
 /**
@@ -56,7 +62,8 @@ export function writeFileAtomic(
   const temporary = `${path}.tmp`
   const fd = openSync(temporary, 'w', 0o600)
   try {
-    writeSync(fd, data)
+    // writeFileSync writes it all; writeSync can stop short on a nearly full disk.
+    writeFileSync(fd, data)
     fsyncSync(fd)
   } finally {
     closeSync(fd)
