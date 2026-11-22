@@ -21,7 +21,7 @@ const held = vi.hoisted(() => {
   /** Steps the test holds: the next call to each waits until released. */
   const steps = new Map<
     string,
-    { reach: () => void; reached: Promise<void>; released: Promise<void> }
+    { reach: () => void; released: Promise<void> }
   >()
   return {
     steps,
@@ -64,7 +64,7 @@ async function lockAt<T>(step: Step, vault: Vault, call: () => Promise<T>) {
   let release!: () => void
   const reached = new Promise<void>((resolve) => (reach = resolve))
   const released = new Promise<void>((resolve) => (release = resolve))
-  held.steps.set(step, { reach, reached, released })
+  held.steps.set(step, { reach, released })
   const result = call()
   await reached
   vault.lock()

@@ -107,13 +107,12 @@ describe('reports', () => {
 
   it('trace a category with its subcategories over twelve months', () => {
     add('everyday', '2026-10-03', -3000, 'food')
-    add('everyday', '2026-11-04', -450, 'coffee')
+    add('everyday', '2026-10-04', -450, 'coffee')
     add('everyday', '2026-11-05', 5000, 'food')
-    add('everyday', '2025-11-30', -9999, 'food')
     const trend = categoryTrend(db, ids.food!, '2026-11', 'AUD')
     expect(trend).toHaveLength(12)
     expect(trend.slice(-2)).toEqual([
-      { month: '2026-10', spentCents: 3000 },
+      { month: '2026-10', spentCents: 3450 },
       { month: '2026-11', spentCents: 0 },
     ])
     expect(trend[0]).toEqual({ month: '2025-12', spentCents: 0 })

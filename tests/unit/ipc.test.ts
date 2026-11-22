@@ -216,9 +216,15 @@ describe('new passwords', () => {
     })
   })
 
-  it('count code points, not UTF-16 units', () => {
+  it('count code points, not UTF-16 units', async () => {
     expect(passwordLength('🔒'.repeat(PASSWORD_MIN))).toBe(PASSWORD_MIN)
     expect('🔒'.repeat(PASSWORD_MIN).length).toBe(PASSWORD_MIN * 2)
+    await expect(
+      create({ password: '🔒'.repeat(PASSWORD_MIN - 1) }),
+    ).rejects.toThrow()
+    await expect(
+      create({ password: '🔒'.repeat(PASSWORD_MIN) }),
+    ).resolves.toEqual({ ok: true })
   })
 
   it('count after NFKC, which folds compatibility forms', () => {

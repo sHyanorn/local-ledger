@@ -3,6 +3,8 @@ import { join } from 'node:path'
 import Database from 'better-sqlite3-multiple-ciphers'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { deriveHere } from '../../src/main/vault/kdf'
+import { openKey } from '../../src/main/vault/keys'
+import { parseVaultFile } from '../../src/main/vault/vault-file'
 import { Vault } from '../../src/main/vault/vault'
 import { FAST, PASSWORD } from '../support/vault'
 import { tempDirs } from '../support/temp-dir'
@@ -90,7 +92,7 @@ describe('on disk', () => {
     )
   })
 
-  it('vault.json holds no fake data and no key in clear', () => {
+  it('vault.json holds no fake data and no key in clear', async () => {
     const text = readFileSync(join(vault.dir, 'vault.json'), 'utf8')
     for (const marker of MARKERS) expect(text).not.toContain(marker)
     expect(Object.keys(JSON.parse(text)).sort()).toEqual([
@@ -100,5 +102,10 @@ describe('on disk', () => {
       'key',
       'version',
     ])
+    const file = parseVaultFile(text)
+    const dataKey = file && (await openKey(file, PASSWORD, deriveHere))
+    if (!dataKey) throw new Error('the data key did not open')
+    expect(text).not.toContain(dataKey.toString('hex'))
+    expect(text).not.toContain(dataKey.toString('base64'))
   })
 })

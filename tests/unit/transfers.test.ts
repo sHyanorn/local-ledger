@@ -370,7 +370,7 @@ describe('a pair in the ledger', () => {
       accountId: everyday,
       date: '2026-05-02',
       amountCents: -5000,
-      description: 'Renamed',
+      description: 'Fake Transfer',
       categoryId: null,
       notes: 'note',
     }
@@ -380,12 +380,12 @@ describe('a pair in the ledger', () => {
     expect(links()).toEqual([])
 
     updateTransaction(db, { ...fields, amountCents: -5000 })
-    pairTransfers(db)
+    expect(pairTransfers(db)).toBe(1)
     updateTransaction(db, { ...fields, accountId: travel })
     expect(links()).toEqual([])
 
     updateTransaction(db, { ...fields, accountId: everyday })
-    pairTransfers(db)
+    expect(pairTransfers(db)).toBe(1)
     deleteTransaction(db, into)
     expect(links()).toEqual([])
   })

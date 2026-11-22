@@ -110,7 +110,7 @@ describe('spending', () => {
     add(travel, '2026-05-06', -3000, coffee)
     add(travel, '2026-05-07', 1000, coffee)
     add(everyday, '2026-05-04', -700, null)
-    // A transfer whose sides are categorized does not count.
+    // A transfer does not count, even with a category on its out side.
     add(everyday, '2026-05-05', -50000, food, 'Fake Transfer')
     add(savings, '2026-05-05', 50000, null, 'Fake Transfer')
     expect(pairTransfers(db)).toBe(1)

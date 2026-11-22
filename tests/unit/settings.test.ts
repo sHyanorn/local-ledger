@@ -30,10 +30,16 @@ describe('settings', () => {
     })
   })
 
-  it('read a value they do not know as the default', () => {
-    db.prepare(
-      "INSERT INTO settings (key, value) VALUES ('home_currency', 'XYZ'), ('idle_lock_minutes', '0')",
-    ).run()
+  it('read what is stored, and a value they do not know as the default', () => {
+    const store = db.prepare(
+      'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?), (?, ?)',
+    )
+    store.run('home_currency', 'CNY', 'idle_lock_minutes', '15')
+    expect(getSettings(db)).toEqual({
+      homeCurrency: 'CNY',
+      idleLockMinutes: 15,
+    })
+    store.run('home_currency', 'XYZ', 'idle_lock_minutes', '0')
     expect(getSettings(db)).toEqual(DEFAULT_SETTINGS)
   })
 

@@ -118,10 +118,32 @@ describe('insertLedger', () => {
       expect(listCategories(db)).toHaveLength(
         ledger.categories.reduce((sum, c) => sum + 1 + c.children.length, 0),
       )
-      expect(totalTransactions(db, {}).map((t) => t.currency)).toEqual([
-        'AUD',
-        'CNY',
-      ])
+      for (const account of accounts) {
+        const fields = ledger.accounts.find((a) => a.name === account.name)!
+        const rows = ledger.transactions.filter(
+          (row) => row.account === account.name,
+        )
+        expect(account.balanceCents).toBe(
+          rows.reduce(
+            (sum, row) => sum + row.amountCents,
+            fields.openingBalanceCents,
+          ),
+        )
+      }
+      const currencyOf = (name: string) =>
+        ledger.accounts.find((a) => a.name === name)!.currency
+      expect(totalTransactions(db, {})).toEqual(
+        (['AUD', 'CNY'] as const).map((currency) => {
+          const rows = ledger.transactions.filter(
+            (row) => currencyOf(row.account) === currency,
+          )
+          return {
+            currency,
+            count: rows.length,
+            cents: rows.reduce((sum, row) => sum + row.amountCents, 0),
+          }
+        }),
+      )
     } finally {
       db.close()
     }
@@ -140,6 +162,19 @@ describe('the seed', () => {
     ).toBe('/fake/config/local-ledger')
     expect(appUserDataDirs('darwin', {}, home)[0]).toBe(
       '/home/fake/Library/Application Support/local-ledger',
+    )
+    expect(
+      appUserDataDirs(
+        'win32',
+        { APPDATA: 'C:\\Fake\\Roaming' },
+        'C:\\Users\\fake',
+      ),
+    ).toEqual([
+      'C:\\Fake\\Roaming\\local-ledger',
+      'C:\\Fake\\Roaming\\local-ledger-dev',
+    ])
+    expect(appUserDataDirs('win32', {}, 'C:\\Users\\fake')[0]).toBe(
+      'C:\\Users\\fake\\AppData\\Roaming\\local-ledger',
     )
   })
 

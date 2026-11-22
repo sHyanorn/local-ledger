@@ -1,5 +1,6 @@
 import {
   closeSync,
+  existsSync,
   mkdtempSync,
   openSync,
   readFileSync,
@@ -73,6 +74,7 @@ describe('openDatabase', () => {
 
   it('does not create a missing database unless asked', () => {
     expect(() => openDatabase(file, KEY)).toThrow()
+    expect(existsSync(file)).toBe(false)
   })
 
   it('refuses an empty file, which decrypts under any key, and writes nothing', () => {
@@ -180,8 +182,11 @@ describe('schema', () => {
 describe('migrate', () => {
   it('is a no-op on an up-to-date database', () => {
     track(openDatabase(file, KEY, { create: true })).close()
+    const before = readFileSync(file)
     const db = track(openDatabase(file, KEY))
     expect(db.pragma('user_version', { simple: true })).toBe(migrations.length)
+    db.close()
+    expect(readFileSync(file).equals(before)).toBe(true)
   })
 
   it('refuses a database from a newer version of the app', () => {

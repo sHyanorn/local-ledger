@@ -279,7 +279,7 @@ describe('a migration', () => {
   })
 
   it('of a new ledger keeps no copy', () => {
-    let copied = false
+    let copied: boolean | null = null
     openDatabase(file, KEY, {
       create: true,
       migrations: [

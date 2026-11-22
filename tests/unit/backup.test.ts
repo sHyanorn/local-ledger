@@ -37,12 +37,16 @@ async function backup(): Promise<Buffer> {
   return made.file
 }
 
-/** The data key from a backup, opened with the password. */
-async function dataKey(read: ReadBackup, password = PASSWORD) {
+/**
+ * The data key from a backup, opened with the password. The sealing key comes
+ * from the Argon2id settings of `from`, which a test can set apart from the
+ * header being opened.
+ */
+async function dataKey(read: ReadBackup, password = PASSWORD, from = read) {
   const sealing = await deriveHere(
     encodePassword(password),
-    read.header.kdf.salt,
-    read.header.kdf,
+    from.header.kdf.salt,
+    from.header.kdf,
   )
   return openBackupKey(read.header, sealing)
 }
@@ -121,7 +125,9 @@ describe('backup', () => {
     expect(read).not.toBeNull()
     expect(await dataKey(read!)).toBeNull()
 
-    // A changed schema version or Argon2id setting fails the same way.
+    // A changed schema version or Argon2id setting fails the same way, even
+    // with the sealing key derived from the original settings.
+    const original = readBackup(file)!
     for (const change of [
       { schema: header.schema + 1 },
       { kdf: { ...header.kdf, iterations: header.kdf.iterations + 1 } },
@@ -143,7 +149,7 @@ describe('backup', () => {
         ]),
       )
       expect(edited).not.toBeNull()
-      expect(await dataKey(edited!)).toBeNull()
+      expect(await dataKey(edited!, PASSWORD, original)).toBeNull()
     }
   })
 })

@@ -154,7 +154,7 @@ describe('classify', () => {
   it('matches the closest date first, then the most alike description', () => {
     const everyday = account()
     manual(everyday, '2026-05-07', -450, 'Fake Cafe')
-    const near = manual(everyday, '2026-05-04', -450, 'Something Else')
+    manual(everyday, '2026-05-04', -450, 'Something Else')
     const alike = manual(everyday, '2026-05-02', -450, 'Fake Cafe')
     const result = classify(db, [
       {
@@ -166,7 +166,22 @@ describe('classify', () => {
       },
     ])
     expect(result[0]?.match?.id).toBe(alike)
-    expect(near).toBeGreaterThan(0)
+  })
+
+  it('prefers a nearer date over a more alike description', () => {
+    const everyday = account()
+    manual(everyday, '2026-05-06', -450, 'Fake Cafe')
+    const nearer = manual(everyday, '2026-05-02', -450, 'Other Words')
+    const result = classify(db, [
+      {
+        index: 0,
+        accountId: everyday,
+        date: '2026-05-03',
+        cents: -450,
+        description: 'Fake Cafe',
+      },
+    ])
+    expect(result[0]?.match?.id).toBe(nearer)
   })
 
   it('ranks by date, then wording, whatever order the ledger holds them in', () => {
@@ -526,13 +541,15 @@ describe('ImportSession', () => {
     const session = new ImportSession()
     const data = Uint8Array.from(sample('anz.csv'))
     const file = opened(session, data)
-    opened(session, sample('nab.csv'))
+    const currentData = Uint8Array.from(sample('nab.csv'))
+    const current = opened(session, currentData)
     expect(data.every((byte) => byte === 0)).toBe(true)
     expect(session.preview(db, request(file, everyday)).ok).toBe(false)
     session.clear()
+    expect(currentData.every((byte) => byte === 0)).toBe(true)
     expect(
       previewAndCommit(db, session, {
-        ...request(file, everyday),
+        ...request(current, everyday),
         selected: [0],
       }),
     ).toEqual({
@@ -593,7 +610,7 @@ describe('import history', () => {
       ...request(file, everyday),
       selected: everything(session, file, everyday),
     })
-    const kept = manual(everyday, '2026-05-01', -100, 'Fake Kept')
+    manual(everyday, '2026-05-01', -100, 'Fake Kept')
 
     const ids = (
       db
@@ -639,7 +656,6 @@ describe('import history', () => {
     ])
     expect(undoBatch(db, 1)).toEqual({ ok: true, count: 3, kept: 0 })
     expect(rows()).toMatchObject([{ description: 'Fake Kept' }])
-    expect(kept).toBeGreaterThan(0)
     expect(listBatches(db)).toEqual([])
     expect(undoBatch(db, 1)).toEqual({ ok: false, reason: 'not-found' })
   })

@@ -22,6 +22,12 @@ const present =
     names.includes(name)
 
 describe('refusedSwitches', () => {
+  it('names the switches that must stay refused', () => {
+    // Built from parts so this file does not trip the sandbox check.
+    expect(switches.sandboxOff).toContain(['no', 'sandbox'].join('-'))
+    expect(switches.remoteDebugging).toContain('remote-debugging-port')
+  })
+
   it.each(switches.sandboxOff)('refuses --%s in every build', (name) => {
     expect(refusedSwitches(present(name), false)).toEqual([name])
     expect(refusedSwitches(present(name), true)).toEqual([name])

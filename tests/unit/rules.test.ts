@@ -134,6 +134,8 @@ describe('order', () => {
     expect(moveRule(db, a, -1)).toEqual({ ok: true })
     expect(moveRule(db, b, 1)).toEqual({ ok: true })
     expect(listRules(db).map((entry) => entry.id)).toEqual([a, c, b])
+    expect(moveRule(db, a, 1)).toEqual({ ok: true })
+    expect(listRules(db).map((entry) => entry.id)).toEqual([c, a, b])
     expect(moveRule(db, 999, 1)).toEqual({ ok: false, reason: 'not-found' })
   })
 

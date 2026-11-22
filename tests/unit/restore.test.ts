@@ -283,7 +283,7 @@ describe('a restore that fails part way', () => {
   it('cannot be spoiled by wiping the staged key while it runs', async () => {
     const staged = await check(vault)
     const restoring = vault.restore(staged, NOW)
-    // As a discard from the page would, between the two key derivations.
+    // As a discard from the page would, before the queued restore starts.
     staged.dataKey.fill(0)
     expect(await restoring).toEqual({ ok: true })
     expect(names(vault)).toEqual(['Fake Backed Up'])
@@ -300,11 +300,7 @@ describe('the restored vault', () => {
       readFileSync(join(root, 'vault', 'vault.json'), 'utf8'),
     )!
     const live = join(root, 'vault', `ledger-${file.generation}.db`)
-    const backupKey = await openKey(
-      { ...parseVaultFile(before)!, generation: 2 },
-      NOW,
-      deriveHere,
-    )
+    const backupKey = await openKey(parseVaultFile(before)!, NOW, deriveHere)
     // Old keys: the backup's (under OLD) and the vault's before the restore.
     const read = readBackup(backup)!
     const sealing = await deriveHere(

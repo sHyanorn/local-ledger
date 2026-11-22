@@ -1,5 +1,6 @@
-// File system failures after a commit point: once vault.json or the vault
-// directory has been renamed into place, nothing that follows undoes it.
+// File system failures around a commit point: once vault.json or the vault
+// directory has been renamed into place, nothing that follows undoes it, and
+// a failure before that puts no vault in place.
 import { mkdtempSync, readdirSync, readlinkSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -62,8 +63,10 @@ const handles = (name: string) =>
   readdirSync('/proc/self/fd').filter((fd) => {
     try {
       return readlinkSync(`/proc/self/fd/${fd}`).endsWith(name)
-    } catch {
-      return false
+    } catch (error) {
+      // A descriptor can close between the listing and the read.
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+      throw error
     }
   }).length
 

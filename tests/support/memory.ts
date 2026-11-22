@@ -134,14 +134,14 @@ function occurrences(bytes: Buffer, needle: Buffer): number {
 }
 
 /** A process of the app: the main process or one it started. */
-export interface AppProcess {
+interface AppProcess {
   pid: number
   /** Chromium's process type, from its command line. */
   type: string
 }
 
 /** Chromium's type of a process, from its command line. */
-export function processType(commandLine: string): string {
+function processType(commandLine: string): string {
   const type = /--type=(\S+)/.exec(commandLine)?.[1]
   if (!type) return 'unknown'
   const sub = /--utility-sub-type=(\S+)/.exec(commandLine)?.[1]

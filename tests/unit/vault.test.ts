@@ -426,6 +426,7 @@ describe('staging', () => {
   it('puts back the newest of several', async () => {
     await unrename('an older fake passphrase', 'vault.creating-a', 60)
     await unrename(PASSWORD, 'vault.creating-b')
+    await unrename('another older fake passphrase', 'vault.creating-c', 30)
     const recovered = new Vault(root, { derive: deriveHere, kdf: FAST })
     expect(await recovered.unlock(PASSWORD)).toEqual({ ok: true })
     recovered.lock()
