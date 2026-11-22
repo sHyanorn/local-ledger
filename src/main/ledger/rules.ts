@@ -167,9 +167,7 @@ export function ruleReach(
     rule.id === undefined
       ? rules.findIndex((other) => specificity(rule, other) < 0)
       : rules.findIndex((other) => other.id === rule.id)
-  const earlier = (at === -1 ? rules : rules.slice(0, at)).filter(
-    (other) => other.id !== rule.id,
-  )
+  const earlier = at === -1 ? rules : rules.slice(0, at)
   const rows = db
     .prepare(
       `SELECT description, category_id AS categoryId,

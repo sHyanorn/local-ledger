@@ -187,7 +187,7 @@ export class NewerSchemaError extends Error {
  */
 export function migrate(
   db: Database.Database,
-  list: readonly Migration[] = migrations,
+  list: readonly Migration[],
 ): void {
   const current = db.pragma('user_version', { simple: true }) as number
   if (current > list.length) throw new NewerSchemaError(current)
@@ -199,8 +199,12 @@ export function migrate(
     list.slice(current).forEach((migration, index) => {
       db.transaction(() => {
         migration(db)
-        if (brokenReferences(db) > allowed)
-          throw new Error('a migration left rows that refer to missing ones')
+        const broken = brokenReferences(db)
+        if (broken > allowed) {
+          throw new Error(
+            `migration ${current + index + 1} left ${broken} rows that refer to missing ones, ${allowed} allowed`,
+          )
+        }
         db.pragma(`user_version = ${current + index + 1}`)
       })()
     })

@@ -34,8 +34,8 @@ async function renameOver(from: string, to: string): Promise<void> {
  * bytes go to a temporary file beside it, which is flushed and renamed over
  * it, as the vault's own files are written. The temporary file has a random
  * name and must be new, so nothing already there, a link least of all, is
- * written to. Throws when the file could not be written; nothing of the
- * attempt stays then.
+ * written to. Throws when the file could not be written; its temporary file
+ * is removed if that can be.
  */
 export async function writeOwnerOnly(
   path: string,
@@ -56,6 +56,7 @@ export async function writeOwnerOnly(
     }
     await renameOver(temporary, target)
   } catch (error) {
+    // The write's error is the one to report, not this clean-up's.
     await rm(temporary, { force: true }).catch(() => {})
     throw error
   }

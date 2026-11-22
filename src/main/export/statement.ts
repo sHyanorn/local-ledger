@@ -28,7 +28,7 @@ export interface Statement {
   report: MonthReport
   /** The twelve months to this one, oldest first. */
   months: MonthTotals[]
-  /** Top-level category names by id. */
+  /** Category names by id. */
   names: Map<number, string>
   /** Categories with a budget this month, for the home currency only. */
   budgets: (CategoryBudget & { name: string })[]

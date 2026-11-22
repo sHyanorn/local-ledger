@@ -2,7 +2,7 @@
 // key that seals the data key; the database is encrypted with the data key.
 import { randomFillSync } from 'node:crypto'
 import { open, seal } from './envelope'
-import { DEFAULT_KDF, encodePassword, KEY_BYTES, SALT_BYTES } from './kdf'
+import { encodePassword, KEY_BYTES, SALT_BYTES } from './kdf'
 import type { Derive, KdfParams } from './kdf'
 import { associatedData } from './vault-file'
 import type { VaultFile } from './vault-file'
@@ -18,7 +18,7 @@ export async function createKey(
   password: string,
   generation: number,
   derive: Derive,
-  params: KdfParams = DEFAULT_KDF,
+  params: KdfParams,
 ): Promise<NewKey> {
   const dataKey = randomFillSync(Buffer.alloc(KEY_BYTES))
   try {
@@ -60,7 +60,7 @@ export async function sealDataKey(
   dataKey: Uint8Array,
   generation: number,
   derive: Derive,
-  params: KdfParams = DEFAULT_KDF,
+  params: KdfParams,
 ): Promise<VaultFile> {
   const salt = randomFillSync(Buffer.alloc(SALT_BYTES))
   const header = { generation, kdf: { ...params, salt } }

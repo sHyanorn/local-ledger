@@ -12,7 +12,7 @@ export function setMenu({
   packaged,
 }: {
   lock: () => void
-  /** Sent to the page, which ignores commands while the vault is locked. */
+  /** Sent to the page; app.ts sends none while the vault is locked. */
   command: (name: Command) => void
   openReleases: () => void
   packaged: boolean

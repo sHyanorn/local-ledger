@@ -179,20 +179,14 @@ export class VaultHost {
     prints: Map<number, AbortController>,
   ): void {
     const { services, onChange, onIdle } = this.#options
-    const reply = (
-      id: number,
-      value: Promise<string | Uint8Array | null>,
-      done?: () => void,
-    ) =>
-      value
-        .then(
-          (value) => this.#post(host, { type: 'answer', id, value }),
-          (error: unknown) => {
-            console.error(`vault host request failed: ${errorCode(error)}`)
-            this.#post(host, { type: 'refused', id })
-          },
-        )
-        .finally(done)
+    const reply = (id: number, value: Promise<string | Uint8Array | null>) =>
+      value.then(
+        (value) => this.#post(host, { type: 'answer', id, value }),
+        (error: unknown) => {
+          console.error(`vault host request failed: ${errorCode(error)}`)
+          this.#post(host, { type: 'refused', id })
+        },
+      )
     switch (message.type) {
       case 'ready':
         return void this.#ready.add(host)

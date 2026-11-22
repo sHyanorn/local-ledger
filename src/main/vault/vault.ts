@@ -482,6 +482,7 @@ export class Vault {
     const result = this.#queue
       .then(() => operation(() => this.#locks !== locks))
       .finally(() => this.#pending--)
+    // The caller gets the error through result; the queue only waits.
     this.#queue = result.catch(() => {})
     return result
   }

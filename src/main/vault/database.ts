@@ -80,7 +80,7 @@ export const passesIntegrityCheck = (db: Db): boolean =>
 
 /**
  * Whether every page reads back whole. Indexes are not compared with their
- * tables, so this is less than integrity_check asks and what opening asks.
+ * tables, so this asks less than integrity_check; it is what opening asks.
  */
 export const passesQuickCheck = (db: Db): boolean =>
   db.pragma('quick_check', { simple: true }) === 'ok'
@@ -145,15 +145,26 @@ function migrateKeepingCopy(
   const broken = brokenReferences(db)
   const sound = passesIntegrityCheck(db)
   if (broken > 0 || !sound)
-    console.error('the database was inconsistent before its migration')
+    console.error(
+      `the database was inconsistent before its migration: ${broken} broken references, integrity_check ${sound ? 'passed' : 'failed'}`,
+    )
   const copy = `${file}${BEFORE_MIGRATION}`
   copyFileSync(file, copy)
   syncFile(copy)
   try {
     migrate(db, list)
     const passes = sound ? passesIntegrityCheck(db) : passesQuickCheck(db)
-    if (!passes || brokenReferences(db) > broken)
-      throw new Error('the migrated database failed its checks')
+    if (!passes) {
+      throw new Error(
+        `the migrated database failed its checks: ${sound ? 'integrity_check' : 'quick_check'} failed`,
+      )
+    }
+    const after = brokenReferences(db)
+    if (after > broken) {
+      throw new Error(
+        `the migrated database failed its checks: ${after} broken references, ${broken} before`,
+      )
+    }
   } catch (error) {
     db.close()
     renameSync(copy, file)

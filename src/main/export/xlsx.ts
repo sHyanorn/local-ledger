@@ -9,7 +9,7 @@ import { startsLikeFormula } from './formula'
 /** A cell: text, a date (YYYY-MM-DD), an amount in cents, or empty. */
 type Cell = string | { date: string } | { cents: number } | null
 
-export interface Row {
+interface Row {
   cells: Cell[]
   bold?: boolean
 }
@@ -63,10 +63,10 @@ const xmlSafe = (text: string): string =>
   text.toWellFormed().replace(INVALID, '')
 
 /**
- * Text as XML character data, from xmlSafe text. A carriage return is kept
- * as a reference, since parsers turn a literal one into a line feed; and
- * `_xHHHH_`, which Excel reads as an escaped character, has its underscore
- * escaped the same way.
+ * Text as XML character data; what XML cannot hold is dropped first. A
+ * carriage return is kept as a reference, since parsers turn a literal one
+ * into a line feed; and `_xHHHH_`, which Excel reads as an escaped
+ * character, has its underscore escaped the same way.
  */
 export function xmlText(text: string): string {
   return (
@@ -135,9 +135,15 @@ const SHEET_NAME = /^[^[\]:*?/\\]{1,31}$/
 
 /** The workbook as xlsx bytes. Same sheets, same bytes. */
 export function workbook(sheets: Sheet[]): Uint8Array {
-  if (sheets.length === 0) throw new Error('A workbook needs a sheet')
+  if (sheets.length === 0) {
+    throw new Error('A workbook needs at least one sheet, got none')
+  }
   for (const sheet of sheets) {
-    if (!SHEET_NAME.test(sheet.name)) throw new Error('Invalid sheet name')
+    if (!SHEET_NAME.test(sheet.name)) {
+      throw new Error(
+        `Invalid sheet name: expected 1 to 31 characters without any of [ ] : * ? / \\, got ${sheet.name.length} characters`,
+      )
+    }
   }
   const files: Zippable = {
     '[Content_Types].xml': strToU8(
