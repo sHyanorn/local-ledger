@@ -61,6 +61,12 @@
 - [x] The same `app.asar` from any build path, checked in CI (D038)
 - [x] Docs: what an import fingerprint is (D025); why the database keeps SQLCipher 4's own format (D002)
 
+## 0.3.0 Vault host
+- [x] The vault, its database, imports, exports and backups run in a utility process that ends at every lock (D047)
+- [x] A lock lets the calls under way settle for at most 30 s, then kills the host (D047)
+- [x] A memory test reads every process of the app on Linux, Windows and macOS, unlocked, after a lock and 30 s later, and fails if the main process, or any process after a lock, holds vault data, the password or a key beyond the copies SECURITY_DESIGN lists
+- [x] Docs: what each process holds in memory, and what 0.2.1 left there after a lock
+
 ## Nice to have
 - [ ] Open an exported workbook in Excel and Numbers, which have not been tried (D030); and see the sidebar vibrancy on a real Mac (D037)
 - [ ] Check the bank layouts against real exports, should any become available (D024): every check so far used public, made-up samples
