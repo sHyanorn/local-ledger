@@ -46,8 +46,12 @@ function main() {
     let text
     try {
       text = readFileSync(file, 'utf8')
-    } catch {
-      continue // deleted but not yet staged
+    } catch (error) {
+      // A file deleted but not yet staged is gone; any other failure means a
+      // file went unchecked.
+      if (/** @type {NodeJS.ErrnoException} */ (error).code === 'ENOENT')
+        continue
+      throw error
     }
     if (text.includes('\0')) continue
     for (const line of findSandboxFlags(text)) {
