@@ -206,7 +206,7 @@ ledgerTest(
       )
     expect(staged()).toHaveLength(1)
     const locked = await lockScreen(app)
-    // Gone at the lock itself, before any unlock.
+    // Gone before any unlock; the locked page's new vault host clears it too.
     expect(staged()).toEqual([])
     const again = await unlock(app, locked)
     expect(

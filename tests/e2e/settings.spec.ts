@@ -34,16 +34,14 @@ ledgerTest(
 ledgerTest(
   'changing the home currency says how many budgets now count in it',
   async ({ home }) => {
-    const month = await home.evaluate(async () => {
+    await home.evaluate(async () => {
       const categories = await window.ledger.categories.list()
       const today = new Date()
       const month = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
       const top = categories.filter((category) => category.parentId === null)
       await window.ledger.budgets.set(top[0]!.id, month, 50_000)
       await window.ledger.budgets.set(top[1]!.id, month, 60_000)
-      return month
     })
-    expect(month).toMatch(/^\d{4}-\d{2}$/)
     await sidebar(home).getByRole('button', { name: 'Settings' }).click()
     await home.getByLabel('Home currency').selectOption('CNY')
     const confirm = home.getByRole('alertdialog', {

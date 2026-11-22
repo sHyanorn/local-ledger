@@ -30,6 +30,7 @@ test('the sidebar lists every account with its balance in its own currency', asy
     } else {
       // The yuan symbol differs between ICU builds; the digits do not.
       expect(shown).toContain(formatAmount(cents, 'AUD').replace(/^-?\$/, ''))
+      expect(shown).not.toContain('$')
     }
   }
 })

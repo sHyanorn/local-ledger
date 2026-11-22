@@ -138,14 +138,11 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
   const api = await page.evaluate(() => {
     const ledger = window.ledger as unknown as Record<string, unknown>
     const vault = ledger.vault as Record<string, unknown>
-    try {
-      ledger.version = 'changed'
-      ledger.extra = true
-      delete ledger.version
-      vault.unlock = () => 'replaced'
-    } catch {
-      // Writes to a frozen object throw in strict mode code.
-    }
+    // This function runs outside strict mode, so each write fails silently.
+    ledger.version = 'changed'
+    ledger.extra = true
+    delete ledger.version
+    vault.unlock = () => 'replaced'
     const methods = (name: string) => Object.keys(ledger[name] as object).sort()
     return {
       keys: Object.keys(ledger),

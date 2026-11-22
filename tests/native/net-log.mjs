@@ -12,8 +12,13 @@ export function networkRequests(file) {
   if (!text.endsWith('}')) text = `${text.replace(/,$/, '')}]}`
   /** @type {{ events?: { params?: { url?: unknown } }[] }} */
   const log = JSON.parse(text)
+  if (!Array.isArray(log.events)) {
+    throw new Error(
+      `${file} has no events list; its keys are ${Object.keys(log).join(', ')}`,
+    )
+  }
   const urls = new Set()
-  for (const event of log.events ?? []) {
+  for (const event of log.events) {
     const url = event.params?.url
     if (typeof url === 'string' && /^(https?|wss?|ftp):/i.test(url)) {
       urls.add(url)

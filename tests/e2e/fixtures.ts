@@ -27,11 +27,11 @@ export async function launch(
     // Playwright turns the Chromium sandbox off on Linux unless asked to keep it.
     chromiumSandbox: true,
   })
+  app.once('close', () => closed.add(app))
   // CI machines get no keyboard or mouse input, so their system idle time
   // can be past the auto-lock limit, which would lock the vault mid-test.
   // Once the first page has loaded, and before the first idle check five
   // seconds in, the system reads as busy; the auto-lock test sets its own.
-  app.once('close', () => closed.add(app))
   await (await app.firstWindow()).waitForLoadState('load')
   await app.evaluate(({ powerMonitor }) => {
     powerMonitor.getSystemIdleTime = () => 0
@@ -82,7 +82,9 @@ export async function expectExited(pid: number): Promise<void> {
       try {
         process.kill(pid, 0)
         return 'running'
-      } catch {
+      } catch (error) {
+        // ESRCH is no such process; any other error is not an exit.
+        if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
         return 'exited'
       }
     })
@@ -140,7 +142,7 @@ function stubDialog(
 ) {
   return app.evaluate(
     ({ dialog }, { kind, path }) => {
-      // Each answer records whether the app asked for it; see dialogsAsked.
+      // Each answer records whether the app asked for it; see expectDialogsAsked.
       const stub = { kind, asked: false }
       const shared = globalThis as { dialogStubs?: (typeof stub)[] }
       ;(shared.dialogStubs ??= []).push(stub)
@@ -262,7 +264,8 @@ export const ledgerTest = test.extend<{ ledger: SeedLedger; home: Page }>({
     await provide(await seedVault(userData))
   },
   app: async ({ userData, ledger }, provide) => {
-    if (!ledger) throw new Error('seed first')
+    // Named so that Playwright seeds the vault first.
+    void ledger
     // Heap snapshots keep strings whole, so a residue search sees all of them.
     const app = await launch(userData, [
       '--js-flags=--heap-snapshot-string-limit=1000000000',
