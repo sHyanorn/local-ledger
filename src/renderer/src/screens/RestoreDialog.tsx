@@ -55,7 +55,7 @@ export function RestoreDialog({
   const [working, setWorking] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
 
-  // What the main process holds for this dialog goes when it closes.
+  // What the vault host holds for this dialog goes when it closes.
   useEffect(
     () => () => {
       void window.ledger.restore.discard().catch(() => undefined)

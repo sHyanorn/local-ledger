@@ -42,7 +42,10 @@ interface LedgerStore {
   /** Counts the reloads, so views load their own data again after each. */
   revision: number
   setReloadFailed(failed: boolean): void
-  /** Reloads accounts and categories after a change; never fails. */
+  /**
+   * Reloads accounts, categories, the transfer count, the month's budgets and
+   * settings after a change; never fails.
+   */
   refresh(): Promise<void>
 }
 

@@ -101,8 +101,8 @@ export function Transactions({ accountId }: { accountId: number | null }) {
     void refreshLedger()
   }
 
-  /** After the user sets a category, a rule may be worth offering. */
   const suggestion$ = useRef(0)
+  /** After the user sets a category, a rule may be worth offering. */
   const suggestFor = (id: number) => {
     // Only the answer for the latest change counts.
     const asked = ++suggestion$.current

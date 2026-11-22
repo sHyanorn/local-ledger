@@ -80,8 +80,6 @@ export function Ledger() {
     () =>
       window.ledger.commands.on((command) => {
         const current = useLedger.getState().view
-        const accountId =
-          current.name === 'transactions' ? current.accountId : null
         switch (command) {
           case 'overview':
           case 'budgets':
@@ -94,7 +92,7 @@ export function Ledger() {
           case 'new-transaction':
           case 'find':
             if (current.name !== 'transactions')
-              show({ name: 'transactions', accountId })
+              show({ name: 'transactions', accountId: null })
             return ask(command)
         }
       }),

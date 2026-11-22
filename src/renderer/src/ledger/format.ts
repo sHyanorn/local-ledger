@@ -42,8 +42,8 @@ export function periodRange(
 }
 
 /** The month of a date, as YYYY-MM, by the local calendar. */
-export function monthOf(today = new Date()): string {
-  return isoDate(today).slice(0, 7)
+export function monthOf(): string {
+  return isoDate(new Date()).slice(0, 7)
 }
 
 export { formatMonth, shiftMonth } from '../../../shared/months'
