@@ -139,10 +139,12 @@ test('an archived account leaves the sidebar and the pickers, and every total st
       name: /^Income and spending by month/,
     })
     await expect(months.locator('rect.bar.income')).toHaveCount(12)
+    // The trend loads with a call of its own.
+    const trend = home.getByRole('img', { name: /^Spending on / })
+    await expect(trend.locator('rect.dot')).toHaveCount(12)
     return home.getByRole('main').innerText()
   }
-  const options = (select: Locator) =>
-    select.locator('option').allTextContents()
+  const options = (select: Locator) => select.locator('option')
 
   await expect(totals).not.toBeEmpty()
   const allTotals = await totals.textContent()
@@ -151,7 +153,9 @@ test('an archived account leaves the sidebar and the pickers, and every total st
 
   await accountButton(home, 'Everyday').click()
   await home.getByRole('button', { name: 'Edit Account…' }).click()
-  await home.getByRole('button', { name: 'Archive Account' }).click()
+  await home
+    .getByRole('button', { name: 'Archive Account', exact: true })
+    .click()
   await expect(home.getByRole('dialog', { name: 'Edit Account' })).toBeHidden()
   // The page stays, and the account shows under Archived.
   await expect(home.getByRole('heading', { name: 'Everyday' })).toBeVisible()
@@ -177,7 +181,7 @@ test('an archived account leaves the sidebar and the pickers, and every total st
   await expect(edit.getByLabel('Account').locator('option:checked')).toHaveText(
     'Everyday',
   )
-  expect(await options(edit.getByLabel('Account'))).toEqual([
+  await expect(options(edit.getByLabel('Account'))).toHaveText([
     'Credit Card',
     'Everyday',
     'Savings',
@@ -186,18 +190,21 @@ test('an archived account leaves the sidebar and the pickers, and every total st
   await edit.getByRole('button', { name: 'Cancel' }).click()
   await home.getByRole('button', { name: 'Add Transaction' }).click()
   const add = home.getByRole('dialog', { name: 'New Transaction' })
-  expect(await options(add.getByLabel('Account'))).toEqual([
+  await expect(options(add.getByLabel('Account'))).toHaveText([
     'Credit Card',
     'Savings',
     'Travel Cash',
   ])
+  await expect(add.getByLabel('Account').locator('option:checked')).toHaveText(
+    'Credit Card',
+  )
   await add.getByRole('button', { name: 'Cancel' }).click()
 
   await chooseFile(app, resolve(__dirname, '../fixtures/csv/commbank.csv'))
   await home.getByRole('button', { name: 'Import CSV…' }).click()
   const target = home.getByRole('combobox', { name: /^Account/ })
   await expect(target).toHaveValue('')
-  expect(await options(target)).toEqual([
+  await expect(options(target)).toHaveText([
     'Choose…',
     'Credit Card',
     'Savings',
@@ -222,6 +229,34 @@ test('an archived account leaves the sidebar and the pickers, and every total st
     'Travel Cash',
   ])
   await expect(toggle).toHaveCount(0)
+})
+
+test('with every account archived, nothing can be added or imported', async ({
+  home,
+}) => {
+  await home.evaluate(async () => {
+    for (const account of await window.ledger.accounts.list()) {
+      if (account.name !== 'Everyday') {
+        await window.ledger.accounts.archive(account.id, true)
+      }
+    }
+  })
+  // Archiving the last one from the page reloads the accounts.
+  await accountButton(home, 'Everyday').click()
+  await home.getByRole('button', { name: 'Edit Account…' }).click()
+  await home
+    .getByRole('button', { name: 'Archive Account', exact: true })
+    .click()
+  await expect(
+    sidebar(home).getByRole('list', { name: 'Archived' }).locator('.name'),
+  ).toHaveText(['Credit Card', 'Everyday', 'Savings', 'Travel Cash'])
+  await expect(
+    sidebar(home).getByRole('list', { name: 'Accounts' }).getByRole('listitem'),
+  ).toHaveCount(0)
+  await expect(
+    home.getByRole('button', { name: 'Add Transaction' }),
+  ).toBeDisabled()
+  await expect(home.getByRole('button', { name: 'Import CSV…' })).toBeDisabled()
 })
 
 test('categories nest two levels, and a deleted one takes its subcategories', async ({

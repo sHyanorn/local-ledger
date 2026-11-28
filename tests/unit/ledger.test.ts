@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { statement } from '../../src/main/export/statement'
 import {
   archiveAccount,
   createAccount,
@@ -13,6 +14,7 @@ import {
   listCategories,
   updateCategory,
 } from '../../src/main/ledger/categories'
+import { reportData } from '../../src/main/ledger/reports'
 import {
   createTransaction,
   deleteTransaction,
@@ -21,9 +23,7 @@ import {
   totalTransactions,
   updateTransaction,
 } from '../../src/main/ledger/transactions'
-import { reportData } from '../../src/main/ledger/reports'
 import { possibleTransfers } from '../../src/main/ledger/transfers'
-import { statement } from '../../src/main/export/statement'
 import type { Db } from '../../src/main/vault/database'
 import type {
   AccountFields,

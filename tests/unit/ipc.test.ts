@@ -291,6 +291,8 @@ describe('data channels', () => {
     ['accounts:update', account],
     ['accounts:archive', { id: 1, archived: 1 }],
     ['accounts:archive', { id: 1 }],
+    ['accounts:archive', { id: 0, archived: true }],
+    ['accounts:archive', { id: 1, archived: true, extra: 1 }],
     ['accounts:delete', { id: 0 }],
     ['accounts:delete', { id: '1' }],
     ['categories:create', { name: 'Fake', parentId: -1 }],

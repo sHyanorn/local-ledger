@@ -107,14 +107,16 @@ for (const scheme of ['light', 'dark'] as const) {
       await scan(home, 'account, pointer on a transaction')
       await home.getByRole('button', { name: 'Edit Account…' }).click()
       await scan(home, 'edit account')
-      await home.getByRole('button', { name: 'Archive Account' }).click()
+      await home
+        .getByRole('button', { name: 'Archive Account', exact: true })
+        .click()
       await expect(
         nav.getByRole('list', { name: 'Archived' }).getByRole('button'),
       ).toHaveCount(1)
       await scan(home, 'archived accounts')
       await home.getByRole('button', { name: 'Edit Account…' }).click()
       await home.getByRole('button', { name: 'Unarchive Account' }).click()
-      await expect(nav.getByRole('list', { name: 'Archived' })).toHaveCount(0)
+      await expect(nav.getByRole('button', { name: 'Archived' })).toHaveCount(0)
 
       for (const view of ['Overview', 'Budgets', 'Reports', 'Transfers']) {
         await nav.getByRole('button', { name: view }).first().click()
