@@ -19,7 +19,8 @@ export function Sidebar() {
   const viewingArchived =
     view.name === 'transactions' &&
     archived.some((account) => account.id === view.accountId)
-  // An account archived from its own page stays in view.
+  // The group opens whenever an archived account's page is shown, so one
+  // archived from its own page stays in view.
   const [wasViewingArchived, setWasViewingArchived] = useState(false)
   if (viewingArchived !== wasViewingArchived) {
     setWasViewingArchived(viewingArchived)

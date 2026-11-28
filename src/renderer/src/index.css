@@ -237,7 +237,6 @@ textarea:focus {
   content: '';
   border-block: 4px solid transparent;
   border-inline-start: 5px solid currentColor;
-  transition: transform var(--motion) ease-out;
 }
 
 .sidebar-toggle[aria-expanded='true']::after {

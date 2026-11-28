@@ -35,7 +35,7 @@ export function Transactions({ accountId }: { accountId: number | null }) {
   const notice = useLedger((store) => store.notice)
   const setNotice = useLedger((store) => store.setNotice)
   const account = accounts.find((candidate) => candidate.id === accountId)
-  // Transactions are added and imported only into accounts not archived.
+  // Transactions are added and imported only into unarchived accounts.
   const hasActive = accounts.some((candidate) => !candidate.archived)
   const [search, setSearch] = useState('')
   const [text, setText] = useState('')
