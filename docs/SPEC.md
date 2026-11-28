@@ -77,7 +77,7 @@ Encryption scheme:
 ## 5. Data model
 
 ```
-accounts(id, name, type, currency, opening_balance_cents, created_at)
+accounts(id, name, type, currency, opening_balance_cents, archived, created_at)
 transactions(id, account_id, date, amount_cents, description, category_id,
              import_batch_id, hash, notes, edited, created_at)
 categories(id, name, parent_id, color, icon)
@@ -92,7 +92,7 @@ settings(key, value)
 report_transactions: transactions minus both sides of confirmed transfers
 ```
 
-All amounts are stored as integers (cents). An imported transaction's `hash` is its fingerprint (D025); `edited` marks a change by the user. Rules match by "contains", "starts with" or "is" (D026). Transfers are pairs of transactions (D027). `import_skips` names the transactions an import left out because an earlier import had brought them in (D042). Preferences are rows of `settings`, read with defaults for missing keys (D032). `categories.color`, `categories.icon` and `import_batches.row_count` are in the schema but unused: an import writes `row_count`, and nothing reads any of them.
+All amounts are stored as integers (cents). An imported transaction's `hash` is its fingerprint (D025); `edited` marks a change by the user. An archived account leaves the sidebar's list of accounts and the account pickers, except for a transaction already in it; its transactions still count everywhere (D048). Rules match by "contains", "starts with" or "is" (D026). Transfers are pairs of transactions (D027). `import_skips` names the transactions an import left out because an earlier import had brought them in (D042). Preferences are rows of `settings`, read with defaults for missing keys (D032). `categories.color`, `categories.icon` and `import_batches.row_count` are in the schema but unused: an import writes `row_count`, and nothing reads any of them.
 
 ## 6. Interface
 
