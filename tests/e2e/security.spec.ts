@@ -193,7 +193,7 @@ test('preload exposes only the ledger API, read-only', async ({ page }) => {
       'takeNotice',
       'unlock',
     ],
-    accounts: ['create', 'delete', 'list', 'update'],
+    accounts: ['archive', 'create', 'delete', 'list', 'update'],
     categories: ['create', 'delete', 'list', 'update'],
     transactions: [
       'create',
