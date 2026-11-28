@@ -32,6 +32,7 @@ export interface Account extends AccountFields {
   /** The opening balance plus every transaction. */
   balanceCents: number
   transactionCount: number
+  archived: boolean
 }
 
 export interface Category extends CategoryFields {

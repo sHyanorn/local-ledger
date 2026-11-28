@@ -4,6 +4,7 @@ import type { Handle } from '../dispatch'
 import type { Settings } from '../../shared/settings'
 import type { Vault } from '../vault/vault'
 import {
+  archiveAccount,
   createAccount,
   deleteAccount,
   listAccounts,
@@ -55,6 +56,9 @@ export function handleLedger(
   handle('accounts:list', () => listAccounts(db()))
   handle('accounts:create', (fields) => createAccount(db(), fields))
   handle('accounts:update', (fields) => updateAccount(db(), fields))
+  handle('accounts:archive', ({ id, archived }) =>
+    archiveAccount(db(), id, archived),
+  )
   handle('accounts:delete', ({ id }) => deleteAccount(db(), id))
   handle('categories:list', () => listCategories(db()))
   handle('categories:create', (fields) => createCategory(db(), fields))

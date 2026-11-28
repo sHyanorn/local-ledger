@@ -117,6 +117,7 @@ const ruleFields = z.strictObject({
 export const schemas = {
   id: z.strictObject({ id }),
   accountUpdate: accountFields.extend({ id }),
+  accountArchive: z.strictObject({ id, archived: z.boolean() }),
   categoryUpdate: categoryFields.extend({ id }),
   transactionUpdate: transactionFields.extend({ id }),
   transactionCategory: z.strictObject({ id, categoryId: id.nullable() }),

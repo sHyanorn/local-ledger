@@ -82,6 +82,7 @@ const api: LedgerApi = {
     list: () => invoke('accounts:list', undefined),
     create: (fields) => invoke('accounts:create', fields),
     update: (fields) => invoke('accounts:update', fields),
+    archive: (id, archived) => invoke('accounts:archive', { id, archived }),
     delete: (id) => invoke('accounts:delete', { id }),
   },
   categories: {

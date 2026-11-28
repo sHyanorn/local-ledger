@@ -173,7 +173,8 @@ export class ImportSession {
     )
     const known = db
       .prepare<number[], { id: number }>(
-        `SELECT id FROM accounts WHERE id IN (${accountIds.map(() => '?').join(',') || 'NULL'})`,
+        `SELECT id FROM accounts
+         WHERE archived = 0 AND id IN (${accountIds.map(() => '?').join(',') || 'NULL'})`,
       )
       .all(...accountIds)
     if (known.length !== accountIds.length) {

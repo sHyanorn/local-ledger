@@ -138,6 +138,9 @@ describe('migrating from each earlier schema version', () => {
             rows.map((row) => expect.objectContaining(row)),
           )
         }
+        expect(
+          db.prepare('SELECT archived FROM accounts').pluck().all(),
+        ).toEqual([0, 0])
         expect(db.pragma('foreign_key_check')).toEqual([])
         expect(db.pragma('integrity_check', { simple: true })).toBe('ok')
         expect(db.pragma('foreign_keys', { simple: true })).toBe(1)

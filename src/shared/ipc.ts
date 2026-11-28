@@ -57,6 +57,7 @@ export const channels = {
   'accounts:list': z.undefined(),
   'accounts:create': accountFields,
   'accounts:update': schemas.accountUpdate,
+  'accounts:archive': schemas.accountArchive,
   'accounts:delete': schemas.id,
   'categories:list': z.undefined(),
   'categories:create': categoryFields,
@@ -149,6 +150,7 @@ export interface Results {
   'accounts:list': Account[]
   'accounts:create': Created<'duplicate'>
   'accounts:update': Outcome<'duplicate' | 'not-found' | 'currency-in-use'>
+  'accounts:archive': Outcome<'not-found'>
   'accounts:delete': Outcome<'in-use' | 'not-found'>
   'categories:list': Category[]
   'categories:create': Created<'duplicate' | 'not-found' | 'too-deep'>

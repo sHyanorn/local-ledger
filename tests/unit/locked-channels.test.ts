@@ -70,6 +70,7 @@ const payloads: { [C in Refusing]: Payload<C> } = {
   'accounts:list': undefined,
   'accounts:create': account,
   'accounts:update': { ...account, id: 1 },
+  'accounts:archive': { id: 1, archived: true },
   'accounts:delete': { id: 1 },
   'categories:list': undefined,
   'categories:create': { name: 'Fake', parentId: null },

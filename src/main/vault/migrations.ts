@@ -168,6 +168,14 @@ export const migrations: readonly Migration[] = [
       ) STRICT;
       CREATE INDEX import_skips_transaction ON import_skips (transaction_id);
     `),
+
+  // 9: an archived account leaves the sidebar and the account pickers;
+  // its transactions stay in every list, total and report.
+  (db) =>
+    db.exec(`
+      ALTER TABLE accounts
+        ADD COLUMN archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1));
+    `),
 ]
 
 export class NewerSchemaError extends Error {

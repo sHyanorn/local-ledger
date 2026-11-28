@@ -289,6 +289,8 @@ describe('data channels', () => {
     ['accounts:create', { ...account, openingBalanceCents: 0.5 }],
     ['accounts:create', { ...account, openingBalanceCents: 1e14 }],
     ['accounts:update', account],
+    ['accounts:archive', { id: 1, archived: 1 }],
+    ['accounts:archive', { id: 1 }],
     ['accounts:delete', { id: 0 }],
     ['accounts:delete', { id: '1' }],
     ['categories:create', { name: 'Fake', parentId: -1 }],

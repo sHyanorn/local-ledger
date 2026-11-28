@@ -40,6 +40,7 @@ export interface LedgerApi {
     list(): Promise<Results['accounts:list']>
     create(fields: AccountFields): Promise<Results['accounts:create']>
     update(fields: Updated<AccountFields>): Promise<Results['accounts:update']>
+    archive(id: number, archived: boolean): Promise<Results['accounts:archive']>
     delete(id: number): Promise<Results['accounts:delete']>
   }
   readonly categories: {

@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
+  archiveAccount,
   createAccount,
   deleteAccount,
   listAccounts,
   updateAccount,
 } from '../../src/main/ledger/accounts'
+import { monthBudgets, setBudget } from '../../src/main/ledger/budgets'
 import {
   createCategory,
   deleteCategory,
@@ -19,6 +21,9 @@ import {
   totalTransactions,
   updateTransaction,
 } from '../../src/main/ledger/transactions'
+import { reportData } from '../../src/main/ledger/reports'
+import { possibleTransfers } from '../../src/main/ledger/transfers'
+import { statement } from '../../src/main/export/statement'
 import type { Db } from '../../src/main/vault/database'
 import type {
   AccountFields,
@@ -142,6 +147,55 @@ describe('accounts', () => {
     expect(deleteAccount(db, empty)).toEqual({ ok: true })
     expect(deleteAccount(db, empty)).toEqual({ ok: false, reason: 'not-found' })
     expect(listAccounts(db).map((a) => a.id)).toEqual([used])
+  })
+
+  it('archive and come back, keeping their name and the rule for deleting', () => {
+    const id = account()
+    transaction({ accountId: id })
+    const archived = () => listAccounts(db).map((a) => a.archived)
+    expect(archived()).toEqual([false])
+    expect(archiveAccount(db, id, true)).toEqual({ ok: true })
+    expect(archived()).toEqual([true])
+    expect(
+      createAccount(db, {
+        name: 'Fake Everyday',
+        type: 'bank',
+        currency: 'AUD',
+        openingBalanceCents: 0,
+      }),
+    ).toEqual({ ok: false, reason: 'duplicate' })
+    expect(deleteAccount(db, id)).toEqual({ ok: false, reason: 'in-use' })
+    expect(archiveAccount(db, id, false)).toEqual({ ok: true })
+    expect(archived()).toEqual([false])
+    expect(archiveAccount(db, 99, true)).toEqual({
+      ok: false,
+      reason: 'not-found',
+    })
+  })
+
+  it('that are archived still count in every list, total, report and export', () => {
+    const everyday = account({ openingBalanceCents: 50000 })
+    const savings = account({ name: 'Fake Savings', type: 'savings' })
+    const food = category('Fake Food')
+    setBudget(db, { categoryId: food, month: '2026-01', amountCents: 10000 })
+    transaction({ accountId: everyday, amountCents: -1250, categoryId: food })
+    transaction({ accountId: everyday, amountCents: 300000 })
+    transaction({ accountId: everyday, amountCents: -20000 })
+    transaction({ accountId: savings, amountCents: 20000, date: '2026-01-16' })
+    const everything = () => ({
+      balances: listAccounts(db).map((a) => a.balanceCents),
+      page: pageTransactions(db, { filter: {}, limit: 100 }),
+      totals: totalTransactions(db, {}),
+      report: reportData(db, '2026-01', 'AUD'),
+      budgets: monthBudgets(db, '2026-01'),
+      statement: statement(db, '2026-01', 'AUD'),
+      transfers: possibleTransfers(db),
+    })
+    const before = everything()
+    expect(before.page.rows).toHaveLength(4)
+    expect(before.transfers).toHaveLength(1)
+    archiveAccount(db, everyday, true)
+    expect(everything()).toEqual(before)
   })
 })
 

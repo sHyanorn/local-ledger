@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { listBatches, undoBatch } from '../../src/main/import/batches'
 import { classify, fingerprints, similarity } from '../../src/main/import/dedup'
 import { ImportSession } from '../../src/main/import/session'
-import { createAccount } from '../../src/main/ledger/accounts'
+import { archiveAccount, createAccount } from '../../src/main/ledger/accounts'
 import {
   createTransaction,
   setTransactionCategory,
@@ -524,6 +524,22 @@ describe('ImportSession', () => {
       ok: false,
       reason: 'not-found',
     })
+  })
+
+  it('refuses an archived account, in the preview and at the commit', () => {
+    const everyday = account()
+    const session = new ImportSession()
+    const file = opened(session, sample('anz.csv'))
+    const selected = everything(session, file, everyday)
+    archiveAccount(db, everyday, true)
+    expect(
+      session.commit(db, { ...request(file, everyday), selected }),
+    ).toEqual({ ok: false, reason: 'not-found' })
+    expect(session.preview(db, request(file, everyday))).toEqual({
+      ok: false,
+      reason: 'not-found',
+    })
+    expect(rows()).toHaveLength(0)
   })
 
   it('reports a file it cannot read, and zeroes its bytes', () => {

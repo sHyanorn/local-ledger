@@ -4,17 +4,18 @@ import type { Db } from '../vault/database'
 import { found, orDuplicate } from './errors'
 
 export function listAccounts(db: Db): Account[] {
-  return db
+  const rows = db
     .prepare(
       `SELECT a.id, a.name, a.type, a.currency,
          a.opening_balance_cents AS openingBalanceCents,
          a.opening_balance_cents + ifnull(sum(t.amount_cents), 0) AS balanceCents,
-         count(t.id) AS transactionCount
+         count(t.id) AS transactionCount, a.archived
        FROM accounts a LEFT JOIN transactions t ON t.account_id = a.id
        GROUP BY a.id
        ORDER BY a.name COLLATE NOCASE`,
     )
-    .all() as Account[]
+    .all() as (Omit<Account, 'archived'> & { archived: 0 | 1 })[]
+  return rows.map((row) => ({ ...row, archived: row.archived === 1 }))
 }
 
 export function createAccount(
@@ -61,6 +62,18 @@ export function updateAccount(
       return { ok: true }
     })
   })()
+}
+
+/** An archived account keeps its transactions; it can still be edited or deleted. */
+export function archiveAccount(
+  db: Db,
+  id: number,
+  archived: boolean,
+): Outcome<'not-found'> {
+  const { changes } = db
+    .prepare('UPDATE accounts SET archived = ? WHERE id = ?')
+    .run(archived ? 1 : 0, id)
+  return found(changes)
 }
 
 /** Only an account without transactions can be deleted. */
