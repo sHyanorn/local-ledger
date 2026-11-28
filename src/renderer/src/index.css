@@ -224,6 +224,26 @@ textarea:focus {
   font-size: 11px;
 }
 
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.sidebar-toggle::after {
+  content: '';
+  border-block: 4px solid transparent;
+  border-inline-start: 5px solid currentColor;
+  transition: transform var(--motion) ease-out;
+}
+
+.sidebar-toggle[aria-expanded='true']::after {
+  transform: rotate(90deg);
+}
+
 .sidebar-item {
   transition: background-color var(--motion) ease-out;
   display: flex;

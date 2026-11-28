@@ -79,6 +79,24 @@ export function AccountDialog({
     }
   }
 
+  const archive = async () => {
+    if (!account) return
+    setBusy(true)
+    try {
+      const result = await window.ledger.accounts.archive(
+        account.id,
+        !account.archived,
+      )
+      if (!result.ok) return setProblem(PROBLEMS[result.reason])
+      await refresh()
+      onClose()
+    } catch {
+      setProblem(PROBLEMS.failed)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const remove = async () => {
     if (!account) return
     try {
@@ -160,8 +178,16 @@ export function AccountDialog({
           />
         </label>
         <ErrorText message={problem} />
-        <div className="actions">
-          {account && (
+        {account && (
+          <div className="actions start">
+            <button
+              type="button"
+              className="secondary"
+              disabled={busy}
+              onClick={() => void archive()}
+            >
+              {account.archived ? 'Unarchive Account' : 'Archive Account'}
+            </button>
             <button
               type="button"
               className="secondary destructive"
@@ -169,8 +195,9 @@ export function AccountDialog({
             >
               Delete Account…
             </button>
-          )}
-          <span className="spacer" />
+          </div>
+        )}
+        <div className="actions">
           <button type="button" className="secondary" onClick={onClose}>
             Cancel
           </button>

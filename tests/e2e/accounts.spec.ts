@@ -1,6 +1,7 @@
-import type { Page } from '@playwright/test'
+import { resolve } from 'node:path'
+import type { Locator, Page } from '@playwright/test'
 import { formatAmount } from '../../src/shared/money'
-import { expect, ledgerTest as test, sidebar } from './fixtures'
+import { chooseFile, expect, ledgerTest as test, sidebar } from './fixtures'
 
 const accountButton = (page: Page, name: string) =>
   sidebar(page).getByRole('button', { name: new RegExp(`^${name}`) })
@@ -121,6 +122,106 @@ test('an account that gained transactions since the page loaded is not deleted',
   )
   await edit.getByRole('button', { name: 'Cancel' }).click()
   await expect(accountButton(home, 'Fake Wallet')).toBeVisible()
+})
+
+test('an archived account leaves the sidebar and the pickers, and every total stays', async ({
+  app,
+  home,
+}) => {
+  const nav = sidebar(home)
+  const accounts = nav.getByRole('list', { name: 'Accounts' })
+  const archived = nav.getByRole('list', { name: 'Archived' })
+  const toggle = nav.getByRole('button', { name: 'Archived' })
+  const totals = home.locator('.totals')
+  const reports = async () => {
+    await nav.getByRole('button', { name: 'Reports' }).click()
+    const months = home.getByRole('img', {
+      name: /^Income and spending by month/,
+    })
+    await expect(months.locator('rect.bar.income')).toHaveCount(12)
+    return home.getByRole('main').innerText()
+  }
+  const options = (select: Locator) =>
+    select.locator('option').allTextContents()
+
+  await expect(totals).not.toBeEmpty()
+  const allTotals = await totals.textContent()
+  const report = await reports()
+  await expect(toggle).toHaveCount(0)
+
+  await accountButton(home, 'Everyday').click()
+  await home.getByRole('button', { name: 'Edit Account…' }).click()
+  await home.getByRole('button', { name: 'Archive Account' }).click()
+  await expect(home.getByRole('dialog', { name: 'Edit Account' })).toBeHidden()
+  // The page stays, and the account shows under Archived.
+  await expect(home.getByRole('heading', { name: 'Everyday' })).toBeVisible()
+  await expect(accounts.locator('.name')).toHaveText([
+    'Credit Card',
+    'Savings',
+    'Travel Cash',
+  ])
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(archived.locator('.name')).toHaveText(['Everyday'])
+  await expect(accountButton(home, 'Everyday')).toHaveAttribute(
+    'aria-current',
+    'page',
+  )
+
+  // A transaction already in it keeps it; a new one cannot go in.
+  await home
+    .getByRole('table', { name: 'Transactions' })
+    .getByRole('row')
+    .nth(1)
+    .dblclick()
+  const edit = home.getByRole('dialog', { name: 'Edit Transaction' })
+  await expect(edit.getByLabel('Account').locator('option:checked')).toHaveText(
+    'Everyday',
+  )
+  expect(await options(edit.getByLabel('Account'))).toEqual([
+    'Credit Card',
+    'Everyday',
+    'Savings',
+    'Travel Cash',
+  ])
+  await edit.getByRole('button', { name: 'Cancel' }).click()
+  await home.getByRole('button', { name: 'Add Transaction' }).click()
+  const add = home.getByRole('dialog', { name: 'New Transaction' })
+  expect(await options(add.getByLabel('Account'))).toEqual([
+    'Credit Card',
+    'Savings',
+    'Travel Cash',
+  ])
+  await add.getByRole('button', { name: 'Cancel' }).click()
+
+  await chooseFile(app, resolve(__dirname, '../fixtures/csv/commbank.csv'))
+  await home.getByRole('button', { name: 'Import CSV…' }).click()
+  const target = home.getByRole('combobox', { name: /^Account/ })
+  await expect(target).toHaveValue('')
+  expect(await options(target)).toEqual([
+    'Choose…',
+    'Credit Card',
+    'Savings',
+    'Travel Cash',
+  ])
+  await home.getByRole('button', { name: 'Cancel' }).click()
+
+  await toggle.click()
+  await expect(archived).toHaveCount(0)
+  await nav.getByRole('button', { name: 'All Transactions' }).click()
+  await expect(totals).toHaveText(allTotals ?? '')
+  expect(await reports()).toBe(report)
+
+  await toggle.click()
+  await accountButton(home, 'Everyday').click()
+  await home.getByRole('button', { name: 'Edit Account…' }).click()
+  await home.getByRole('button', { name: 'Unarchive Account' }).click()
+  await expect(accounts.locator('.name')).toHaveText([
+    'Credit Card',
+    'Everyday',
+    'Savings',
+    'Travel Cash',
+  ])
+  await expect(toggle).toHaveCount(0)
 })
 
 test('categories nest two levels, and a deleted one takes its subcategories', async ({

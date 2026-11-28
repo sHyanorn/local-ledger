@@ -33,8 +33,15 @@ export function TransactionDialog({
   onClose: () => void
 }) {
   const accounts = useLedger((store) => store.accounts)
+  // An archived account takes no new transactions; those it has keep it.
+  const options = accounts.filter(
+    (option) => !option.archived || option.id === transaction?.accountId,
+  )
   const [account, setAccount] = useState(
-    transaction?.accountId ?? accountId ?? accounts[0]?.id ?? 0,
+    transaction?.accountId ??
+      options.find((option) => option.id === accountId)?.id ??
+      options[0]?.id ??
+      0,
   )
   const [date, setDate] = useState(
     () => transaction?.date ?? isoDate(new Date()),
@@ -154,7 +161,7 @@ export function TransactionDialog({
               value={account}
               onChange={(event) => setAccount(Number(event.target.value))}
             >
-              {accounts.map((option) => (
+              {options.map((option) => (
                 <option key={option.id} value={option.id}>
                   {option.name}
                 </option>

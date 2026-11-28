@@ -35,6 +35,8 @@ export function Transactions({ accountId }: { accountId: number | null }) {
   const notice = useLedger((store) => store.notice)
   const setNotice = useLedger((store) => store.setNotice)
   const account = accounts.find((candidate) => candidate.id === accountId)
+  // Transactions are added and imported only into accounts not archived.
+  const hasActive = accounts.some((candidate) => !candidate.archived)
   const [search, setSearch] = useState('')
   const [text, setText] = useState('')
   const [category, setCategory] = useState('')
@@ -51,7 +53,7 @@ export function Transactions({ accountId }: { accountId: number | null }) {
       if (command === 'find') {
         searchField.current?.focus()
         searchField.current?.select()
-      } else if (store.accounts.length > 0) {
+      } else if (store.accounts.some((candidate) => !candidate.archived)) {
         setEditing({})
       }
     }
@@ -160,14 +162,14 @@ export function Transactions({ accountId }: { accountId: number | null }) {
           <button
             type="button"
             className="secondary"
-            disabled={accounts.length === 0}
+            disabled={!hasActive}
             onClick={() => void startImport()}
           >
             Import CSV…
           </button>
           <button
             type="button"
-            disabled={accounts.length === 0}
+            disabled={!hasActive}
             onClick={() => setEditing({})}
           >
             Add Transaction

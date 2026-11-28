@@ -53,10 +53,19 @@ export function ImportView({
   const [editingColumns, setEditingColumns] = useState(
     file.mapping === null || file.dateOrders.length > 1,
   )
+  // The page's account is the target, unless it is archived.
   const [targets, setTargets] = useState<ImportTarget[]>(() =>
     file.groups
       ? file.groups.map((group) => ({ key: group.key, accountId: null }))
-      : [{ key: '', accountId }],
+      : [
+          {
+            key: '',
+            accountId:
+              accounts.find(
+                (account) => account.id === accountId && !account.archived,
+              )?.id ?? null,
+          },
+        ],
   )
   // The preview shown, and the settings it was made with.
   const [answer, setAnswer] = useState<{
@@ -350,11 +359,13 @@ function AccountSelect({
       {(skippable || value === null) && (
         <option value="">{skippable ? 'Skip' : 'Choose…'}</option>
       )}
-      {accounts.map((account) => (
-        <option key={account.id} value={account.id}>
-          {account.name}
-        </option>
-      ))}
+      {accounts
+        .filter((account) => !account.archived)
+        .map((account) => (
+          <option key={account.id} value={account.id}>
+            {account.name}
+          </option>
+        ))}
     </select>
   )
 }
