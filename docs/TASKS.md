@@ -70,5 +70,5 @@
 ## Nice to have
 - [ ] Open an exported workbook in Excel and Numbers, which have not been tried (D030); and see the sidebar vibrancy on a real Mac (D037)
 - [ ] Check the bank layouts against real exports, should any become available (D024): every check so far used public, made-up samples
-- [ ] Archive an account: hide it from lists while keeping its transactions
+- [x] Archive an account: hide it from lists while keeping its transactions (D048)
 - [ ] Recovery key: a random key, shown once at setup, that also seals the data key (D013 leaves room for it)
